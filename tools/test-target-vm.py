@@ -119,13 +119,13 @@ def main():
         expected = ['TELEMETRY_VALUES_DONE', 'string \"com.tesla.Debug\"']
         print(output[output.find('WELCOME_FIRMWARE_BUS_NAMES_BEGIN'):])
         for name in ['NAV_vehicleLatitude', 'NAV_vehicleLongitude', 'NAV_vehicleSpeedMph',
-                     'VAPI_vehicleSpeed', 'VAPI_driverDoor', 'VAPI_driverDoorAlert',
+                     'VAPI_vehicleSpeed', 'VAPI_batteryLevel', 'VAPI_driverDoor', 'VAPI_driverDoorAlert',
                      'VAPI_doorState', 'DOOR_frontDriverDoor']:
             block = output.split('TELEMETRY_READ_BEGIN ' + name + '\n')[-1].split('TELEMETRY_READ_END')[0]
             if 'boolean true' not in block:
                 raise SystemExit('Native DataValue missing: ' + name)
         for name, value in [('NAV_vehicleLatitude', '52.512345'), ('NAV_vehicleLongitude', '13.412345'),
-                            ('NAV_vehicleSpeedMph', '10'), ('VAPI_driverDoor', 'true'),
+                            ('NAV_vehicleSpeedMph', '10'), ('VAPI_batteryLevel', '73.5'), ('VAPI_driverDoor', 'true'),
                             ('VAPI_driverDoor', 'false')]:
             block = output.split('TELEMETRY_SYNTHETIC_BEGIN ' + name + ' ' + value + '\n')[-1].split('TELEMETRY_SYNTHETIC_END')[0]
             observed = re.findall(r'string "([^"\n]*)"', block)

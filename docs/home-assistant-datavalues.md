@@ -13,6 +13,7 @@ Es wurde keine Verbindung zu einem Auto hergestellt.
 | `longitude_dv` | `NAV_vehicleLongitude` | Numerischer NavServer-Wert, Name und Datenfluss passen zum Längengrad. Dezimalgrad ist die naheliegende Interpretation, noch kein Live-Abgleich. |
 | `speed_dv` | `NAV_vehicleSpeedMph` | Numerischer NavServer-Wert mit expliziter mph-Bezeichnung. |
 | `speed_unit` | `mph` | Das Plugin rechnet damit in km/h um. Nicht beim bisherigen Standard `km/h` belassen. |
+| `soc_dv` | `VAPI_batteryLevel` | Numerischer Firmware-Kandidat für Akkuladestand in Prozent; in QEMU auf Existenz und Format geprüft, Live-Abgleich fehlt. |
 | `door_dv` | `VAPI_driverDoor` | Boolescher Wert; im Fahrzeug-Code aus der vorderen Fahrertür abgeleitet. `true` als offen ist aus dem Code abgeleitet, noch nicht physisch geprüft. |
 
 Die Einstellungen bleiben im Paket zunächst leer, bis die Zuordnung am Zielauto

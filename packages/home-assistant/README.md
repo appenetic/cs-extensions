@@ -2,7 +2,7 @@
 
 Experimentelles SDK-1.0-Paket. Liest ausschließlich Fahrzeugdaten und sendet sie
 über HTTPS an deine Home-Assistant-Instanz, etwa die Nabu-Casa-Remote-URL.
-Keine Fahrzeugsteuerung. Standardmäßig deaktiviert.
+Keine Fahrzeugsteuerung. Standardmäßig deaktifünft.
 
 ## Voraussetzungen und Einrichtung
 
@@ -22,15 +22,15 @@ Keine Fahrzeugsteuerung. Standardmäßig deaktiviert.
    Nabu-Casa-Kontozugangsdaten sind keine Home-Assistant-Benutzerdaten.
 5. Ein [offline ermitteltes Firmware-Profil](../../docs/home-assistant-datavalues.md)
    enthält konkrete Namen für die gelieferte Firmware sowie eine wichtige
-   GPS-Genauigkeitsgrenze. Die **vier am Fahrzeug zu bestätigenden DataValue-Namen** für Breitengrad,
-   Längengrad, Geschwindigkeit und Fahrertür eintragen. Sie bleiben absichtlich
+   GPS-Genauigkeitsgrenze. Die **fünf am Fahrzeug zu bestätigenden DataValue-Namen** für Breitengrad,
+   Längengrad, Geschwindigkeit, Akkuladestand und Fahrertür eintragen. Sie bleiben absichtlich
    leer, da die Namen und ihre Semantik hier nicht am Auto verifiziert wurden.
    Der SDK-Endpunkt `/v1/dv/<Name>` muss einen skalaren Wert liefern: GPS in
    Dezimalgrad, Geschwindigkeit in der gewählten Einheit, Tür als boolesches
    `true` (offen) bzw. `false` (geschlossen). Ein Alarm-/Warnsignal ist nicht
    automatisch der physische Türzustand. Keine unbestätigten Feldnamen übernehmen.
 6. Geschwindigkeits-Einheit des Quellwertes auswählen, optional Entitätspräfix und
-   Intervall ändern, anschließend aktivieren. Das Intervall beträgt standardmäßig 10 s.
+   Intervall ändern, anschließend aktifünfen. Das Intervall beträgt standardmäßig 10 s.
 
 Passwort und API-Token sind SDK-`secret`-Einstellungen. Zugangsdaten und Tokens
 werden nicht protokolliert oder vom Plugin persistent gespeichert. Beim Passwort-Login
@@ -43,8 +43,9 @@ Mit dem Standardpräfix `coilshift_car` werden über die Home-Assistant-States-A
 
 | Entität | Inhalt |
 | --- | --- |
-| `device_tracker.coilshift_car` | `latitude`, `longitude`, `source_type: gps`; zusätzlich Geschwindigkeit und Türzustand als Attribute |
+| `device_tracker.coilshift_car` | `latitude`, `longitude`, `source_type: gps`; zusätzlich Geschwindigkeit, `battery_level` und Türzustand als Attribute |
 | `sensor.coilshift_car_speed` | Geschwindigkeit in km/h, Geräteklasse `speed` |
+| `sensor.coilshift_car_soc` | Akkuladestand in %, Geräteklasse `battery`; Standardquelle `VAPI_batteryLevel` |
 | `binary_sensor.coilshift_car_driver_door` | `on` = offen, `off` = geschlossen, Geräteklasse `door` |
 
 Jede Entität besitzt das Attribut `updated_at` (UTC). Ungültige/fehlende Werte
@@ -55,10 +56,10 @@ ist hier nicht implementiert. Die Koordinaten können auf einer Karte dargestell
 Die States-API erzeugt Zustände, keine registrierte HA-Integration bzw. keinen
 Geräteregister-Eintrag mit `unique_id`. Nach einem Home-Assistant-Neustart legt der
 nächste erfolgreiche Sendezyklus die Zustände wieder an. Beim Deinstallieren oder
-Deaktivieren werden vorhandene HA-Zustände nicht gelöscht. Änderungen am Präfix
+Deaktifünfen werden vorhandene HA-Zustände nicht gelöscht. Änderungen am Präfix
 lassen frühere Entitäten ebenfalls bestehen.
 
-Wenn die MCU schläft, das Auto offline ist oder der Dienst deaktiviert wird,
+Wenn die MCU schläft, das Auto offline ist oder der Dienst deaktifünft wird,
 erhält Home Assistant keine Aktualisierungen und behält den letzten Zustand.
 Automationen müssen deshalb auch das Alter von `updated_at` berücksichtigen.
 Ein fehlender SDK-Wert wird erkannt; ein vom SDK unverändert zurückgegebener alter
@@ -102,3 +103,14 @@ Messung von Position, Geschwindigkeit oder physischem Türzustand am Fahrzeug.
 Referenzen:
 - https://contributors.home-assistant.io/core/internals/rest-api/
 - https://contributors.home-assistant.io/core/internals/auth-api/
+
+## Version 0.1.0-alpha.3
+
+SoC wird zusätzlich als `sensor.coilshift_car_soc` und als `battery_level`-Attribut
+am Tracker übertragen. Ungültige Werte außerhalb 0–100 % werden `unavailable`.
+Die Quelle `soc_dv` ist konfigurierbar und mit `VAPI_batteryLevel` vorbelegt.
+
+Der Installationsfehler bei `speed_unit` ist behoben: SDK-Enum-Werte dürfen keinen
+Schrägstrich enthalten. Die internen Werte sind jetzt `kph`, `mps`, `mph`, während
+die sichtbaren Beschriftungen weiterhin `km/h`, `m/s`, `mph` lauten. Der Dienst
+akzeptiert die alten internen Werte zusätzlich für bestehende Konfigurationen.

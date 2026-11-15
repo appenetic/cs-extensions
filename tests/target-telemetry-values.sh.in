@@ -32,13 +32,13 @@ done
 echo WELCOME_FIRMWARE_BUS_NAMES_BEGIN
 cat /tmp/names
 echo WELCOME_FIRMWARE_BUS_NAMES_END
-for name in NAV_vehicleLatitude NAV_vehicleLongitude NAV_vehicleSpeedMph VAPI_vehicleSpeed VAPI_driverDoor VAPI_driverDoorAlert VAPI_doorState DOOR_frontDriverDoor AppeneticNonexistentProbeValue; do
+for name in NAV_vehicleLatitude NAV_vehicleLongitude NAV_vehicleSpeedMph VAPI_vehicleSpeed VAPI_batteryLevel VAPI_driverDoor VAPI_driverDoorAlert VAPI_doorState DOOR_frontDriverDoor AppeneticNonexistentProbeValue; do
     echo "TELEMETRY_READ_BEGIN $name"
     dbus-send --system --print-reply --reply-timeout=3000 --dest=com.tesla.Debug /Debug com.tesla.Debug.get_data_value string:"$name" 2>&1
     echo "TELEMETRY_READ_END $name"
 done
 # Synthetic values in this isolated RAM-only guest verify scalar serialization.
-for pair in NAV_vehicleLatitude:52.512345 NAV_vehicleLongitude:13.412345 NAV_vehicleSpeedMph:10 VAPI_driverDoor:true VAPI_driverDoor:false; do
+for pair in NAV_vehicleLatitude:52.512345 NAV_vehicleLongitude:13.412345 NAV_vehicleSpeedMph:10 VAPI_batteryLevel:73.5 VAPI_driverDoor:true VAPI_driverDoor:false; do
     name=${pair%%:*}; value=${pair#*:}
     echo "TELEMETRY_SYNTHETIC_BEGIN $name $value"
     dbus-send --system --print-reply --reply-timeout=3000 --dest=com.tesla.Debug /Debug com.tesla.Debug.set_data_value string:"$name" string:"$value" string: string:

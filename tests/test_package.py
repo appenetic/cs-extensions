@@ -57,6 +57,17 @@ class Package(unittest.TestCase):
             self.assertFalse(any(n.endswith('.pyc') or '__pycache__' in n for n in archive.getnames()))
             self.assertEqual(json.load(archive.extractfile('coilshift.json')), entry['manifest'])
 
+    def test_sdk_enum_tokens(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('builder', ROOT / 'tools/build.py')
+        builder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(builder)
+        for path in (ROOT / 'packages').glob('*/coilshift.json'):
+            builder.validate_settings(json.loads(path.read_text()))
+        with self.assertRaisesRegex(ValueError, 'speed_unit'):
+            builder.validate_settings({'settings': [{'id': 'speed_unit', 'type': 'enum',
+                'values': [{'value': 'km/h'}, {'value': 'm/s'}], 'default': 'km/h'}]})
+
     def test_shell_syntax(self):
         for path in (ROOT / 'packages').rglob('*.sh'):
             subprocess.run(['/bin/bash', '-n', str(path)], check=True)

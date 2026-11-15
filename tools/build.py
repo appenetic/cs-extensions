@@ -5,6 +5,7 @@ Run official csdk lint/test/build as well before promoting a release.
 import hashlib
 import io
 import json
+import re
 from pathlib import Path
 import tarfile
 
@@ -17,8 +18,23 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def validate_settings(manifest):
+    # SDK enum IDs are tokens; display titles may contain units such as km/h.
+    pattern = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]*')
+    for setting in manifest.get('settings', []):
+        if setting['type'] != 'enum':
+            continue
+        values = [v['value'] for v in setting['values']]
+        if (not 2 <= len(values) <= 64 or len(set(values)) != len(values)
+                or any(not isinstance(v, str) or not pattern.fullmatch(v)
+                       or v in ('true', 'false') for v in values)
+                or setting.get('default', values[0]) not in values):
+            raise ValueError('Invalid SDK enum setting: ' + setting['id'])
+
+
 def build_package(PACKAGE):
     manifest = json.loads((PACKAGE / 'coilshift.json').read_text())
+    validate_settings(manifest)
     # Match JSON Compact without reordering keys or HTML escaping.
     compact = json.dumps(manifest, separators=(',', ':'), ensure_ascii=False).encode()
     for hook in [manifest['hooks']['apply'], manifest['hooks']['remove']] + manifest['hooks']['service']:

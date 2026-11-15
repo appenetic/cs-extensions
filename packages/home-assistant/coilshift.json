@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "id": "com.appenetic.home-assistant",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "sdk": ">=1.0 <2",
   "title": "Home Assistant Bridge (experimental)",
-  "summary": "Überträgt GPS, Geschwindigkeit und Fahrertür über HTTPS an Home Assistant. Statischer x86_64-Dienst; Fahrzeug-DataValues müssen konfiguriert werden.",
+  "summary": "Überträgt GPS, Geschwindigkeit, Akkuladestand und Fahrertür über HTTPS an Home Assistant. Statischer x86_64-Dienst.",
   "authors": [
     {
       "name": "Appenetic",
@@ -101,17 +101,25 @@
       "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
     },
     {
+      "id": "soc_dv",
+      "type": "string",
+      "title": "DataValue Akkuladestand (SoC in %)",
+      "default": "VAPI_batteryLevel",
+      "max_bytes": 128,
+      "summary": "Firmware-Kandidat für den angezeigten Akkuladestand. Wertebereich 0–100 %."
+    },
+    {
       "id": "speed_unit",
       "type": "enum",
       "title": "Einheit des Geschwindigkeits-DataValues",
-      "default": "km/h",
+      "default": "kph",
       "values": [
         {
-          "value": "km/h",
+          "value": "kph",
           "title": "km/h"
         },
         {
-          "value": "m/s",
+          "value": "mps",
           "title": "m/s"
         },
         {

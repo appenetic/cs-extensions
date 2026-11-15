@@ -74,3 +74,18 @@ consumers must check `updated_at`. The tracker does not calculate Home zones.
 Die DataValue-Namen wurden anschließend in der Firmware ermittelt und mit dem
 echten QtCarServer unter QEMU geprüft. Siehe [Ergebnisse und GPS-Genauigkeitsgrenze](home-assistant-datavalues.md).
 Die Bestätigung am realen Fahrzeug steht weiterhin aus.
+
+## Version 0.1.0-alpha.3: SoC und Installationskorrektur
+
+Die SDK-Dokumentation verlangt für Enum-Werte das Muster
+`[A-Za-z0-9][A-Za-z0-9_.-]*`. Die bisherigen Werte `km/h` und `m/s` verletzten
+diese Regel und verhinderten die Installation. Das Manifest verwendet jetzt
+`kph`, `mps`, `mph`; die UI-Beschriftungen bleiben unverändert. Der Paketbauer
+prüft diese Regel nun vor dem Archivbau, mit einem Regressionstest für den
+ursprünglichen Fehler.
+
+SoC wird als `sensor.coilshift_car_soc` (Geräteklasse `battery`, Einheit `%`)
+und als `battery_level`-Attribut des Trackers übertragen. Die Quelle ist
+konfigurierbar, Vorgabe `VAPI_batteryLevel`; Werte außerhalb 0–100 werden
+`unavailable`. Die neun Go-Tests einschließlich Produktionstest bestanden im
+Firmware-QEMU sowie auf dem Host mit Race Detector. Kein Live-Fahrzeugtest.

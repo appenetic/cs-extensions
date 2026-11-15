@@ -13,7 +13,7 @@ local/private and is ignored by this public checkout. See
 ## Home Assistant Bridge
 
 New experimental package: [setup and limitations](packages/home-assistant/README.md).
-Publishes GPS coordinates, speed and driver-door state to Home Assistant over HTTPS.
+Publishes GPS coordinates, speed, battery state of charge and driver-door state to Home Assistant over HTTPS.
 Includes Cloud URL, username, secret password and optional API-token settings.
 Includes a static x86_64 Linux service, verified in the firmware userland under
 QEMU with local HTTPS/SDK test servers. Requires verified vehicle DataValue names;
@@ -49,14 +49,14 @@ that happened while the MCU was asleep. It refuses firmware other than 2026.38.5
 ## Repository and installation
 
 After this repository has been pushed publicly to `appenetic/cs-extensions`, the
-Package repository base URL is:
+Package repository index URL is:
 
 ```
-https://raw.githubusercontent.com/appenetic/cs-extensions/main/repository/
+https://raw.githubusercontent.com/appenetic/cs-extensions/main/repository/index.json
 ```
 
 The index is `repository/index.json`; archives are content-addressed under
-`repository/pool/`. Add the base URL in the package manager, then select
+`repository/pool/`. Add the index URL in the package manager, then select
 **Welcome Light (experimental)**. Leave the experimental setting disabled until
 the control path has been validated. Installation does not prove physical operation.
 
