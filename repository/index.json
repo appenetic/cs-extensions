@@ -95,6 +95,163 @@
         "sha256": "af7cbd56d9d6b50101cb29cdd3f3ae3d5235e8a176978d6a0429e652ef73d9b8",
         "bytes": 20480
       }
+    },
+    {
+      "id": "com.appenetic.home-assistant",
+      "version": "0.1.0-alpha.2",
+      "sdk": ">=1.0 <2",
+      "title": "Home Assistant Bridge (experimental)",
+      "published_unix": 1794614400,
+      "withdrawn": false,
+      "manifest": {
+        "schema": 1,
+        "id": "com.appenetic.home-assistant",
+        "version": "0.1.0-alpha.2",
+        "sdk": ">=1.0 <2",
+        "title": "Home Assistant Bridge (experimental)",
+        "summary": "Überträgt GPS, Geschwindigkeit und Fahrertür über HTTPS an Home Assistant. Statischer x86_64-Dienst; Fahrzeug-DataValues müssen konfiguriert werden.",
+        "authors": [
+          {
+            "name": "Appenetic",
+            "url": "https://github.com/appenetic/cs-extensions"
+          }
+        ],
+        "capabilities": [
+          "service",
+          "dv.read"
+        ],
+        "settings": [
+          {
+            "id": "enabled",
+            "type": "bool",
+            "title": "Home Assistant aktivieren",
+            "default": false
+          },
+          {
+            "id": "url",
+            "type": "string",
+            "title": "Home Assistant Cloud-URL",
+            "default": "",
+            "placeholder": "https://deine-instanz.ui.nabu.casa",
+            "max_bytes": 512
+          },
+          {
+            "id": "username",
+            "type": "string",
+            "title": "Benutzername",
+            "default": "",
+            "max_bytes": 256
+          },
+          {
+            "id": "password",
+            "type": "secret",
+            "title": "Passwort",
+            "max_bytes": 1024,
+            "summary": "Für Home-Assistant-Konten ohne MFA. Alternativ API-Token verwenden."
+          },
+          {
+            "id": "access_token",
+            "type": "secret",
+            "title": "Langlebiger API-Token (optional)",
+            "max_bytes": 1024,
+            "summary": "Hat Vorrang vor Benutzername und Passwort; unterstützt Konten mit MFA."
+          },
+          {
+            "id": "entity_prefix",
+            "type": "string",
+            "title": "Entitätsname",
+            "default": "coilshift_car",
+            "regex": "^[a-z][a-z0-9_]{0,63}$",
+            "max_bytes": 64
+          },
+          {
+            "id": "interval",
+            "type": "int",
+            "title": "Aktualisierungsintervall",
+            "default": 10,
+            "min": 5,
+            "max": 300,
+            "unit": "s"
+          },
+          {
+            "id": "latitude_dv",
+            "type": "string",
+            "title": "DataValue Breitengrad (Dezimalgrad)",
+            "default": "",
+            "max_bytes": 128,
+            "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
+          },
+          {
+            "id": "longitude_dv",
+            "type": "string",
+            "title": "DataValue Längengrad (Dezimalgrad)",
+            "default": "",
+            "max_bytes": 128,
+            "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
+          },
+          {
+            "id": "speed_dv",
+            "type": "string",
+            "title": "DataValue Geschwindigkeit",
+            "default": "",
+            "max_bytes": 128,
+            "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
+          },
+          {
+            "id": "door_dv",
+            "type": "string",
+            "title": "DataValue Fahrertür (true = offen)",
+            "default": "",
+            "max_bytes": 128,
+            "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
+          },
+          {
+            "id": "speed_unit",
+            "type": "enum",
+            "title": "Einheit des Geschwindigkeits-DataValues",
+            "default": "km/h",
+            "values": [
+              {
+                "value": "km/h",
+                "title": "km/h"
+              },
+              {
+                "value": "m/s",
+                "title": "m/s"
+              },
+              {
+                "value": "mph",
+                "title": "mph"
+              }
+            ]
+          }
+        ],
+        "hooks": {
+          "apply": {
+            "run": "hooks/apply.sh",
+            "rerun": "in-place",
+            "phase": "late",
+            "timeout": 10
+          },
+          "remove": {
+            "run": "hooks/remove.sh",
+            "timeout": 10
+          },
+          "service": [
+            {
+              "id": "bridge",
+              "run": "hooks/service.sh",
+              "restart": "on-failure"
+            }
+          ]
+        }
+      },
+      "manifest_sha256": "4ec4d46ed2042646617c03742fed8814a954b4c602cc7ddd5e763e9778c32468",
+      "archive": {
+        "url": "pool/fb54fae100fb47005da8a1059bb10bef9bfc604181b7025d8d5b8add36bf573d",
+        "sha256": "fb54fae100fb47005da8a1059bb10bef9bfc604181b7025d8d5b8add36bf573d",
+        "bytes": 6993920
+      }
     }
   ]
 }

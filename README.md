@@ -2,6 +2,24 @@
 
 Experimental SDK packages for Tesla MCU.
 
+## Public feed without application source
+
+Publish only the output of `python3 tools/export-public-feed.py --output dist/public-feed`
+into a separate artifacts repository. The export follows the private-source/public-feed
+pattern and includes only the compiled Home Assistant package. Its Go source stays
+local/private and is ignored by this public checkout. See
+[release separation and publishing](docs/private-source-public-feed.md).
+
+## Home Assistant Bridge
+
+New experimental package: [setup and limitations](packages/home-assistant/README.md).
+Publishes GPS coordinates, speed and driver-door state to Home Assistant over HTTPS.
+Includes Cloud URL, username, secret password and optional API-token settings.
+Includes a static x86_64 Linux service, verified in the firmware userland under
+QEMU with local HTTPS/SDK test servers. Requires verified vehicle DataValue names;
+live vehicle telemetry and a real HA instance remain untested. Disabled by default.
+
+
 **Welcome Light is an unverified prototype, not a validated approach-light feature.**
 It is disabled by default. Its current trigger is a locked-to-unlocked transition;
 this can include remote unlock and does not detect your phone before unlocking.

@@ -9,7 +9,7 @@ from pathlib import Path
 import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = ROOT / 'packages/welcome-light'
+PACKAGES = ROOT / 'packages'
 SITE = ROOT / 'repository'
 
 
@@ -17,7 +17,7 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def build():
+def build_package(PACKAGE):
     manifest = json.loads((PACKAGE / 'coilshift.json').read_text())
     # Match JSON Compact without reordering keys or HTML escaping.
     compact = json.dumps(manifest, separators=(',', ':'), ensure_ascii=False).encode()
@@ -31,6 +31,12 @@ def build():
             if p.is_symlink() or not (p.is_dir() or p.is_file()):
                 raise ValueError('Unsupported archive entry: ' + str(p))
             name = p.relative_to(PACKAGE).as_posix()
+            if manifest['id'] == 'com.appenetic.home-assistant':
+                # Explicit release allowlist: no developer docs or source files.
+                allowed = {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh',
+                           'hooks/service.sh', 'bin', 'bin/bridge-linux-amd64', 'NOTICE'}
+                if name not in allowed:
+                    continue
             entry = tarfile.TarInfo(name + '/' if p.is_dir() else name)
             entry.mode = 0o755 if p.is_dir() or p.stat().st_mode & 0o111 else 0o644
             if p.is_dir():
@@ -46,15 +52,22 @@ def build():
     (SITE / 'pool' / digest).write_bytes(data)
     # Fixed timestamp for this prerelease keeps rebuilding deterministic.
     published = 1794614400
+    print(f'{manifest["id"]}: {digest} {len(data)} bytes')
+    return {
+        'id': manifest['id'], 'version': manifest['version'], 'sdk': manifest['sdk'],
+        'title': manifest['title'], 'published_unix': published, 'withdrawn': False,
+        'manifest': manifest, 'manifest_sha256': sha(compact),
+        'archive': {'url': 'pool/' + digest, 'sha256': digest, 'bytes': len(data)}}
+
+
+def build():
+    # Keep the original package first for existing consumers.
+    packages = sorted(PACKAGES.iterdir(), key=lambda p: (p.name != 'welcome-light', p.name))
+    entries = [build_package(p) for p in packages if (p / 'coilshift.json').is_file()]
     index = {'schema': 1, 'repository': {'name': 'Appenetic CS Extensions',
              'homepage': 'https://github.com/appenetic/cs-extensions'},
-             'generated_unix': published, 'packages': [{
-             'id': manifest['id'], 'version': manifest['version'], 'sdk': manifest['sdk'],
-             'title': manifest['title'], 'published_unix': published, 'withdrawn': False,
-             'manifest': manifest, 'manifest_sha256': sha(compact),
-             'archive': {'url': 'pool/' + digest, 'sha256': digest, 'bytes': len(data)}}]}
+             'generated_unix': 1794614400, 'packages': entries}
     (SITE / 'index.json').write_text(json.dumps(index, indent=2, ensure_ascii=False) + '\n')
-    print(f'{digest} {len(data)} bytes')
 
 
 if __name__ == '__main__':

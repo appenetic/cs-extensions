@@ -1,0 +1,24 @@
+#!/bin/bash
+set -eu
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+mkdir -p /tmp/pkg /run
+mount -t tmpfs -o noexec,nosuid,nodev tmpfs /tmp/pkg
+mkdir -p /tmp/pkg/hooks /tmp/pkg/bin
+@@PACKAGE@@
+cp /ha-bridge /tmp/pkg/bin/bridge-linux-amd64
+chmod +x /tmp/pkg/bin/bridge-linux-amd64
+mount -o remount,ro,noexec /tmp/pkg
+grep " /tmp/pkg " /proc/mounts
+# Initramfs exports /ha-tests through the root switch as /ha-tests.
+ip link set lo up
+# QEMU has no NIC. All HTTPS and Unix servers are loopback-only test doubles.
+export HA_TEST_SERVICE=/tmp/pkg/hooks/service.sh
+if /ha-tests -test.v -test.timeout=100s; then
+    echo HA_VM_SERVICE_TESTS_PASS
+else
+    echo 'HA_VM_FAIL production tests failed'
+fi
+echo HA_VM_DONE
+sync
+echo o > /proc/sysrq-trigger
+while :; do sleep 1; done

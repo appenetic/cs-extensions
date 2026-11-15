@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Public-feed checkout: the unpublished HA source stays local/private.
+/services/home-assistant/
+/dist/

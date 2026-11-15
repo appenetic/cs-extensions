@@ -41,6 +41,22 @@ class Package(unittest.TestCase):
         self.assertEqual(index, next_index)
         self.assertEqual(archive, next_archive)
 
+    def test_home_assistant_archive(self):
+        subprocess.run(['python3', 'tools/build.py'], cwd=ROOT, check=True, capture_output=True)
+        entries = json.loads((ROOT / 'repository/index.json').read_text())['packages']
+        entry = next(e for e in entries if e['id'] == 'com.appenetic.home-assistant')
+        data = (ROOT / 'repository' / entry['archive']['url']).read_bytes()
+        self.assertEqual(hashlib.sha256(data).hexdigest(), entry['archive']['sha256'])
+        self.assertEqual(len(data), entry['archive']['bytes'])
+        self.assertEqual({s['id'] for s in entry['manifest']['settings'] if s['type'] == 'secret'},
+                         {'password', 'access_token'})
+        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+            binary = archive.extractfile('bin/bridge-linux-amd64').read()
+            self.assertEqual(binary[:4], b'\x7fELF')
+            self.assertEqual(archive.getmember('hooks/service.sh').mode, 0o755)
+            self.assertFalse(any(n.endswith('.pyc') or '__pycache__' in n for n in archive.getnames()))
+            self.assertEqual(json.load(archive.extractfile('coilshift.json')), entry['manifest'])
+
     def test_shell_syntax(self):
         for path in (ROOT / 'packages').rglob('*.sh'):
             subprocess.run(['/bin/bash', '-n', str(path)], check=True)
