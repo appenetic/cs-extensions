@@ -54,6 +54,9 @@ class Package(unittest.TestCase):
             binary = archive.extractfile('bin/bridge-linux-amd64').read()
             self.assertEqual(binary[:4], b'\x7fELF')
             self.assertEqual(archive.getmember('hooks/service.sh').mode, 0o755)
+            self.assertIn('panel/index.html', archive.getnames())
+            self.assertIn('panel/app.js', archive.getnames())
+            self.assertIn('panel', entry['manifest']['capabilities'])
             self.assertFalse(any(n.endswith('.pyc') or '__pycache__' in n for n in archive.getnames()))
             self.assertEqual(json.load(archive.extractfile('coilshift.json')), entry['manifest'])
 

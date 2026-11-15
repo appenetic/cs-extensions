@@ -15,7 +15,9 @@ HOME_ASSISTANT = 'com.appenetic.home-assistant'
 # Shell lifecycle adapters are intentionally readable; application logic is ELF.
 RUNTIME_FILES = {
     'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/service.sh',
-    'bin/bridge-linux-amd64', 'NOTICE',
+    'bin/bridge-linux-amd64', 'NOTICE', 'LICENSE-CoilShift-SDK',
+    'panel/index.html', 'panel/app.js', 'panel/style.css',
+    'panel/csdk-panel.js', 'panel/csdk-panel.css',
 }
 PUBLIC_README = '''# Appenetic CS package feed
 
@@ -66,7 +68,7 @@ def validate_package(entry, repository):
                 raise ValueError('Unsafe or duplicate archive member')
             seen.add(name)
             if member.isdir():
-                if name not in {'hooks', 'bin'}:
+                if name not in {'hooks', 'bin', 'panel'}:
                     raise ValueError('Unexpected package directory: ' + name)
                 continue
             if not member.isfile() or name not in RUNTIME_FILES:

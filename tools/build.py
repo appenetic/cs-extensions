@@ -50,7 +50,9 @@ def build_package(PACKAGE):
             if manifest['id'] == 'com.appenetic.home-assistant':
                 # Explicit release allowlist: no developer docs or source files.
                 allowed = {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh',
-                           'hooks/service.sh', 'bin', 'bin/bridge-linux-amd64', 'NOTICE'}
+                           'hooks/service.sh', 'bin', 'bin/bridge-linux-amd64', 'NOTICE',
+                           'LICENSE-CoilShift-SDK', 'panel', 'panel/index.html', 'panel/app.js',
+                           'panel/style.css', 'panel/csdk-panel.js', 'panel/csdk-panel.css'}
                 if name not in allowed:
                     continue
             entry = tarfile.TarInfo(name + '/' if p.is_dir() else name)

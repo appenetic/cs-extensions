@@ -89,3 +89,16 @@ und als `battery_level`-Attribut des Trackers übertragen. Die Quelle ist
 konfigurierbar, Vorgabe `VAPI_batteryLevel`; Werte außerhalb 0–100 werden
 `unavailable`. Die neun Go-Tests einschließlich Produktionstest bestanden im
 Firmware-QEMU sowie auf dem Host mit Race Detector. Kein Live-Fahrzeugtest.
+
+## Version 0.1.0-alpha.4: SDK-Einstellungspanel
+
+Das Manifest deklariert jetzt die Fähigkeit `panel` und die eigene Seite
+`panel/index.html` mit `settings.read`, `settings.write` und `status`.
+Die unveränderte SDK-Brücke und das SDK-Stylesheet wurden unter Apache-2.0
+übernommen; Lizenzhinweise sind im Paket enthalten.
+
+Sieben Node-Tests gegen den SDK-Panel-Host prüfen Einstellungen, Geheimnisfelder,
+gezieltes Löschen, Profilübernahme, die Reihenfolge Deaktivieren/Speichern/Aktivieren,
+Eingabevalidierung, unveränderte Eingaben beim Statuspolling und Teilfehler.
+Alle 19 Paket-/Regressionstests bestehen. Die Dienst-Binärdatei wurde nicht
+verändert; ein Test in der tatsächlichen CoilShift-App steht noch aus.

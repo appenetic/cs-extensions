@@ -114,3 +114,24 @@ Der Installationsfehler bei `speed_unit` ist behoben: SDK-Enum-Werte dürfen kei
 Schrägstrich enthalten. Die internen Werte sind jetzt `kph`, `mps`, `mph`, während
 die sichtbaren Beschriftungen weiterhin `km/h`, `m/s`, `mph` lauten. Der Dienst
 akzeptiert die alten internen Werte zusätzlich für bestehende Konfigurationen.
+
+## Eigene Einstellungsseite (ab 0.1.0-alpha.4)
+
+Das Paket registriert ein SDK-Panel **Home Assistant · Einstellungen**, das
+CoilShift neben seinen eigenen Seiten anzeigt. Nach dem Update auf alpha.4
+CoilShift neu laden, damit das Panel registriert wird. Der genaue Navigationsort
+hängt von der CoilShift-App-Version ab.
+
+Die Seite enthält Verbindung, verschlüsselte Zugangsdaten, Intervall,
+Fahrzeug-DataValues und den aktuellen Dienststatus. **Firmware-Profil übernehmen**
+trägt die offline geprüften Namen ein, ohne sie sofort zu speichern. Anschließend
+**Einstellungen speichern** wählen. Das Profil ist noch nicht am Auto bestätigt.
+
+Leere Passwort-/Tokenfelder behalten den gespeicherten Wert bei. **Löschen**
+merkt die Löschung bis zum Speichern vor. Während einer Änderung wird ein
+bereits aktiver Dienst zuerst deaktiviert und erst nach vollständigem Speichern
+wieder aktiviert. Bei einem Teilfehler die angezeigten Einstellungen prüfen.
+
+Die Seite verwendet ausschließlich die SDK-Nachrichtenbrücke und keine eigenen
+HA-Netzwerkanfragen. Die JavaScript-Dateien der Oberfläche sind wie bei anderen
+Web-Panels auslesbar; die Fahrzeug-/HA-Dienstlogik bleibt in der Binärdatei.

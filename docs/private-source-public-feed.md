@@ -14,7 +14,7 @@ Verschlüsselung des ausführbaren Programms.
   **separaten privaten Git-Repository** versioniert werden. Es wurde kein
   privates Remote angelegt und keine Repository-Sichtbarkeit geändert.
 - Das öffentliche Paket enthält ausschließlich die kompilierte Linux-Datei,
-  Manifest, drei kleine Lifecycle-Skripte und Lizenzhinweise. Entwickler-README,
+  Manifest, drei kleine Lifecycle-Skripte, das SDK-Einstellungspanel und Lizenzhinweise. Entwickler-README,
   Go-Dateien, Tests und Analysedokumente werden nicht eingepackt.
 - `tools/export-public-feed.py` erzeugt einen neuen, getrennten Ordner, der als
   Inhalt eines öffentlichen Artefakt-Repositories verwendet werden kann.
@@ -67,7 +67,7 @@ werden. Der Export wurde lokal vorbereitet, aber nicht gepusht oder live geschal
 ## Grenzen
 
 Die ursprünglichen `.go`-Dateien fehlen im veröffentlichten Feed. Manifest,
-Einstellungen, kleine Startskripte und die herunterladbare Binärdatei sind
+Einstellungen, HTML/JavaScript/CSS des Einstellungspanels, kleine Startskripte und die herunterladbare Binärdatei sind
 weiterhin einsehbar. Die Binärdatei enthält keine Debugsymbole oder absoluten
 Buildpfade (`-s -w -trimpath`), kann aber analysiert bzw. dekompiliert werden.
 Geheimnisse werden deshalb nie in die Binärdatei eingebaut; die Anmeldedaten
