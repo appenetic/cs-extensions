@@ -102,3 +102,13 @@ gezieltes Löschen, Profilübernahme, die Reihenfolge Deaktivieren/Speichern/Akt
 Eingabevalidierung, unveränderte Eingaben beim Statuspolling und Teilfehler.
 Alle 19 Paket-/Regressionstests bestehen. Die Dienst-Binärdatei wurde nicht
 verändert; ein Test in der tatsächlichen CoilShift-App steht noch aus.
+
+## Version 0.1.0-alpha.5: Verbindungsdiagnose und erneutes Laden
+
+Beim Panel-Start wurden Einstellungen bisher nur einmal geladen. Eine späte
+Host-/Manifestregistrierung ließ alle Eingaben dauerhaft deaktiviert. Das Panel
+wiederholt fehlgeschlagene Ladeversuche und zeigt die Einstellungsverbindung
+oberhalb der Eingaben. Fehlende Einstellungsnamen und explizite Host-Sperren
+werden unterschieden; Host-Sperren werden nicht umgangen. Zehn Paneltests
+bestehen, darunter verspätete Registrierung, Zugriffsverweigerung und gesperrte
+Felder. Die Ursache in der vom Nutzer gemeldeten Live-Installation steht noch aus.

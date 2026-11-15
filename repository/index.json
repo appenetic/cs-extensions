@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.home-assistant",
-      "version": "0.1.0-alpha.4",
+      "version": "0.1.0-alpha.5",
       "sdk": ">=1.0 <2",
       "title": "Home Assistant Bridge (experimental)",
       "published_unix": 1794614400,
@@ -106,7 +106,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.home-assistant",
-        "version": "0.1.0-alpha.4",
+        "version": "0.1.0-alpha.5",
         "sdk": ">=1.0 <2",
         "title": "Home Assistant Bridge (experimental)",
         "summary": "Überträgt GPS, Geschwindigkeit, Akkuladestand und Fahrertür über HTTPS an Home Assistant. Statischer x86_64-Dienst.",
@@ -264,10 +264,10 @@
           ]
         }
       },
-      "manifest_sha256": "0b2fecf956e648e6301b0e7e8dece70f48ca1b1518420197b54008de93380077",
+      "manifest_sha256": "d92e807c04f5289479d327b73270665c277cc940a2a3f46c05e5debb3e09d057",
       "archive": {
-        "url": "pool/3f66fff423107807b73710f411897feb3e607552c1a3fe08e599c47820f2517d",
-        "sha256": "3f66fff423107807b73710f411897feb3e607552c1a3fe08e599c47820f2517d",
+        "url": "pool/122a59d64d311f90b171566f463e9b5b2edd504546bb70e5cc6f3e07e28d2bd7",
+        "sha256": "122a59d64d311f90b171566f463e9b5b2edd504546bb70e5cc6f3e07e28d2bd7",
         "bytes": 7034880
       }
     }

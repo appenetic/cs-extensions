@@ -68,6 +68,29 @@ test('failed partial save does not re-enable or show server error secrets',async
 test('missing settings keep saving disabled with useful feedback',async()=>{
   const h=await setup({settings:[]});
   assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,true);
-  assert.match(field(h,'message').textContent,/Einstellungen fehlen/);
+  assert.match(field(h,'message').textContent,/fehlend:/);
   save(h);await h.settle();assert.deepEqual(changes(h),[]);
+});
+
+test('late settings registration recovers automatically and enables fields',async()=>{
+ let ready=false,h;
+ h=await setup({answers:{'settings.get':()=>ready ? h.settings.map(s=>({...s,value:s.type==='secret'?{set:true}:s.value})) : []}});
+ assert.equal(field(h,'url').disabled,true);
+ assert.match(field(h,'settings-connection').textContent,/liefert 0/);
+ ready=true;await h.tick();
+ assert.equal(field(h,'url').disabled,false);
+ assert.match(field(h,'settings-connection').textContent,/Einstellungen verbunden/);
+});
+test('host refusal is explained at top of page and not bypassed',async()=>{
+ const h=await setup({answers:{'settings.get':()=>{throw Object.assign(new Error('denied'),{code:'forbidden'});}}});
+ assert.match(field(h,'settings-connection').textContent,/verweigert/);
+ assert.match(field(h,'settings-connection').textContent,/forbidden/);
+ assert.equal(field(h,'url').disabled,true);
+ save(h);await h.settle();assert.deepEqual(changes(h),[]);
+});
+test('explicit host availability restrictions remain enforced',async()=>{
+ const h=await setup({settings:manifest.settings.map(s=>({...s,id:manifest.id+'.'+s.id,value:s.default??'',available:false}))});
+ assert.match(field(h,'settings-connection').textContent,/gesperrt/);
+ assert.equal(field(h,'url').disabled,true);
+ assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,true);
 });

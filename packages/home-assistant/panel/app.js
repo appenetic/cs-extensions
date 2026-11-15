@@ -2,7 +2,7 @@
   'use strict';
   var bridge = window.csdkPanel.createClient(window);
   var root = document.getElementById('root');
-  var fields = {}, records = {}, cleared = {}, busy = false;
+  var fields = {}, records = {}, cleared = {}, busy = false, settingsReady = false, loadingSettings = false;
   var groups = [
     ['Verbindung', [
       ['enabled', 'Home Assistant aktivieren', 'bool'],
@@ -28,12 +28,13 @@
     return el;
   }
   var message = h('p', { 'aria-live': 'polite', id: 'message' });
+  var connection = h('p', { class: 'notice', 'aria-live': 'polite', id: 'settings-connection' }, 'Verbindung zu den CoilShift-Einstellungen wird aufgebaut …');
   var state = h('div', { class: 'notice', 'aria-live': 'polite', id: 'package-status' }, 'Status wird geladen …');
   var saveButton = h('button', { type: 'button', class: 'primary', 'aria-label': 'Einstellungen speichern' }, 'Einstellungen speichern');
   saveButton.disabled = true;
   function say(text, tone) { message.textContent = text; message.setAttribute('class', tone || ''); }
   function build() {
-    root.replaceChildren(h('h1', {}, 'Home Assistant'), h('p', { class: 'subtitle' }, 'Verbindung und Fahrzeugdaten konfigurieren.'), state);
+    root.replaceChildren(h('h1', {}, 'Home Assistant'), h('p', { class: 'subtitle' }, 'Verbindung und Fahrzeugdaten konfigurieren.'), connection, state);
     groups.forEach(function (group) {
       var card = h('section', { class: 'card' }, h('h2', {}, group[0]));
       group[1].forEach(function (spec) {
@@ -77,23 +78,46 @@
     root.append(h('div', { class: 'actions' }, saveButton, reload), message);
     saveButton.addEventListener('click', save);
   }
+  function settingsError(error) {
+    settingsReady = false;
+    saveButton.disabled = true;
+    var code = error && error.code;
+    var explanation = code === 'timeout' || code === 'no_host' || code === 'offline'
+      ? 'Die CoilShift-App beantwortet die Einstellungsanfrage nicht. Die Seite in CoilShift öffnen und die App neu laden.'
+      : code === 'forbidden' ? 'CoilShift verweigert dem Panel den Einstellungszugriff. Paket aktualisieren und App neu laden.'
+      : error && error.message || 'Die Einstellungen konnten nicht geladen werden.';
+    connection.textContent = explanation + (code && /^[a-z_]{1,40}$/.test(code) ? ' (' + code + ')' : '');
+    connection.setAttribute('class', 'notice bad');
+  }
   function loadSettings() {
+    if (loadingSettings) return Promise.resolve();
+    loadingSettings = true;
     return bridge.settings.get().then(function (list) {
-      var missing = [];
+      var missing = [], locked = [];
       Object.keys(fields).forEach(function (id) {
         var field = fields[id], setting = window.csdkPanel.findSetting(list, id);
         records[id] = setting;
         field.input.disabled = !setting || setting.available === false;
         if (field.clear) field.clear.disabled = field.input.disabled;
         if (!setting) { missing.push(id); return; }
+        if (setting.available === false) locked.push(id);
         if (field.type === 'secret') {
           field.input.value = ''; cleared[id] = false;
           field.input.setAttribute('placeholder', setting.value && setting.value.set ? 'Gespeichert · unverändert lassen' : 'Noch nicht gespeichert');
         } else if (field.type === 'bool') field.input.checked = setting.value === true || setting.value === 'true';
         else field.input.value = setting.value == null ? '' : String(setting.value);
       });
-      saveButton.disabled = missing.length > 0;
-      if (missing.length) throw new Error('Einstellungen fehlen. Bitte Paket und CoilShift aktualisieren.');
+      saveButton.disabled = missing.length > 0 || fields.enabled.input.disabled;
+      if (missing.length) Object.keys(fields).forEach(function (id) {
+        fields[id].input.disabled = true;
+        if (fields[id].clear) fields[id].clear.disabled = true;
+      });
+      if (missing.length) throw new Error('CoilShift liefert ' + list.length + ' Einstellungen; fehlend: ' + missing.join(', ') + '. Bitte Paket und App aktualisieren.');
+      settingsReady = true;
+      connection.textContent = locked.length ? 'CoilShift meldet diese Felder als gesperrt: ' + locked.join(', ') + '. Paket-Auswahl und Fahrzeugzustand prüfen.' : 'Einstellungen verbunden.';
+      connection.setAttribute('class', locked.length ? 'notice bad' : 'notice ok');
+    }).then(function () { loadingSettings = false; }, function (error) {
+      loadingSettings = false; settingsError(error); throw error;
     });
   }
   function loadStatus() {
@@ -152,5 +176,9 @@
   build(); bridge.applyChrome(document);
   loadSettings().catch(function (error) { say(error.message || 'Einstellungen konnten nicht geladen werden.', 'bad'); });
   loadStatus();
-  window.setInterval(loadStatus, 5000);
+  window.setInterval(function () {
+    loadStatus();
+    // Retry a late app/manifest handshake without overwriting an active editor.
+    if (!settingsReady && !busy) loadSettings().catch(function () {});
+  }, 5000);
 })();

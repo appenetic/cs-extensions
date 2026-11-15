@@ -135,3 +135,12 @@ wieder aktiviert. Bei einem Teilfehler die angezeigten Einstellungen prüfen.
 Die Seite verwendet ausschließlich die SDK-Nachrichtenbrücke und keine eigenen
 HA-Netzwerkanfragen. Die JavaScript-Dateien der Oberfläche sind wie bei anderen
 Web-Panels auslesbar; die Fahrzeug-/HA-Dienstlogik bleibt in der Binärdatei.
+
+## Graue Felder / Verbindungsdiagnose (ab alpha.5)
+
+Die Seite wartet auf die vom CoilShift-Host gelieferten Einstellungen. Ab alpha.5
+wird eine fehlgeschlagene oder verspätete Registrierung automatisch erneut
+abgefragt. Oberhalb der Felder steht jetzt, ob die Verbindung besteht, welche
+Einstellungen fehlen oder ob CoilShift den Zugriff verweigert bzw. Felder sperrt.
+Bereits geladene Eingaben werden durch das Statuspolling nicht überschrieben.
+Die genaue Ursache in der betroffenen Installation ist noch nicht bestätigt.
