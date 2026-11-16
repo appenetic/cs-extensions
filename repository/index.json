@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.home-assistant",
-      "version": "0.1.0-alpha.12",
+      "version": "0.1.0-alpha.13",
       "sdk": ">=1.0 <2",
       "title": "Home Assistant Bridge (experimental)",
       "published_unix": 1794614400,
@@ -106,7 +106,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.home-assistant",
-        "version": "0.1.0-alpha.12",
+        "version": "0.1.0-alpha.13",
         "sdk": ">=1.0 <2",
         "title": "Home Assistant Bridge (experimental)",
         "summary": "Überträgt GPS, Geschwindigkeit, Fahrstufe, Akkuladestand und Fahrertür über HTTPS an Home Assistant. Mit eigener Einstellungsseite.",
@@ -257,7 +257,7 @@
           ]
         },
         "panel": {
-          "entry": "panel/settings-0.1.0-alpha.12.html",
+          "entry": "panel/settings-0.1.0-alpha.13.html",
           "title": "Home Assistant · Einstellungen",
           "permissions": [
             "settings.read",
@@ -282,10 +282,10 @@
           ]
         }
       },
-      "manifest_sha256": "b8f895a8b4de7f805142990ea317896cd70d4450a695e8c374a69bf61f85e92d",
+      "manifest_sha256": "e88a5a1fc02216bd17a444e4b459c55bfd33fb91a2d36e4a82fcabdfd8c5a36a",
       "archive": {
-        "url": "pool/c89b30aee78665919f2db05e7041ff7774da133d14a287d422b21f668d97cfc3",
-        "sha256": "c89b30aee78665919f2db05e7041ff7774da133d14a287d422b21f668d97cfc3",
+        "url": "pool/affe248c3eecb49f9908276bc0a3acc38928a788d8c4256ecd7c2bbed48863e7",
+        "sha256": "affe248c3eecb49f9908276bc0a3acc38928a788d8c4256ecd7c2bbed48863e7",
         "bytes": 8437760
       }
     }

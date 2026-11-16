@@ -273,3 +273,27 @@ Portnummer und den neuen Zugriffscode. Nur der Host-/Port-Text reicht nicht zum
 Speichern, weil der QR-Link auch das geheime Fragment enthält.
 
 Referenz: https://tailscale.com/docs/concepts/tailscale-ip-addresses
+
+## GPS-Diagnose (alpha.13)
+
+Bei fehlender Position enthält `device_tracker.coilshift_car` jetzt die Attribute
+`gps_latitude_status`, `gps_longitude_status`, `gps_latitude_datavalue` und
+`gps_longitude_datavalue` (bei geändertem Präfix entsprechend anderer Entitätsname).
+Diese Angaben bleiben auch beim Zustand `unavailable` sichtbar.
+
+| Status | Bedeutung |
+| --- | --- |
+| `ok` | Endlicher Zahlenwert innerhalb des Dezimalgrad-Bereichs |
+| `no_value` | Leere Rückgabe, `null` oder Firmware-Rückgabe `<invalid>` |
+| `sdk_http_404` | SDK findet den DataValue nicht |
+| `sdk_http_401` / `sdk_http_403` | SDK verweigert den Lesezugriff |
+| `sdk_read_failed` | SDK-Verbindung/Lesen fehlgeschlagen |
+| `invalid_datavalue_name` | Konfigurierter Name fehlt oder ist ungültig |
+| `not_a_finite_number` | Rückgabe ist keine endliche skalare Zahl |
+| `out_of_range` | Zahl liegt außerhalb ±90° bzw. ±180° |
+
+Weitere HTTP-Fehler erscheinen als `sdk_http_<Statuscode>`. Rohwerte und
+Fehlerantworten werden nicht in Diagnoseattribute übernommen. Es wird keine
+Koordinatenskalierung geraten. Diese Version verbessert die Eingrenzung;
+sie bestätigt noch keine funktionierende Live-GPS-Quelle. Für die Eingrenzung
+genügen zunächst die vier Diagnoseattribute, ohne Standortdaten weiterzugeben.
