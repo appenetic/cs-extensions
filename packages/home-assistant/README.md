@@ -297,3 +297,24 @@ Fehlerantworten werden nicht in Diagnoseattribute übernommen. Es wird keine
 Koordinatenskalierung geraten. Diese Version verbessert die Eingrenzung;
 sie bestätigt noch keine funktionierende Live-GPS-Quelle. Für die Eingrenzung
 genügen zunächst die vier Diagnoseattribute, ohne Standortdaten weiterzugeben.
+
+## GPS auf Produktionsfahrzeugen (alpha.14)
+
+Am Zielauto wurde bestätigt: `NAV_vehicleLatitude` und `NAV_vehicleLongitude`
+liefern über `com.tesla.Debug.get_data_value` den Text `<redacted>`. Die Werte
+sind damit vorhanden, aber auf diesem Leseweg verborgen. Die separate
+Nur-Lese-Methode `com.tesla.SensitiveDataValues.get_LOC_geoLocation` auf
+`/SensitiveDataValues` liefert eine Position als `(Breitengrad N/S, Längengrad E/W)`.
+
+Ab alpha.14 nutzt die Bridge bei `<redacted>` und den beiden unveränderten
+Standard-DataValue-Namen diese Standortabfrage über `/usr/bin/dbus-send`.
+Die Abfrage hat ein Zeitlimit; Zahlenbereiche und Himmelsrichtungen werden
+geprüft. Sie verändert weder Fahrzeugwerte noch Datenschutzeinstellungen.
+Benutzerdefinierte GPS-DataValues werden nicht durch einen anderen Leseweg ersetzt.
+
+Das Attribut `gps_source` zeigt `datavalues` oder `sensitive_geolocation`.
+`redacted` kennzeichnet geschwärzte DataValues; `location_read_failed` und
+`location_invalid_response` grenzen Fehler der separaten Standortabfrage ein.
+Bei Fehlern werden keine alten oder geratenen Koordinaten übertragen.
+Die erfolgreiche Standortabfrage wurde am Auto bestätigt; der vollständige
+Bridge-zu-Home-Assistant-Datenfluss dieser Version erfordert noch das Update.

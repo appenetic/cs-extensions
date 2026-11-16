@@ -5,6 +5,15 @@ Die Namen wurden anhand der lokal vorhandenen Firmware ermittelt und im echten
 QtCarServer unter QEMU über `com.tesla.Debug.get_data_value` geprüft.
 Es wurde keine Verbindung zu einem Auto hergestellt.
 
+**Live-Ergänzung vom 2026-11-16:** Die Nur-Lese-Prüfung am Zielauto hat ergeben,
+dass beide `NAV_`-Koordinaten über die Debug-Schnittstelle `<redacted>` liefern.
+Die separate D-Bus-Methode
+`com.tesla.SensitiveDataValues.get_LOC_geoLocation` auf `/SensitiveDataValues`
+liefert hingegen eine gültige Position mit sechs Nachkommastellen und
+Himmelsrichtungen. Ab alpha.14 nutzt die Bridge diesen Leseweg als Fallback für
+die geschwärzten Standard-Koordinaten. Die folgende Offline-Untersuchung beschreibt
+den früher untersuchten Debug-Leseweg und seine Einschränkungen.
+
 ## Vorgeschlagene Konfiguration
 
 | Plugin-Einstellung | Wert | Evidenz und Grenze |
