@@ -94,3 +94,23 @@ test('explicit host availability restrictions remain enforced',async()=>{
  assert.equal(field(h,'url').disabled,true);
  assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,true);
 });
+
+test('explicit panel scope exposes all thirteen settings on a scope-only host',async()=>{
+ const expected=manifest.settings.map(s=>manifest.id+'.'+s.id).sort();
+ assert.equal(expected.length,13);
+ assert.deepEqual([...manifest.panel.settings].sort(),expected);
+ let h;
+ const allowed=new Set(manifest.panel.settings);
+ h=await setup({answers:{'settings.get':()=>{
+  // A host which does not automatically add the package settings only returns
+  // settings explicitly named in panel.settings. The old manifest returned [].
+  return {settings:manifest.settings.filter(s=>allowed.has(manifest.id+'.'+s.id)).map(s=>({
+   ...s,id:manifest.id+'.'+s.id,value:s.type==='secret'?{set:true}:s.default
+  }))};
+ }}});
+ assert.equal(field(h,'url').disabled,false);
+ assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,false);
+ field(h,'url').type('https://ha.example');field(h,'username').type('test-user');save(h);await h.settle(50);
+ assert.ok(changes(h).some(([id,value])=>id==='username'&&value==='test-user'));
+ assert.match(field(h,'message').textContent,/Gespeichert/);
+});

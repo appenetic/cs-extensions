@@ -153,3 +153,12 @@ Die genaue Ursache in der betroffenen Installation ist noch nicht bestätigt.
 die Quelle ist `GET /v1/vehicle/gear` des CoilShift-SDK. Unbekannte/fehlende Werte
 werden `unavailable`, niemals automatisch `P`. Numerische Firmware-Enums werden
 nicht geraten. Der Wert wird im gleichen Zyklus wie die übrigen Daten gesendet.
+
+## Expliziter Panel-Zugriff (alpha.7)
+
+Das Panel listet jetzt alle 13 eigenen Einstellungen mit vollständigen IDs in
+`panel.settings`. So hängt die Zuordnung nicht ausschließlich von der impliziten
+Freigabe paketinterner Einstellungen ab. Nach dem Update die Panel-Seite schließen
+und CoilShift neu laden. Ein Host-Test mit ausschließlich expliziter Freigabe
+prüft das Laden und Speichern. Der Live-Abgleich der gemeldeten leeren Liste
+steht noch aus.

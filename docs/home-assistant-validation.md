@@ -124,3 +124,18 @@ ein voriger gültiger Wert wird nicht als aktuelle Fahrstufe weitergesendet.
 Alle zehn Diensttests bestehen im Firmware-QEMU und auf dem Host mit Race Detector,
 inklusive des echten Produktionsdiensts. Zusätzlich bestehen zehn Paneltests,
 19 Paket-/Regressionstests und `go vet`. Live-SDK-/Fahrzeugprüfung steht aus.
+
+## Version 0.1.0-alpha.7: Expliziter Panel-Scope
+
+Die gemeldete Antwort mit null Einstellungen zeigt, dass der bisherige Retry
+allein die betroffene Installation nicht repariert. Das Manifest benennt nun
+alle 13 eigenen Einstellungen explizit in `panel.settings`, analog zum
+veröffentlichten Blitzer-Panel des Referenzrepositories. Das SDK beschreibt auch
+eine implizite Freigabe eigener Einstellungen; auf diese wird nicht mehr allein
+vertraut. Die genaue Live-Ursache ist damit noch nicht bewiesen.
+
+Ein zusätzlicher Paneltest simuliert einen Host, der ausschließlich explizit
+freigegebene Einstellungen liefert. Er prüft vollständige Anzeige sowie einen
+Speichervorgang. Elf Paneltests bestehen. Der Paketbauer prüft außerdem, dass
+die expliziten IDs dem eigenen Paket gehören; der Regressionstest verweigert
+fremde IDs. Keine zusätzliche Berechtigung außerhalb der eigenen Einstellungen.

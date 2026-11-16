@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.home-assistant",
-      "version": "0.1.0-alpha.6",
+      "version": "0.1.0-alpha.7",
       "sdk": ">=1.0 <2",
       "title": "Home Assistant Bridge (experimental)",
       "published_unix": 1794614400,
@@ -106,7 +106,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.home-assistant",
-        "version": "0.1.0-alpha.6",
+        "version": "0.1.0-alpha.7",
         "sdk": ">=1.0 <2",
         "title": "Home Assistant Bridge (experimental)",
         "summary": "Überträgt GPS, Geschwindigkeit, Fahrstufe, Akkuladestand und Fahrertür über HTTPS an Home Assistant. Mit eigener Einstellungsseite.",
@@ -262,13 +262,28 @@
             "settings.read",
             "settings.write",
             "status"
+          ],
+          "settings": [
+            "com.appenetic.home-assistant.enabled",
+            "com.appenetic.home-assistant.url",
+            "com.appenetic.home-assistant.username",
+            "com.appenetic.home-assistant.password",
+            "com.appenetic.home-assistant.access_token",
+            "com.appenetic.home-assistant.entity_prefix",
+            "com.appenetic.home-assistant.interval",
+            "com.appenetic.home-assistant.latitude_dv",
+            "com.appenetic.home-assistant.longitude_dv",
+            "com.appenetic.home-assistant.speed_dv",
+            "com.appenetic.home-assistant.door_dv",
+            "com.appenetic.home-assistant.soc_dv",
+            "com.appenetic.home-assistant.speed_unit"
           ]
         }
       },
-      "manifest_sha256": "e32d9b977837c93fbd58ce6102594766fd8032e55b3bacef6c8e98dd492f9829",
+      "manifest_sha256": "2cf61007ec65ba6b36061d58e8ec990ec10d66a60d902958c31551a56c97cffa",
       "archive": {
-        "url": "pool/cabb7efa4fde1422ecb45ce194034b73925f8b6f3db0032f0196c46d64b8609e",
-        "sha256": "cabb7efa4fde1422ecb45ce194034b73925f8b6f3db0032f0196c46d64b8609e",
+        "url": "pool/d8f0c3a2ffecd94fb51af7706417b31bc9a3d8aeae684000ad002c100994a32c",
+        "sha256": "d8f0c3a2ffecd94fb51af7706417b31bc9a3d8aeae684000ad002c100994a32c",
         "bytes": 7034880
       }
     }

@@ -67,6 +67,12 @@ class Package(unittest.TestCase):
         spec.loader.exec_module(builder)
         for path in (ROOT / 'packages').glob('*/coilshift.json'):
             builder.validate_settings(json.loads(path.read_text()))
+        manifest = json.loads((ROOT / 'packages/home-assistant/coilshift.json').read_text())
+        self.assertEqual(set(manifest['panel']['settings']),
+                         {manifest['id'] + '.' + s['id'] for s in manifest['settings']})
+        manifest['panel']['settings'].append('other.package.password')
+        with self.assertRaisesRegex(ValueError, 'belong'):
+            builder.validate_settings(manifest)
         with self.assertRaisesRegex(ValueError, 'speed_unit'):
             builder.validate_settings({'settings': [{'id': 'speed_unit', 'type': 'enum',
                 'values': [{'value': 'km/h'}, {'value': 'm/s'}], 'default': 'km/h'}]})

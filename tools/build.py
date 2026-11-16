@@ -21,6 +21,13 @@ def sha(data):
 def validate_settings(manifest):
     # SDK enum IDs are tokens; display titles may contain units such as km/h.
     pattern = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]*')
+    panel = manifest.get('panel', {})
+    own = {manifest.get('id', '') + '.' + s['id'] for s in manifest.get('settings', [])}
+    scope = panel.get('settings', [])
+    if len(scope) != len(set(scope)):
+        raise ValueError('Duplicate panel setting scope')
+    if any(s not in own for s in scope) and not manifest.get('id', '').startswith('dev.coilshift.'):
+        raise ValueError('Panel settings must belong to the package')
     for setting in manifest.get('settings', []):
         if setting['type'] != 'enum':
             continue
