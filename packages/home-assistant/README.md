@@ -162,3 +162,19 @@ Freigabe paketinterner Einstellungen ab. Nach dem Update die Panel-Seite schlie�
 und CoilShift neu laden. Ein Host-Test mit ausschließlich expliziter Freigabe
 prüft das Laden und Speichern. Der Live-Abgleich der gemeldeten leeren Liste
 steht noch aus.
+
+## Bearbeiten trotz leerer Leseantwort (alpha.8)
+
+Eine leere oder fehlgeschlagene Einstellungsabfrage sperrt nicht mehr alle
+Eingaben und die Firmware-Profilübernahme. Die Seite nutzt dann ausdrücklich als
+lokale Vorgaben gekennzeichnete Manifest-Defaults. Nicht geladene gespeicherte
+Werte werden nicht als bekannt dargestellt; leere Geheimnisfelder bleiben beim
+Speichern unverändert. Eigene Eingaben werden bei späteren Ladeversuchen bewahrt.
+
+Speichern erfolgt weiterhin ausschließlich über `settings.set` des CoilShift-
+Hosts. Dieser muss die Werte und Berechtigungen prüfen. Eine explizite
+Zugriffsverweigerung sperrt das Speichern; explizit gesperrte Felder bleiben
+schreibgeschützt. Werden Schreibvorgänge bestätigt, aber das Zurücklesen bleibt
+leer, zeigt die Seite genau diese eingeschränkte Bestätigung. Ohne erfolgreiche
+Schreibantwort wird kein Erfolg behauptet. Zur Sicherheit wird vor Änderungen
+bei unbekanntem Aktivierungszustand zunächst die Übertragung deaktiviert.

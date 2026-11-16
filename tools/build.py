@@ -42,6 +42,12 @@ def validate_settings(manifest):
 def build_package(PACKAGE):
     manifest = json.loads((PACKAGE / 'coilshift.json').read_text())
     validate_settings(manifest)
+    if manifest['id'] == 'com.appenetic.home-assistant':
+        # Public declarations/defaults only; never runtime setting values/secrets.
+        schema = {'package': manifest['id'], 'version': manifest['version'],
+                  'settings': manifest['settings']}
+        (PACKAGE / 'panel/settings-schema.js').write_text(
+            'window.haSettingsSchema=' + json.dumps(schema, ensure_ascii=True, separators=(',', ':')) + ';\n')
     # Match JSON Compact without reordering keys or HTML escaping.
     compact = json.dumps(manifest, separators=(',', ':'), ensure_ascii=False).encode()
     for hook in [manifest['hooks']['apply'], manifest['hooks']['remove']] + manifest['hooks']['service']:
@@ -59,7 +65,7 @@ def build_package(PACKAGE):
                 allowed = {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh',
                            'hooks/service.sh', 'bin', 'bin/bridge-linux-amd64', 'NOTICE',
                            'LICENSE-CoilShift-SDK', 'panel', 'panel/index.html', 'panel/app.js',
-                           'panel/style.css', 'panel/csdk-panel.js', 'panel/csdk-panel.css'}
+                           'panel/style.css', 'panel/settings-schema.js', 'panel/csdk-panel.js', 'panel/csdk-panel.css'}
                 if name not in allowed:
                     continue
             entry = tarfile.TarInfo(name + '/' if p.is_dir() else name)

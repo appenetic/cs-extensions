@@ -16,7 +16,7 @@ HOME_ASSISTANT = 'com.appenetic.home-assistant'
 RUNTIME_FILES = {
     'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/service.sh',
     'bin/bridge-linux-amd64', 'NOTICE', 'LICENSE-CoilShift-SDK',
-    'panel/index.html', 'panel/app.js', 'panel/style.css',
+    'panel/index.html', 'panel/app.js', 'panel/style.css', 'panel/settings-schema.js',
     'panel/csdk-panel.js', 'panel/csdk-panel.css',
 }
 PUBLIC_README = '''# Appenetic CS package feed

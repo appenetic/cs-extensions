@@ -139,3 +139,21 @@ freigegebene Einstellungen liefert. Er prüft vollständige Anzeige sowie einen
 Speichervorgang. Elf Paneltests bestehen. Der Paketbauer prüft außerdem, dass
 die expliziten IDs dem eigenen Paket gehören; der Regressionstest verweigert
 fremde IDs. Keine zusätzliche Berechtigung außerhalb der eigenen Einstellungen.
+
+## Version 0.1.0-alpha.8: Entwürfe bei leerer Host-Antwort
+
+Die aktuelle SDK-Referenz wurde bis Commit `b28793e` geprüft; die dokumentierte
+Antwortform ist unverändert. Der Nutzer hat alpha.7 und weiterhin deaktivierte
+Eingaben bestätigt. Die vorherige Annahme, expliziter Scope behebe die Live-
+Anbindung, ist damit nicht bestätigt.
+
+Die Eingabeseite hängt jetzt nicht mehr vollständig vom ersten Leseergebnis ab.
+Sie rendert IDs und Defaults aus einem beim Paketbau erzeugten, rein öffentlichen
+Manifest-Schema. Leere Antworten lassen URL, Zugangsdaten und Profilübernahme als
+lokalen Entwurf editierbar. Fehlgeschlagene oder spätere Reads überschreiben
+keine bearbeiteten Felder. Explizite SDK-Sperren werden weiterhin eingehalten.
+Speichern bleibt ein SDK-Aufruf mit vollständiger eigener ID. Fehlercodes werden
+ohne Fehlerantwort-Inhalte angezeigt; ein fehlendes Readback wird gesondert
+benannt. Zwölf Paneltests bestehen, darunter leeres Read mit erfolgreichem Write
+und leeres Read mit abgelehntem Write. Dies beweist nicht, dass der betroffene
+Live-Host die Schreibvorgänge akzeptiert.

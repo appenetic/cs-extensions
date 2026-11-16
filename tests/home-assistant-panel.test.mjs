@@ -11,7 +11,7 @@ async function setup(options = {}) {
   if (options.enabled) settings.find(s => s.id.endsWith('.enabled')).value = 'true';
   const host = createHost({ permissions: manifest.panel.permissions, settings,
     status: {state:'degraded',reason:'Home Assistant bridge disabled.'}, ...options });
-  host.load([pkg + 'panel/csdk-panel.js', pkg + 'panel/app.js']);
+  host.load([pkg + 'panel/csdk-panel.js', pkg + 'panel/settings-schema.js', pkg + 'panel/app.js']);
   await host.settle(25);
   return host;
 }
@@ -61,23 +61,34 @@ test('failed partial save does not re-enable or show server error secrets',async
   }}});
   field(h,'url').type('https://new.example');save(h);await h.settle(70);
   assert.deepEqual(changes(h),[['enabled','false'],['url','https://new.example']]);
-  assert.match(field(h,'message').textContent,/fehlgeschlagen/);
+  assert.match(field(h,'message').textContent,/nicht vollständig bestätigen/);
   assert.doesNotMatch(field(h,'root').textContent,/credential-in-error/);
-  assert.equal(field(h,'enabled').checked,false);
+  assert.equal(h.settings.find(s=>s.id.endsWith('.enabled')).value,'false');
+  assert.equal(field(h,'enabled').checked,true); // keep the intended draft for retry
 });
-test('missing settings keep saving disabled with useful feedback',async()=>{
-  const h=await setup({settings:[]});
-  assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,true);
-  assert.match(field(h,'message').textContent,/fehlend:/);
-  save(h);await h.settle();assert.deepEqual(changes(h),[]);
+test('empty settings reply leaves URL and profile editable; writes still use host',async()=>{
+ const h=await setup({answers:{'settings.get':()=>[]}});
+ assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,false);
+ assert.equal(field(h,'url').disabled,false);
+ field(h,'url').type('https://my-ha.example');
+ field(h,'root').byLabel('Firmware-Profil übernehmen').click();
+ assert.equal(field(h,'latitude_dv').value,'NAV_vehicleLatitude');
+ assert.equal(field(h,'speed_unit').value,'mph');
+ save(h);await h.settle(70);
+ assert.ok(changes(h).some(([id,v])=>id==='url'&&v==='https://my-ha.example'));
+ assert.ok(changes(h).some(([id,v])=>id==='latitude_dv'&&v==='NAV_vehicleLatitude'));
+ assert.ok(!changes(h).some(([id])=>id==='password'||id==='access_token'));
+ assert.match(field(h,'message').textContent,/Schreibvorgänge bestätigt/);
+ assert.match(field(h,'message').textContent,/noch nicht geprüft/);
 });
-
 test('late settings registration recovers automatically and enables fields',async()=>{
  let ready=false,h;
  h=await setup({answers:{'settings.get':()=>ready ? h.settings.map(s=>({...s,value:s.type==='secret'?{set:true}:s.value})) : []}});
- assert.equal(field(h,'url').disabled,true);
+ assert.equal(field(h,'url').disabled,false);
+ field(h,'url').type('https://unsaved.example');
  assert.match(field(h,'settings-connection').textContent,/liefert 0/);
  ready=true;await h.tick();
+ assert.equal(field(h,'url').value,'https://unsaved.example');
  assert.equal(field(h,'url').disabled,false);
  assert.match(field(h,'settings-connection').textContent,/Einstellungen verbunden/);
 });
@@ -85,12 +96,13 @@ test('host refusal is explained at top of page and not bypassed',async()=>{
  const h=await setup({answers:{'settings.get':()=>{throw Object.assign(new Error('denied'),{code:'forbidden'});}}});
  assert.match(field(h,'settings-connection').textContent,/verweigert/);
  assert.match(field(h,'settings-connection').textContent,/forbidden/);
- assert.equal(field(h,'url').disabled,true);
+ assert.equal(field(h,'url').disabled,false);
+ assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,true);
  save(h);await h.settle();assert.deepEqual(changes(h),[]);
 });
 test('explicit host availability restrictions remain enforced',async()=>{
  const h=await setup({settings:manifest.settings.map(s=>({...s,id:manifest.id+'.'+s.id,value:s.default??'',available:false}))});
- assert.match(field(h,'settings-connection').textContent,/gesperrt/);
+ assert.match(field(h,'settings-connection').textContent,/sperrt:/);
  assert.equal(field(h,'url').disabled,true);
  assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,true);
 });
@@ -113,4 +125,15 @@ test('explicit panel scope exposes all thirteen settings on a scope-only host',a
  field(h,'url').type('https://ha.example');field(h,'username').type('test-user');save(h);await h.settle(50);
  assert.ok(changes(h).some(([id,value])=>id==='username'&&value==='test-user'));
  assert.match(field(h,'message').textContent,/Gespeichert/);
+});
+
+test('empty read plus rejected write never reports a successful save or discards draft',async()=>{
+ const h=await setup({answers:{'settings.get':()=>[], 'settings.set':()=>{throw Object.assign(new Error('private value'),{code:'not_found'});}}});
+ field(h,'url').type('https://draft.example');field(h,'password').type('keep-this');save(h);await h.settle(50);
+ assert.match(field(h,'message').textContent,/nicht vollständig bestätigen/);
+ assert.match(field(h,'message').textContent,/not_found/);
+ assert.doesNotMatch(field(h,'root').textContent,/private value/);
+ assert.equal(field(h,'url').value,'https://draft.example');
+ assert.equal(field(h,'password').value,'keep-this');
+ assert.equal(field(h,'url').disabled,false);
 });
