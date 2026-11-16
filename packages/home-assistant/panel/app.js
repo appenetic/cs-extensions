@@ -41,7 +41,7 @@
   var phoneQR = h('img', {id:'phone-qr', alt:'QR-Code für die Handy-Eingabe', width:'256', height:'256'});
   var phoneAddresses = h('div', {class:'actions', id:'phone-addresses'});
   var phoneCard = h('section', {class:'card', id:'phone-setup'}, h('h2',{},'Am Handy einrichten'),
-    h('p',{},'Handy und Auto ins gleiche WLAN bringen. QR-Code scannen, URL und Zugangsdaten am Handy eingeben und auf die MCU übernehmen.'),
+    h('p',{},'Handy und Auto ins gleiche WLAN bringen oder über Tailscale verbinden. QR-Code scannen, URL und Zugangsdaten am Handy eingeben und auf die MCU übernehmen.'),
     phoneNote, phoneQR, phoneAddresses,
     h('p',{class:'hint'},'Die Verbindung verwendet ein lokales HTTPS-Zertifikat, das am Handy einmal bestätigt werden muss. Der Link gilt fünf Minuten und nur einmal. Danach die übernommenen Werte hier prüfen und speichern.'));
   function build() {
@@ -170,7 +170,7 @@
         return typeof entry.url === 'string' && /^https:\/\/[0-9.]+:[0-9]+\/#([a-f0-9]{48})$/.test(entry.url) &&
           typeof entry.qr === 'string' && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(entry.qr);
       });
-      if (!phoneLinks.length) { phoneNote.textContent = 'Dienst läuft, aber keine private IPv4-Adresse gefunden. Auto mit dem WLAN verbinden und Plugin-Dienst neu starten.'; return; }
+      if (!phoneLinks.length) { phoneNote.textContent = 'Dienst läuft, aber keine lokale oder Tailscale-IPv4-Adresse gefunden. Auto mit dem WLAN verbinden und Plugin-Dienst neu starten.'; return; }
       function show(entry) { phoneQR.setAttribute('src',entry.qr); phoneQR.style.display='block'; phoneNote.textContent='QR-Code scannen. Adresse: '+entry.url.split('/#')[0]; }
       show(phoneLinks[0]);
       if (phoneLinks.length > 1) phoneLinks.forEach(function(entry,index){var button=h('button',{type:'button'},'Adresse '+(index+1));button.addEventListener('click',function(){show(entry);});phoneAddresses.append(button);});

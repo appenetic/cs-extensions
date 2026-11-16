@@ -257,3 +257,19 @@ Fehlt bereits diese Überschrift, ist eine ältere/andere Oberfläche geöffnet;
 das ist kein Beleg für einen fehlenden QR-Backenddienst. Nach dem Update
 CoilShift vollständig schließen und neu öffnen. Fehlt die Versionsanzeige
 weiterhin, ist die neue Oberfläche am Gerät noch nicht aktiv.
+
+## Tailscale-/CGNAT-Zugriff (alpha.12)
+
+Der Einrichtungsserver akzeptiert zusätzlich zu privaten LAN-/Loopback-Adressen
+jetzt das geteilte IPv4-Netz `100.64.0.0/10`, aus dem Tailscale seine IPv4-Adressen
+vergibt. Go klassifiziert diesen Bereich nicht als `IP.IsPrivate()`, weshalb der
+bisherige Filter entsprechende Clients schon beim Seitenaufruf mit 403 ablehnte.
+Die Adressermittlung für QR-Codes berücksichtigt den Bereich ebenfalls.
+
+Der Zugriff benötigt weiterhin HTTPS, den Einmalcode, eine passende Origin und
+ein gültiges Zeitfenster. Öffentliche Client-IP-Adressen bleiben abgewiesen.
+Nach dem Update einen frisch erzeugten QR-Code verwenden; er enthält die aktuelle
+Portnummer und den neuen Zugriffscode. Nur der Host-/Port-Text reicht nicht zum
+Speichern, weil der QR-Link auch das geheime Fragment enthält.
+
+Referenz: https://tailscale.com/docs/concepts/tailscale-ip-addresses

@@ -221,3 +221,24 @@ Formulars. Der Export prüft Entry-Pfad, Version, referenzierte Dateien und
 Asset-Hashes. Der neue Paneltest startet die tatsächlich aus dem Entry
 referenzierten Skripte und verlangt Versionsanzeige sowie Handy-Abschnitt,
 auch ohne Backend-Dateien. Die Live-Aktivierung auf der MCU bleibt zu prüfen.
+
+## Version 0.1.0-alpha.12: Shared-Address-Space im Einrichtungsfilter
+
+Die vom Nutzer genannte Zieladresse liegt im RFC-6598-/Tailscale-Bereich
+`100.64.0.0/10`. Der bisherige Filter ließ nur Go-`IsPrivate` und Loopback zu;
+Clients dieses Bereichs wurden dadurch mit 403 abgewiesen. Der Filter erlaubt
+nun zusätzlich exakt dieses /10-Netz, sowohl für den Request-Peer als auch bei
+der Ermittlung möglicher QR-Adressen. Keine Aufweichung der Token-/Originprüfung.
+
+Zusätzliche Tests decken die /10-Grenzen, weiterhin blockierte öffentliche IPs,
+einen Seitenaufruf mit synthetischer Tailscale-Peer-Adresse und eine erfolgreiche
+Übertragung mit passendem Code/Origin ab. Falscher Code und fremde Origin werden
+auch für Tailscale-Peers abgewiesen. Alle 18 Go-Tests bestehen in QEMU; der Host-
+Race-Detector-Lauf und 17 Paneltests sind ebenfalls erfolgreich. Ein echter
+Tailnet-Netzwerkpfad wurde nicht simuliert; der nachgewiesene Fehler liegt im
+HTTP-Peer-Filter.
+
+Beim Host-Abschlusstest wurde außerdem ein Rennen zwischen asynchroner Dienst-
+Bereinigung und Testverzeichnis-Löschung gefunden. Dienst und Tests warten jetzt
+auf die abgeschlossene Bereinigung; der Status einer direkt gespeicherten
+Konfiguration bleibt dabei `saved` und wird nicht versehentlich `sent`.
