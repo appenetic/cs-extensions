@@ -15,7 +15,7 @@ HOME_ASSISTANT = 'com.appenetic.home-assistant'
 # Shell lifecycle adapters are intentionally readable; application logic is ELF.
 RUNTIME_FILES = {
     'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/service.sh',
-    'bin/bridge-linux-amd64', 'NOTICE', 'LICENSE-CoilShift-SDK',
+    'bin/bridge-linux-amd64', 'NOTICE', 'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code',
     'panel/index.html', 'panel/app.js', 'panel/style.css', 'panel/settings-schema.js',
     'panel/csdk-panel.js', 'panel/csdk-panel.css',
 }

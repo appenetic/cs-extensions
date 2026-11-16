@@ -36,3 +36,5 @@ Copyright 2026 Lupine
 
 The unmodified panel bridge and stylesheet are included under the Apache License,
 Version 2.0; see LICENSE-CoilShift-SDK. The panel test host uses the same license.
+
+QR code generation uses go-qrcode by skip2, under the license in LICENSE-QR-Code.

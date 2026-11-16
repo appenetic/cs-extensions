@@ -68,7 +68,7 @@ Messwert lässt sich ohne Quellzeitstempel nicht als veraltet erkennen.
 
 ## Entwicklung und Validierungsstand
 
-Quellcode: `services/home-assistant/`, ausschließlich Go-Standardbibliothek.
+Quellcode: `services/home-assistant/`, Go-Standardbibliothek und fest versioniertes `go-qrcode` für den lokalen Einrichtungs-QR-Code.
 Binärdatei: `bin/bridge-linux-amd64`, statisch, Baseline AMD64 v1. Reproduzierbarer
 Build mit Go 1.27.4 (verwendete Toolchain):
 
@@ -178,3 +178,39 @@ schreibgeschützt. Werden Schreibvorgänge bestätigt, aber das Zurücklesen ble
 leer, zeigt die Seite genau diese eingeschränkte Bestätigung. Ohne erfolgreiche
 Schreibantwort wird kein Erfolg behauptet. Zur Sicherheit wird vor Änderungen
 bei unbekanntem Aktivierungszustand zunächst die Übertragung deaktiviert.
+
+## Handy-Eingabe im gleichen WLAN (alpha.9)
+
+1. Auto und Handy mit demselben WLAN verbinden, dann den Plugin-Dienst starten
+   bzw. nach dem Update die Einstellungsseite öffnen.
+2. Unter **Am Handy einrichten** den QR-Code scannen. Er zeigt auf eine private
+   IPv4-Adresse der MCU. Falls mehrere Adressen angezeigt werden, die passende
+   WLAN-Adresse auswählen. Es wird keine Firewall-Regel geändert.
+3. Der lokale HTTPS-Server verwendet ein nur für diesen Start erzeugtes
+   Zertifikat. Dieses muss im Handy-Browser einmal bestätigt werden; die Adresse
+   muss der auf der MCU angezeigten lokalen Adresse entsprechen.
+4. URL und Benutzername/Passwort oder API-Token am Handy eingeben. Mit
+   **Auf MCU übernehmen** werden die Werte als Entwurf an die MCU übertragen.
+5. Auf der MCU die Werte prüfen, **Home Assistant aktivieren** wählen und
+   **Einstellungen speichern** drücken. Die Handy-Übertragung ist noch keine
+   Bestätigung, dass CoilShift die Werte dauerhaft gespeichert hat.
+
+Die DataValue-Namen und `mph` sind für die untersuchte Firmware vorbelegt.
+Übertragung und Fahrzeugdaten liegen unter **Erweitert**. Individuell gespeicherte
+Werte werden nicht automatisch durch die neuen Defaults überschrieben; für
+früher leere Felder steht der Profilknopf außerhalb des aufgeklappten Bereichs bereit.
+
+Der QR-Link gilt fünf Minuten nach Dienststart und nur für eine Übertragung.
+Der Listener schließt nach erfolgreicher Übertragung, Ablauf oder Dienstende.
+Für einen neuen QR-Code den Plugin-Dienst neu starten. Die temporären Eingaben
+liegen höchstens bis zum Ablauf des Einrichtungsfensters als Datei mit Modus
+0600 im bootflüchtigen SDK-Verzeichnis; sie werden beim Ablauf/Dienstende entfernt.
+Keine Zugangsdaten werden durch den Einrichtungsserver in persistenten Speicher
+oder Logs geschrieben. Gespeichert wird weiterhin ausschließlich durch CoilShift.
+
+Die Authentisierung verwendet einen zufälligen 192-Bit-Code im QR-Fragment;
+Schreibanfragen verlangen diesen Code und dieselbe HTTPS-Origin. Öffentliche
+Remote-IP-Adressen werden abgewiesen, Browser-CORS wird nicht freigegeben.
+Zugriffe über private Netzwerke/Loopback sind während des Fensters möglich.
+Die tatsächliche WLAN-Erreichbarkeit hängt von Routing und Firewall der MCU ab
+und ist hier nicht am Auto geprüft; das gleiche WLAN allein garantiert sie nicht.

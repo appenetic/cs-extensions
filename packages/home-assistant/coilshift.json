@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "com.appenetic.home-assistant",
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "sdk": ">=1.0 <2",
   "title": "Home Assistant Bridge (experimental)",
   "summary": "Überträgt GPS, Geschwindigkeit, Fahrstufe, Akkuladestand und Fahrertür über HTTPS an Home Assistant. Mit eigener Einstellungsseite.",
@@ -15,7 +15,8 @@
     "service",
     "dv.read",
     "panel",
-    "vehicle.read"
+    "vehicle.read",
+    "web.listen"
   ],
   "settings": [
     {
@@ -74,33 +75,33 @@
       "id": "latitude_dv",
       "type": "string",
       "title": "DataValue Breitengrad (Dezimalgrad)",
-      "default": "",
+      "default": "NAV_vehicleLatitude",
       "max_bytes": 128,
-      "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
+      "summary": "Vorbelegt für Firmware 2026.38.5.12 (offline geprüft). Nur bei abweichender Firmware ändern."
     },
     {
       "id": "longitude_dv",
       "type": "string",
       "title": "DataValue Längengrad (Dezimalgrad)",
-      "default": "",
+      "default": "NAV_vehicleLongitude",
       "max_bytes": 128,
-      "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
+      "summary": "Vorbelegt für Firmware 2026.38.5.12 (offline geprüft). Nur bei abweichender Firmware ändern."
     },
     {
       "id": "speed_dv",
       "type": "string",
       "title": "DataValue Geschwindigkeit",
-      "default": "",
+      "default": "NAV_vehicleSpeedMph",
       "max_bytes": 128,
-      "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
+      "summary": "Vorbelegt für Firmware 2026.38.5.12 (offline geprüft). Nur bei abweichender Firmware ändern."
     },
     {
       "id": "door_dv",
       "type": "string",
       "title": "DataValue Fahrertür (true = offen)",
-      "default": "",
+      "default": "VAPI_driverDoor",
       "max_bytes": 128,
-      "summary": "Exakten, auf deiner Firmware geprüften DataValue-Namen eintragen."
+      "summary": "Vorbelegt für Firmware 2026.38.5.12 (offline geprüft). Nur bei abweichender Firmware ändern."
     },
     {
       "id": "soc_dv",
@@ -108,13 +109,13 @@
       "title": "DataValue Akkuladestand (SoC in %)",
       "default": "VAPI_batteryLevel",
       "max_bytes": 128,
-      "summary": "Firmware-Kandidat für den angezeigten Akkuladestand. Wertebereich 0–100 %."
+      "summary": "Vorbelegt für Firmware 2026.38.5.12 (offline geprüft). Nur bei abweichender Firmware ändern."
     },
     {
       "id": "speed_unit",
       "type": "enum",
       "title": "Einheit des Geschwindigkeits-DataValues",
-      "default": "kph",
+      "default": "mph",
       "values": [
         {
           "value": "kph",
@@ -156,7 +157,8 @@
     "permissions": [
       "settings.read",
       "settings.write",
-      "status"
+      "status",
+      "data"
     ],
     "settings": [
       "com.appenetic.home-assistant.enabled",

@@ -137,3 +137,33 @@ test('empty read plus rejected write never reports a successful save or discards
  assert.equal(field(h,'password').value,'keep-this');
  assert.equal(field(h,'url').disabled,false);
 });
+
+test('vehicle defaults are prefilled and advanced controls start collapsed',async()=>{
+ const h=await setup();
+ assert.equal(field(h,'latitude_dv').value,'NAV_vehicleLatitude');
+ assert.equal(field(h,'longitude_dv').value,'NAV_vehicleLongitude');
+ assert.equal(field(h,'speed_dv').value,'NAV_vehicleSpeedMph');
+ assert.equal(field(h,'speed_unit').value,'mph');
+ assert.equal(field(h,'door_dv').value,'VAPI_driverDoor');
+ assert.equal(field(h,'advanced-settings').getAttribute('open'),null);
+ // A saved custom value still wins over the new manifest default.
+ const settings=manifest.settings.map(s=>({...s,id:manifest.id+'.'+s.id,value:s.id==='latitude_dv'?'CUSTOM_lat':s.default}));
+ const custom=await setup({settings});
+ assert.equal(field(custom,'latitude_dv').value,'CUSTOM_lat');
+});
+test('phone transfer fills a draft without auto-saving; polling does not replay it',async()=>{
+ const transfer={schema:1,id:'pairing-1',expires:Date.now()/1000+120,values:{url:'https://phone.example',username:'from-phone',password:'phone-secret'}};
+ const h=await setup({data:{'phone-input.json':JSON.stringify(transfer),'phone-setup.json':JSON.stringify({schema:1,state:'sent'})}});
+ assert.equal(field(h,'url').value,'https://phone.example');
+ assert.equal(field(h,'password').value,'phone-secret');
+ assert.deepEqual(changes(h),[]);
+ field(h,'url').type('https://edited.example');await h.tick();
+ assert.equal(field(h,'url').value,'https://edited.example');
+ save(h);await h.settle(70);
+ assert.ok(changes(h).some(([id,v])=>id==='password'&&v==='phone-secret'));
+ assert.equal(field(h,'password').value,'');
+});
+test('expired phone input cannot replace fields',async()=>{
+ const h=await setup({data:{'phone-input.json':JSON.stringify({schema:1,id:'old',expires:1,values:{url:'https://old.example'}})}});
+ assert.equal(field(h,'url').value,'https://ha.example');
+});

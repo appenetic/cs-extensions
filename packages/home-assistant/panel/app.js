@@ -3,6 +3,7 @@
   var bridge = window.csdkPanel.createClient(window);
   var root = document.getElementById('root');
   var fields = {}, records = {}, cleared = {}, busy = false, settingsReady = false, loadingSettings = false, dirty = {}, writeBlocked = false;
+  var phoneInputID = "", phoneLinks = [];
   var schema = window.haSettingsSchema;
   var declarations = {};
   schema.settings.forEach(function (setting) { declarations[setting.id] = setting; });
@@ -36,8 +37,16 @@
   var saveButton = h('button', { type: 'button', class: 'primary', 'aria-label': 'Einstellungen speichern' }, 'Einstellungen speichern');
   saveButton.disabled = true;
   function say(text, tone) { message.textContent = text; message.setAttribute('class', tone || ''); }
+  var phoneNote = h('p', {id:'phone-note', 'aria-live':'polite'}, 'Handy-Eingabe wird gesucht …');
+  var phoneQR = h('img', {id:'phone-qr', alt:'QR-Code für die Handy-Eingabe', width:'256', height:'256'});
+  var phoneAddresses = h('div', {class:'actions', id:'phone-addresses'});
+  var phoneCard = h('section', {class:'card', id:'phone-setup'}, h('h2',{},'Am Handy einrichten'),
+    h('p',{},'Handy und Auto ins gleiche WLAN bringen. QR-Code scannen, URL und Zugangsdaten am Handy eingeben und auf die MCU übernehmen.'),
+    phoneNote, phoneQR, phoneAddresses,
+    h('p',{class:'hint'},'Die Verbindung verwendet ein lokales HTTPS-Zertifikat, das am Handy einmal bestätigt werden muss. Der Link gilt fünf Minuten und nur einmal. Danach die übernommenen Werte hier prüfen und speichern.'));
   function build() {
-    root.replaceChildren(h('h1', {}, 'Home Assistant'), h('p', { class: 'subtitle' }, 'Verbindung und Fahrzeugdaten konfigurieren.'), connection, state);
+    root.replaceChildren(h('h1', {}, 'Home Assistant'), h('p', { class: 'subtitle' }, 'Verbindung und Fahrzeugdaten konfigurieren.'), phoneCard, connection, state);
+    var advanced = h('details', { class: 'card', id: 'advanced-settings' }, h('summary', {}, 'Erweitert · Übertragung und Fahrzeugdaten'));
     groups.forEach(function (group) {
       var card = h('section', { class: 'card' }, h('h2', {}, group[0]));
       group[1].forEach(function (spec) {
@@ -74,10 +83,12 @@
           Object.keys(values).forEach(function (id) { if (!fields[id].input.disabled) { fields[id].input.value = values[id]; dirty[id] = true; } });
           say('Firmware-Profil eingetragen. Zum Übernehmen speichern.');
         });
-        card.append(profile, h('p', { class: 'hint' }, 'Profil für 2026.38.5.12: offline geprüft, Live-Abgleich steht aus. GPS wird über diesen Leseweg auf drei Nachkommastellen gerundet.'));
+        root.append(h('div', { class: 'notice' }, profile, h('p', { class: 'hint' }, 'Die Werte sind für 2026.38.5.12 vorbelegt und müssen normalerweise nicht eingetippt werden. Offline geprüft, Live-Abgleich steht aus. GPS wird auf drei Nachkommastellen gerundet.')));
       }
-      root.append(card);
+      if (group[0] === 'Verbindung') root.append(card);
+      else advanced.append(card);
     });
+    root.append(advanced);
     var reload = h('button', { type: 'button', 'aria-label': 'Einstellungen neu laden' }, 'Neu laden');
     reload.addEventListener('click', function () {
       if (busy) return;
@@ -136,6 +147,39 @@
     }).then(function () { loadingSettings = false; }, function (error) {
       loadingSettings = false; settingsError(error); throw error;
     });
+  }
+  function loadPhone() {
+    bridge.data.get('phone-setup.json').then(function (text) {
+      var info = JSON.parse(text);
+      if (info.schema !== 1) return;
+      phoneQR.style.display = 'none'; phoneAddresses.replaceChildren();
+      if (info.state === 'sent') { phoneNote.textContent = 'Vom Handy übertragen. Eingaben unten prüfen und Einstellungen speichern.'; return; }
+      if (info.state === 'expired') { phoneNote.textContent = 'Einrichtungsfenster abgelaufen. Für einen neuen QR-Code den Plugin-Dienst neu starten.'; return; }
+      if (info.state !== 'ready') { phoneNote.textContent = 'Handy-Eingabe konnte nicht gestartet werden.'; return; }
+      phoneLinks = (info.addresses || []).filter(function (entry) {
+        return typeof entry.url === 'string' && /^https:\/\/[0-9.]+:[0-9]+\/#([a-f0-9]{48})$/.test(entry.url) &&
+          typeof entry.qr === 'string' && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(entry.qr);
+      });
+      if (!phoneLinks.length) { phoneNote.textContent = 'Dienst läuft, aber keine private IPv4-Adresse gefunden. Auto mit dem WLAN verbinden und Plugin-Dienst neu starten.'; return; }
+      function show(entry) { phoneQR.setAttribute('src',entry.qr); phoneQR.style.display='block'; phoneNote.textContent='QR-Code scannen. Adresse: '+entry.url.split('/#')[0]; }
+      show(phoneLinks[0]);
+      if (phoneLinks.length > 1) phoneLinks.forEach(function(entry,index){var button=h('button',{type:'button'},'Adresse '+(index+1));button.addEventListener('click',function(){show(entry);});phoneAddresses.append(button);});
+    }).catch(function () { phoneQR.style.display='none'; phoneNote.textContent='Noch kein Lebenszeichen der Handy-Eingabe. Dienststart prüfen und nach dem Update neu laden.'; });
+    bridge.data.get('phone-input.json').then(function (text) {
+      var input=JSON.parse(text);
+      if (busy || input.schema!==1 || typeof input.id!=='string' || input.id===phoneInputID || typeof input.expires!=='number' || input.expires*1000<Date.now()) return;
+      var values=input.values;
+      if (!values || typeof values!=='object') return;
+      var imported = 0;
+      ['url','username','password','access_token'].forEach(function(id){
+        if (typeof values[id]==='string' && !fields[id].input.disabled && (values[id]!=='' || (id!=='password' && id!=='access_token'))) {
+          fields[id].input.value=values[id];dirty[id]=true;cleared[id]=false;imported++;
+        }
+      });
+      if (!imported) { say('Vom Handy empfangen, aber CoilShift sperrt die Eingabefelder. Noch nicht in das Formular übernommen.', 'bad'); return; }
+      phoneInputID=input.id;
+      say('Vom Handy übernommen. Jetzt Werte prüfen, bei Bedarf aktivieren und Einstellungen speichern.');
+    }).catch(function () {});
   }
   function loadStatus() {
     return bridge.status().then(function (status) {
@@ -196,9 +240,9 @@
   }
   build(); bridge.applyChrome(document);
   loadSettings().catch(function (error) { say(error.message || 'Einstellungen konnten nicht geladen werden.', 'bad'); });
-  loadStatus();
+  loadStatus(); loadPhone();
   window.setInterval(function () {
-    loadStatus();
+    loadStatus(); loadPhone();
     // Retry a late app/manifest handshake without overwriting an active editor.
     if (!settingsReady && !busy) loadSettings().catch(function () {});
   }, 5000);

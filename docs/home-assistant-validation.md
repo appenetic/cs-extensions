@@ -157,3 +157,24 @@ ohne Fehlerantwort-Inhalte angezeigt; ein fehlendes Readback wird gesondert
 benannt. Zwölf Paneltests bestehen, darunter leeres Read mit erfolgreichem Write
 und leeres Read mit abgelehntem Write. Dies beweist nicht, dass der betroffene
 Live-Host die Schreibvorgänge akzeptiert.
+
+## Version 0.1.0-alpha.9: Lokale Handy-Eingabe
+
+Der Dienst öffnet für fünf Minuten einen lokalen HTTPS-Einrichtungsserver auf
+einem freien IPv4-Port. QR-Codes enthalten private Interface-Adressen und einen
+192-Bit-Einmalcode; es werden keine externen QR-Dienste verwendet. Das selbst
+signierte, pro Start erzeugte Zertifikat besitzt passende IP-SANs. Erfolgreiche
+Übertragung erzeugt nur eine 0600-RAM-Datei für das eigene SDK-Panel und beendet
+den Listener. Das Panel übernimmt die Eingaben als Entwurf, speichert nicht
+automatisch und ignoriert abgelaufene/wiederholte Nachrichten.
+
+Die fest versionierte QR-Bibliothek wird nur in die private Go-Quellstruktur
+vendort. Der öffentliche Export enthält die kompilierte Datei und Lizenzhinweise.
+Default-DataValues sind vorbelegt und fortgeschrittene Felder eingeklappt.
+
+Tests: TLS mit explizit vertrautem Test-Zertifikat, Einmalcode, falsche Origin,
+ungültige/zu große Eingaben, Ablauf und Löschung bei Dienstende. Die entsprechenden
+13 Go-Tests bestehen im Firmware-QEMU, einschließlich echtem Produktionsdienst.
+15 Paneltests prüfen u. a. Übernahme ohne automatisches Speichern, kein Replay und
+Ignorieren abgelaufener Entwürfe. Im Gast gibt es ausschließlich Loopback, keine
+physische WLAN-Schnittstelle: Erreichbarkeit vom Handy ist damit nicht belegt.

@@ -64,7 +64,7 @@ def build_package(PACKAGE):
                 # Explicit release allowlist: no developer docs or source files.
                 allowed = {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh',
                            'hooks/service.sh', 'bin', 'bin/bridge-linux-amd64', 'NOTICE',
-                           'LICENSE-CoilShift-SDK', 'panel', 'panel/index.html', 'panel/app.js',
+                           'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'panel', 'panel/index.html', 'panel/app.js',
                            'panel/style.css', 'panel/settings-schema.js', 'panel/csdk-panel.js', 'panel/csdk-panel.css'}
                 if name not in allowed:
                     continue
