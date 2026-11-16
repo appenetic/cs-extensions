@@ -45,6 +45,7 @@ Mit dem Standardpräfix `coilshift_car` werden über die Home-Assistant-States-A
 | --- | --- |
 | `device_tracker.coilshift_car` | `latitude`, `longitude`, `source_type: gps`; zusätzlich Geschwindigkeit, `battery_level` und Türzustand als Attribute |
 | `sensor.coilshift_car_speed` | Geschwindigkeit in km/h, Geräteklasse `speed` |
+| `sensor.coilshift_car_gear` | Fahrstufe `P`, `R`, `N` oder `D`; automatisch über den SDK-Fahrzeugendpunkt |
 | `sensor.coilshift_car_soc` | Akkuladestand in %, Geräteklasse `battery`; Standardquelle `VAPI_batteryLevel` |
 | `binary_sensor.coilshift_car_driver_door` | `on` = offen, `off` = geschlossen, Geräteklasse `door` |
 
@@ -144,3 +145,11 @@ abgefragt. Oberhalb der Felder steht jetzt, ob die Verbindung besteht, welche
 Einstellungen fehlen oder ob CoilShift den Zugriff verweigert bzw. Felder sperrt.
 Bereits geladene Eingaben werden durch das Statuspolling nicht überschrieben.
 Die genaue Ursache in der betroffenen Installation ist noch nicht bestätigt.
+
+## Fahrstufe (ab alpha.6)
+
+`sensor.coilshift_car_gear` und das Tracker-Attribut `gear` liefern `D` (Drive),
+`N` (Neutral), `R` (Reverse) oder `P` (Park). Keine zusätzliche Einstellung nötig:
+die Quelle ist `GET /v1/vehicle/gear` des CoilShift-SDK. Unbekannte/fehlende Werte
+werden `unavailable`, niemals automatisch `P`. Numerische Firmware-Enums werden
+nicht geraten. Der Wert wird im gleichen Zyklus wie die übrigen Daten gesendet.

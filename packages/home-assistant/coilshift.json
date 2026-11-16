@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "id": "com.appenetic.home-assistant",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "sdk": ">=1.0 <2",
   "title": "Home Assistant Bridge (experimental)",
-  "summary": "Überträgt GPS, Geschwindigkeit, Akkuladestand und Fahrertür über HTTPS an Home Assistant. Statischer x86_64-Dienst.",
+  "summary": "Überträgt GPS, Geschwindigkeit, Fahrstufe, Akkuladestand und Fahrertür über HTTPS an Home Assistant. Mit eigener Einstellungsseite.",
   "authors": [
     {
       "name": "Appenetic",
@@ -14,7 +14,8 @@
   "capabilities": [
     "service",
     "dv.read",
-    "panel"
+    "panel",
+    "vehicle.read"
   ],
   "settings": [
     {

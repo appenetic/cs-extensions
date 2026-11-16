@@ -112,3 +112,15 @@ oberhalb der Eingaben. Fehlende Einstellungsnamen und explizite Host-Sperren
 werden unterschieden; Host-Sperren werden nicht umgangen. Zehn Paneltests
 bestehen, darunter verspätete Registrierung, Zugriffsverweigerung und gesperrte
 Felder. Die Ursache in der vom Nutzer gemeldeten Live-Installation steht noch aus.
+
+## Version 0.1.0-alpha.6: Fahrstufe
+
+Der Dienst liest die Fahrstufe über `GET /v1/vehicle/gear`, deklariert
+`vehicle.read` und sendet `sensor.coilshift_car_gear` sowie das Tracker-Attribut
+`gear`. Unterstützt werden `P`, `R`, `N`, `D` und deren ausgeschriebene Namen.
+Unbekannte Werte, numerische Enums und HTTP-Fehler ergeben `unavailable`;
+ein voriger gültiger Wert wird nicht als aktuelle Fahrstufe weitergesendet.
+
+Alle zehn Diensttests bestehen im Firmware-QEMU und auf dem Host mit Race Detector,
+inklusive des echten Produktionsdiensts. Zusätzlich bestehen zehn Paneltests,
+19 Paket-/Regressionstests und `go vet`. Live-SDK-/Fahrzeugprüfung steht aus.
