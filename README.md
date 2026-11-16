@@ -48,12 +48,16 @@ that happened while the MCU was asleep. It refuses firmware other than 2026.38.5
 
 ## Repository and installation
 
-After this repository has been pushed publicly to `appenetic/cs-extensions`, the
-Package repository index URL is:
+The stable Home Assistant package repository index URL is:
 
 ```
-https://raw.githubusercontent.com/appenetic/cs-extensions/main/repository/index.json
+https://appenetic.github.io/cs-extensions/index.json
 ```
+
+GitHub Actions validates and publishes the current compiled Home Assistant release
+after feed updates on `main`. The URL stays the same for future versions.
+The original feed (including Welcome Light) remains available at
+`https://raw.githubusercontent.com/appenetic/cs-extensions/main/repository/index.json`.
 
 The index is `repository/index.json`; archives are content-addressed under
 `repository/pool/`. Add the index URL in the package manager, then select
