@@ -178,3 +178,29 @@ ungültige/zu große Eingaben, Ablauf und Löschung bei Dienstende. Die entsprec
 15 Paneltests prüfen u. a. Übernahme ohne automatisches Speichern, kein Replay und
 Ignorieren abgelaufener Entwürfe. Im Gast gibt es ausschließlich Loopback, keine
 physische WLAN-Schnittstelle: Erreichbarkeit vom Handy ist damit nicht belegt.
+
+## Version 0.1.0-alpha.10: Eigener verschlüsselter Konfigurationsspeicher
+
+Der Nutzer hat `settings.set: not_found` bestätigt. Der SDK-Schreibweg ist damit
+in der betroffenen Installation nicht funktionsfähig; seine genaue serverseitige
+Ursache bleibt ohne App-/Daemon-Diagnose offen. Statt weiterer Annahmen über
+SDK-Registrierung kann der Einrichtungsserver nun explizit direkt in den
+paketeigenen persistenten Zustand speichern.
+
+`connection.enc` verwendet AES-256-GCM, einen zufälligen 256-Bit-Schlüssel, eine
+neue Nonce pro Speichern und festen Schema-Kontext als AAD. Schlüssel und
+Konfiguration sind reguläre 0600-Dateien. Ciphertext wird nach Validierung durch
+eine neue Datei und atomisches Rename ersetzt und vor der Bestätigung synchronisiert.
+Eine nicht entschlüsselbare Konfiguration wird nicht still überschrieben.
+
+Die Direkt-Konfiguration hat im Dienst Vorrang vor den SDK-Settings und wird im
+MCU-Panel als solche angezeigt, einschließlich maskierter Geheimnisse. Um eine
+falsche Bestätigung von SDK-Writes zu vermeiden, ist das Panel in diesem Modus
+zur Kontrolle gedacht; Änderungen werden über die Handy-Seite vorgenommen.
+
+16 Go-Tests bestehen im Firmware-QEMU, darunter Speichern/Neustart/echte HA-Test-
+Übertragung aus der geladenen Konfiguration, Integritätsfehler, Abweisung einer
+ungültigen Aktualisierung, Dateimodi und lokale Handy-Speicherung trotz unverändert
+deaktivierter SDK-Einstellungen. Der Host-Lauf mit Race
+Detector ist ebenfalls erfolgreich; der Linux-Produktionsprozess wird nur in QEMU ausgeführt. 16 Paneltests prüfen auch die lokale Anzeige ohne SDK-Schreibaufrufe.
+Kein Test belegt die Erreichbarkeit im konkreten WLAN oder Live-HA-Zugangsdaten.

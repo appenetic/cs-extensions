@@ -167,3 +167,12 @@ test('expired phone input cannot replace fields',async()=>{
  const h=await setup({data:{'phone-input.json':JSON.stringify({schema:1,id:'old',expires:1,values:{url:'https://old.example'}})}});
  assert.equal(field(h,'url').value,'https://ha.example');
 });
+test('private configuration snapshot is displayed without calling broken SDK writes',async()=>{
+ const views=manifest.settings.map(s=>({...s,id:manifest.id+'.'+s.id,value:s.type==='secret'?{set:true}:s.id==='url'?'https://local.example':s.default}));
+ const h=await setup({answers:{'settings.get':()=>[], 'settings.set':()=>{throw Object.assign(new Error('missing'),{code:'not_found'});}},data:{'plugin-settings.json':JSON.stringify({source:'plugin',settings:views}),'phone-setup.json':JSON.stringify({schema:1,state:'saved'})}});
+ assert.equal(field(h,'url').value,'https://local.example');
+ assert.match(field(h,'settings-connection').textContent,/Direkt im Plugin gespeichert/);
+ assert.equal(field(h,'password').value,'');
+ assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,true);
+ save(h);await h.settle();assert.deepEqual(changes(h),[]);
+});

@@ -179,6 +179,35 @@ leer, zeigt die Seite genau diese eingeschränkte Bestätigung. Ohne erfolgreich
 Schreibantwort wird kein Erfolg behauptet. Zur Sicherheit wird vor Änderungen
 bei unbekanntem Aktivierungszustand zunächst die Übertragung deaktiviert.
 
+## Speichern ohne CoilShift-Einstellungskatalog (alpha.10)
+
+Wenn CoilShift bei `settings.set` mit `not_found` antwortet, funktioniert dieser
+Schreibweg in der betroffenen Installation nicht. Ab alpha.10 ist auf der
+Handy-Seite **Direkt im Plugin speichern** standardmäßig ausgewählt:
+
+1. Plugin aktualisieren und den frischen QR-Code scannen.
+2. URL und Zugangsdaten eintragen. **Direkt im Plugin speichern** und bei Bedarf
+   **Übertragung nach dem Speichern aktivieren** angehakt lassen.
+3. **Im Plugin speichern** drücken. Erst die Erfolgsmeldung bestätigt die
+   lokale Speicherung. Ein weiterer Speicherklick auf der MCU ist nicht nötig.
+
+Die Konfiguration liegt AES-256-GCM-verschlüsselt unter `$CSDK_STATE/connection.enc`.
+Der separat erzeugte Schlüssel liegt unter `$CSDK_STATE/connection.key`; beide
+Dateien haben Modus 0600. Updates und Dienstneustarts behalten die Konfiguration.
+Der Dienst verwendet sie vorrangig vor SDK-Einstellungsdateien und bemerkt
+Änderungen automatisch. Sie wird nicht in CoilShift-Cloud-Snapshots synchronisiert.
+Root-Zugriff auf beide Dateien ermöglicht weiterhin die Entschlüsselung.
+
+Auf der MCU erscheint **Direkt im Plugin gespeichert und vom Dienst verwendet**.
+Die Werte sind dort zur Kontrolle sichtbar, Geheimnisse nur als „gesetzt“.
+Bearbeiten erfolgt in diesem Modus über die Handy-Seite; die MCU-Speicherfunktion
+ist zur Vermeidung widersprüchlicher SDK-/Plugin-Konfiguration deaktiviert.
+Für weitere Änderungen den Plugin-Dienst für einen neuen QR-Code neu starten.
+
+Ist **Direkt im Plugin speichern** nicht angehakt, bleibt der bisherige reine
+Entwurfsweg aktiv; dieser behebt keinen `not_found`-Fehler beim SDK-Speichern.
+Die Handy-Verbindung benötigt weiterhin lokale Netzwerk-Erreichbarkeit.
+
 ## Handy-Eingabe im gleichen WLAN (alpha.9)
 
 1. Auto und Handy mit demselben WLAN verbinden, dann den Plugin-Dienst starten
@@ -205,8 +234,9 @@ Der Listener schließt nach erfolgreicher Übertragung, Ablauf oder Dienstende.
 Für einen neuen QR-Code den Plugin-Dienst neu starten. Die temporären Eingaben
 liegen höchstens bis zum Ablauf des Einrichtungsfensters als Datei mit Modus
 0600 im bootflüchtigen SDK-Verzeichnis; sie werden beim Ablauf/Dienstende entfernt.
-Keine Zugangsdaten werden durch den Einrichtungsserver in persistenten Speicher
-oder Logs geschrieben. Gespeichert wird weiterhin ausschließlich durch CoilShift.
+Im Entwurfsmodus werden keine Zugangsdaten durch den Einrichtungsserver in
+persistenten Speicher oder Logs geschrieben. Der direkte Speichermodus ab
+alpha.10 verwendet dagegen den oben beschriebenen verschlüsselten Plugin-Speicher.
 
 Die Authentisierung verwendet einen zufälligen 192-Bit-Code im QR-Fragment;
 Schreibanfragen verlangen diesen Code und dieselbe HTTPS-Origin. Öffentliche

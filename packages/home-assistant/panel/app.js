@@ -2,8 +2,8 @@
   'use strict';
   var bridge = window.csdkPanel.createClient(window);
   var root = document.getElementById('root');
-  var fields = {}, records = {}, cleared = {}, busy = false, settingsReady = false, loadingSettings = false, dirty = {}, writeBlocked = false;
-  var phoneInputID = "", phoneLinks = [];
+  var fields = {}, records = {}, cleared = {}, busy = false, settingsReady = false, loadingSettings = false, dirty = {}, writeBlocked = false, pluginMode = false;
+  var phoneInputID = "", phoneLinks = [], profileButton = null;
   var schema = window.haSettingsSchema;
   var declarations = {};
   schema.settings.forEach(function (setting) { declarations[setting.id] = setting; });
@@ -77,6 +77,7 @@
       });
       if (group[0] === 'Fahrzeugdaten') {
         var profile = h('button', { type: 'button', 'aria-label': 'Firmware-Profil übernehmen' }, 'Firmware-Profil übernehmen');
+        profileButton = profile;
         profile.addEventListener('click', function () {
           if (busy) return;
           var values = { latitude_dv: 'NAV_vehicleLatitude', longitude_dv: 'NAV_vehicleLongitude', speed_dv: 'NAV_vehicleSpeedMph', speed_unit: 'mph', door_dv: 'VAPI_driverDoor', soc_dv: 'VAPI_batteryLevel' };
@@ -100,10 +101,12 @@
   }
   function controls() {
     Object.keys(fields).forEach(function (id) {
-      fields[id].input.disabled = busy || records[id].available === false;
+      fields[id].input.disabled = busy || pluginMode || records[id].available === false;
       if (fields[id].clear) fields[id].clear.disabled = fields[id].input.disabled;
     });
-    saveButton.disabled = busy || writeBlocked || records.enabled.available === false;
+    saveButton.disabled = busy || pluginMode || writeBlocked || records.enabled.available === false;
+    if (profileButton) profileButton.disabled = busy || pluginMode;
+    saveButton.textContent = pluginMode ? 'Konfiguration am Handy verwalten' : 'Einstellungen speichern';
   }
   function settingsError(error) {
     settingsReady = false;
@@ -119,14 +122,20 @@
     loadingSettings = true;
     // Use the raw SDK reply: settingList would silently turn unsupported shapes
     // into an empty array and hide the distinction from an actual empty reply.
-    return bridge.request('settings.get').then(function (reply) {
+    return bridge.data.get('plugin-settings.json').then(function (text) {
+      var local = JSON.parse(text);
+      if (local.source !== 'plugin' || !Array.isArray(local.settings)) throw new Error('not local');
+      return local;
+    }).catch(function () { return bridge.request('settings.get'); }).then(function (reply) {
+      pluginMode = !!reply && reply.source === 'plugin';
       var list = window.csdkPanel.settingList(reply), missing = [], locked = [];
       Object.keys(fields).forEach(function (id) {
         var field = fields[id], setting = window.csdkPanel.findSetting(list, id);
         if (!setting) { missing.push(id); return; }
         records[id] = setting;
         if (setting.available === false) locked.push(id);
-        if (dirty[id]) return; // Never replace a draft during a retry.
+        if (dirty[id] && !pluginMode) return;
+        if (pluginMode) dirty[id] = false; // Never replace a draft during a retry.
         if (field.type === 'secret') {
           field.input.value = ''; cleared[id] = false;
           field.input.setAttribute('placeholder', setting.value && setting.value.set ? 'Gespeichert · unverändert lassen' : 'Noch nicht gespeichert');
@@ -140,7 +149,7 @@
         connection.textContent = 'CoilShift liefert ' + list.length + ' Einstellungen (Antwort: ' + shape + '). Gespeicherte Werte sind nicht vollständig bekannt. Lokale Vorgaben und eigene Eingaben bleiben bearbeitbar. Speichern wird über CoilShift angefordert; eine Übernahme ist noch nicht bestätigt.';
         connection.setAttribute('class', 'notice bad');
       } else {
-        connection.textContent = locked.length ? 'CoilShift sperrt: ' + locked.join(', ') : 'Einstellungen verbunden.';
+        connection.textContent = pluginMode ? 'Direkt im Plugin gespeichert und vom Dienst verwendet. Zum Ändern die Handy-Seite verwenden (für einen neuen QR-Code Plugin-Dienst neu starten).' : locked.length ? 'CoilShift sperrt: ' + locked.join(', ') : 'Einstellungen verbunden.';
         connection.setAttribute('class', locked.length ? 'notice bad' : 'notice ok');
       }
       controls();
@@ -153,6 +162,7 @@
       var info = JSON.parse(text);
       if (info.schema !== 1) return;
       phoneQR.style.display = 'none'; phoneAddresses.replaceChildren();
+      if (info.state === 'saved') { phoneNote.textContent = 'Verschlüsselt im Plugin gespeichert. Der Dienst übernimmt die Konfiguration automatisch.'; return; }
       if (info.state === 'sent') { phoneNote.textContent = 'Vom Handy übertragen. Eingaben unten prüfen und Einstellungen speichern.'; return; }
       if (info.state === 'expired') { phoneNote.textContent = 'Einrichtungsfenster abgelaufen. Für einen neuen QR-Code den Plugin-Dienst neu starten.'; return; }
       if (info.state !== 'ready') { phoneNote.textContent = 'Handy-Eingabe konnte nicht gestartet werden.'; return; }
@@ -244,6 +254,6 @@
   window.setInterval(function () {
     loadStatus(); loadPhone();
     // Retry a late app/manifest handshake without overwriting an active editor.
-    if (!settingsReady && !busy) loadSettings().catch(function () {});
+    if ((!settingsReady || pluginMode || !Object.keys(dirty).some(function(id){return dirty[id];})) && !busy) loadSettings().catch(function () {});
   }, 5000);
 })();
