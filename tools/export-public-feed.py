@@ -57,6 +57,9 @@ def validate_package(entry, repository):
         raise ValueError('Manifest checksum mismatch')
     if manifest['id'] != entry['id'] or manifest['version'] != entry['version']:
         raise ValueError('Manifest identity mismatch')
+    release_entry = 'panel/settings-' + manifest['version'] + '.html'
+    if manifest.get('panel', {}).get('entry') != release_entry:
+        raise ValueError('Expected versioned panel entry')
     seen = set()
     files = set()
     with tarfile.open(fileobj=io.BytesIO(data)) as tar:
@@ -71,12 +74,24 @@ def validate_package(entry, repository):
                 if name not in {'hooks', 'bin', 'panel'}:
                     raise ValueError('Unexpected package directory: ' + name)
                 continue
-            if not member.isfile() or name not in RUNTIME_FILES:
+            if not member.isfile() or (name not in RUNTIME_FILES and name != release_entry
+                    and not re.fullmatch(r'panel/(app|style|settings-schema)\.[0-9a-f]{12}\.(js|css)', name)):
                 raise ValueError('Source or unexpected file in public archive: ' + name)
             files.add(name)
-        required = RUNTIME_FILES
+        required = RUNTIME_FILES | {release_entry}
         if not required <= files:
             raise ValueError('Missing runtime artifacts')
+        html = tar.extractfile(release_entry).read().decode()
+        if 'Oberfläche ' + manifest['version'] not in html:
+            raise ValueError('Missing visible panel version')
+        for source, suffix in [('app', 'js'), ('style', 'css'), ('settings-schema', 'js')]:
+            pattern = source + r'\.([0-9a-f]{12})\.' + suffix
+            references = re.findall(pattern, html)
+            if len(references) != 1:
+                raise ValueError('Expected exactly one versioned asset: ' + source)
+            filename = 'panel/' + source + '.' + references[0] + '.' + suffix
+            if filename not in files or digest(tar.extractfile(filename).read())[:12] != references[0]:
+                raise ValueError('Versioned asset checksum mismatch: ' + source)
         if json.load(tar.extractfile('coilshift.json')) != manifest:
             raise ValueError('Embedded manifest mismatch')
         binary = tar.extractfile('bin/bridge-linux-amd64').read()

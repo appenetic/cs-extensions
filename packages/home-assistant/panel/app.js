@@ -45,7 +45,7 @@
     phoneNote, phoneQR, phoneAddresses,
     h('p',{class:'hint'},'Die Verbindung verwendet ein lokales HTTPS-Zertifikat, das am Handy einmal bestätigt werden muss. Der Link gilt fünf Minuten und nur einmal. Danach die übernommenen Werte hier prüfen und speichern.'));
   function build() {
-    root.replaceChildren(h('h1', {}, 'Home Assistant'), h('p', { class: 'subtitle' }, 'Verbindung und Fahrzeugdaten konfigurieren.'), phoneCard, connection, state);
+    root.replaceChildren(h('h1', {}, 'Home Assistant'), h('p', { class: 'subtitle' }, 'Verbindung und Fahrzeugdaten konfigurieren. UI ' + schema.version), phoneCard, connection, state);
     var advanced = h('details', { class: 'card', id: 'advanced-settings' }, h('summary', {}, 'Erweitert · Übertragung und Fahrzeugdaten'));
     groups.forEach(function (group) {
       var card = h('section', { class: 'card' }, h('h2', {}, group[0]));

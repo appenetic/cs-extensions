@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+execFileSync('python3',['tools/build.py']);
 import { createHost } from './vendor/panel-host.mjs';
 const pkg = 'packages/home-assistant/';
 const manifest = JSON.parse(fs.readFileSync(pkg + 'coilshift.json'));
@@ -11,7 +13,7 @@ async function setup(options = {}) {
   if (options.enabled) settings.find(s => s.id.endsWith('.enabled')).value = 'true';
   const host = createHost({ permissions: manifest.panel.permissions, settings,
     status: {state:'degraded',reason:'Home Assistant bridge disabled.'}, ...options });
-  host.load([pkg + 'panel/csdk-panel.js', pkg + 'panel/settings-schema.js', pkg + 'panel/app.js']);
+  host.load(options.scripts || [pkg + 'panel/csdk-panel.js', pkg + 'panel/settings-schema.js', pkg + 'panel/app.js']);
   await host.settle(25);
   return host;
 }
@@ -175,4 +177,17 @@ test('private configuration snapshot is displayed without calling broken SDK wri
  assert.equal(field(h,'password').value,'');
  assert.equal(field(h,'root').byLabel('Einstellungen speichern').disabled,true);
  save(h);await h.settle();assert.deepEqual(changes(h),[]);
+});
+
+test('actual versioned entry loads hashed assets and always includes phone setup',async()=>{
+ const html=fs.readFileSync(pkg+manifest.panel.entry,'utf8');
+ assert.match(manifest.panel.entry,new RegExp('settings-'+manifest.version.replaceAll('.','\\.')+'\\.html$'));
+ assert.ok(html.includes('Oberfläche '+manifest.version));
+ const scripts=[...html.matchAll(/<script src="([^"]+)"/g)].map(m=>pkg+'panel/'+m[1]);
+ assert.ok(scripts.some(path=>/app\.[a-f0-9]{12}\.js$/.test(path)));
+ assert.ok(scripts.some(path=>/settings-schema\.[a-f0-9]{12}\.js$/.test(path)));
+ const h=await setup({scripts});
+ assert.ok(field(h,'phone-setup'));
+ assert.match(field(h,'root').textContent,/Am Handy einrichten/);
+ assert.ok(field(h,'root').textContent.includes('UI '+manifest.version));
 });

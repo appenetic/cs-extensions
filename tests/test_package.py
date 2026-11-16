@@ -56,6 +56,9 @@ class Package(unittest.TestCase):
             self.assertEqual(archive.getmember('hooks/service.sh').mode, 0o755)
             self.assertIn('panel/index.html', archive.getnames())
             self.assertIn('panel/app.js', archive.getnames())
+            entry_html = entry['manifest']['panel']['entry']
+            self.assertIn(entry_html, archive.getnames())
+            self.assertIn('Oberfläche ' + entry['version'], archive.extractfile(entry_html).read().decode())
             self.assertIn('panel', entry['manifest']['capabilities'])
             self.assertFalse(any(n.endswith('.pyc') or '__pycache__' in n for n in archive.getnames()))
             self.assertEqual(json.load(archive.extractfile('coilshift.json')), entry['manifest'])

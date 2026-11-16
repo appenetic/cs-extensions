@@ -244,3 +244,16 @@ Remote-IP-Adressen werden abgewiesen, Browser-CORS wird nicht freigegeben.
 Zugriffe über private Netzwerke/Loopback sind während des Fensters möglich.
 Die tatsächliche WLAN-Erreichbarkeit hängt von Routing und Firewall der MCU ab
 und ist hier nicht am Auto geprüft; das gleiche WLAN allein garantiert sie nicht.
+
+## UI-Version prüfen (alpha.11)
+
+Oberhalb der Seite steht jetzt **Oberfläche 0.1.0-alpha.11**; im Untertitel
+steht dieselbe UI-Version. Jede Version nutzt eine eigene HTML-Einstiegsadresse
+und inhaltsadressierte App-/CSS-/Schema-Dateien, damit ein Cache keine alte
+Oberfläche unter denselben Asset-URLs wiederverwenden kann.
+
+**Am Handy einrichten** wird immer angezeigt, selbst ohne laufenden Dienst.
+Fehlt bereits diese Überschrift, ist eine ältere/andere Oberfläche geöffnet;
+das ist kein Beleg für einen fehlenden QR-Backenddienst. Nach dem Update
+CoilShift vollständig schließen und neu öffnen. Fehlt die Versionsanzeige
+weiterhin, ist die neue Oberfläche am Gerät noch nicht aktiv.

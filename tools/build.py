@@ -42,12 +42,30 @@ def validate_settings(manifest):
 def build_package(PACKAGE):
     manifest = json.loads((PACKAGE / 'coilshift.json').read_text())
     validate_settings(manifest)
+    release_files = set()
     if manifest['id'] == 'com.appenetic.home-assistant':
         # Public declarations/defaults only; never runtime setting values/secrets.
         schema = {'package': manifest['id'], 'version': manifest['version'],
                   'settings': manifest['settings']}
         (PACKAGE / 'panel/settings-schema.js').write_text(
             'window.haSettingsSchema=' + json.dumps(schema, ensure_ascii=True, separators=(',', ':')) + ';\n')
+        # Change both the iframe URL and every changing asset URL per release.
+        html = (PACKAGE / 'panel/index.html').read_text()
+        for source in ['app.js', 'style.css', 'settings-schema.js']:
+            data = (PACKAGE / 'panel' / source).read_bytes()
+            stem, suffix = source.rsplit('.', 1)
+            filename = stem + '.' + sha(data)[:12] + '.' + suffix
+            (PACKAGE / 'panel' / filename).write_bytes(data)
+            html = html.replace('"' + source + '"', '"' + filename + '"')
+            release_files.add('panel/' + filename)
+        entry = manifest['panel']['entry']
+        expected = 'panel/settings-' + manifest['version'] + '.html'
+        if entry != expected:
+            raise ValueError('Panel entry must be versioned: ' + expected)
+        html = html.replace('<body>', '<body><p class="release-version" id="release-version">Oberfläche '
+                            + manifest['version'] + '</p>')
+        (PACKAGE / entry).write_text(html)
+        release_files.add(entry)
     # Match JSON Compact without reordering keys or HTML escaping.
     compact = json.dumps(manifest, separators=(',', ':'), ensure_ascii=False).encode()
     for hook in [manifest['hooks']['apply'], manifest['hooks']['remove']] + manifest['hooks']['service']:
@@ -66,7 +84,7 @@ def build_package(PACKAGE):
                            'hooks/service.sh', 'bin', 'bin/bridge-linux-amd64', 'NOTICE',
                            'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'panel', 'panel/index.html', 'panel/app.js',
                            'panel/style.css', 'panel/settings-schema.js', 'panel/csdk-panel.js', 'panel/csdk-panel.css'}
-                if name not in allowed:
+                if name not in allowed | release_files:
                     continue
             entry = tarfile.TarInfo(name + '/' if p.is_dir() else name)
             entry.mode = 0o755 if p.is_dir() or p.stat().st_mode & 0o111 else 0o644

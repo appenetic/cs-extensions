@@ -204,3 +204,20 @@ ungültigen Aktualisierung, Dateimodi und lokale Handy-Speicherung trotz unverä
 deaktivierter SDK-Einstellungen. Der Host-Lauf mit Race
 Detector ist ebenfalls erfolgreich; der Linux-Produktionsprozess wird nur in QEMU ausgeführt. 16 Paneltests prüfen auch die lokale Anzeige ohne SDK-Schreibaufrufe.
 Kein Test belegt die Erreichbarkeit im konkreten WLAN oder Live-HA-Zugangsdaten.
+
+## Version 0.1.0-alpha.11: Eindeutige UI-Version und neue Asset-Adressen
+
+Der Nutzer sieht nicht nur keinen QR-Code, sondern den gesamten Abschnitt
+„Am Handy einrichten“ nicht. Dieser Abschnitt ist seit alpha.9 statisch im
+UI-Code enthalten, unabhängig von Dienstzustand/IP-Adresse/Zeitfenster. Das
+öffentlich heruntergeladene alpha.10-Archiv wurde überprüft und enthält ihn.
+Ein fehlender Abschnitt ist daher mit einer alten/anderen angezeigten Oberfläche
+vereinbar, kein Nachweis eines Dienstfehlers.
+
+Der Panel-Einstieg heißt nun `settings-<version>.html`. App, Stylesheet und
+Schema werden zusätzlich unter SHA-256-Präfix-Dateinamen referenziert. Die
+HTML-Seite enthält eine sichtbare Versionsanzeige außerhalb des dynamischen
+Formulars. Der Export prüft Entry-Pfad, Version, referenzierte Dateien und
+Asset-Hashes. Der neue Paneltest startet die tatsächlich aus dem Entry
+referenzierten Skripte und verlangt Versionsanzeige sowie Handy-Abschnitt,
+auch ohne Backend-Dateien. Die Live-Aktivierung auf der MCU bleibt zu prüfen.
