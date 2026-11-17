@@ -1,7 +1,8 @@
 # Claude Code für CoilShift: Validierung, 2026-11-17
 
 Version `0.1.0-alpha.1`, Plugin `coilshift` 0.1.0, Claude Code 2.1.304, Go 1.27.4,
-Node 26. Am Auto ist noch nichts davon geprüft.
+Node 26. Der Bericht beginnt mit dem Stand vor dem ersten Test am Auto; die
+Abschnitte am Ende halten die Befunde am Auto fest.
 
 ## Auf dem Mac geprüft (Host)
 
@@ -125,3 +126,13 @@ CoilShift-App ist überflüssig.
 - Das Panel ist entfernt, die Kachel-Dateien liegen unter `web/`.
 - Die App-Tests laufen jetzt im Kachel-Modus.
 - Archiv- und Export-Tests verlangen, dass das Paket kein Panel deklariert.
+
+## Am Auto bestätigt (alpha.8)
+
+Model Y, Firmware 2026.32.7, 17.11.2026: Nach dem Update auf alpha.8 meldet der
+Nutzer „funktioniert alles“.
+- **Diagnose an die Mac-Bridge:** Verbindung online, Web-Dienst läuft,
+  Namespace-Bind ok, Karte über der Navi ok, Sprach-Transkript bereit.
+- **Plugin:** Die Installation von GitHub
+  (`claude plugin marketplace add appenetic/cs-extensions`) funktioniert in
+  einer isolierten Claude-Code-Konfiguration.

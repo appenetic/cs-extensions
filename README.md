@@ -20,7 +20,8 @@ dem Mac. Es ist öffentlich, auch für Kollegen:
 `claude plugin marketplace add appenetic/cs-extensions`, dann
 `claude plugin install coilshift@appenetic`.
 [Einrichtung und Grenzen](packages/claude/README.md) ·
-[Validierung](docs/claude-validation.md). Am Auto noch ungeprüft.
+[Validierung](docs/claude-validation.md). Läuft seit alpha.8 am Auto
+(Model Y, Firmware 2026.32.7).
 
 ## Home Assistant Bridge
 

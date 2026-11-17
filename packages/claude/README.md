@@ -257,5 +257,5 @@ python3 -m unittest discover -s tests -v
 python3 tools/build.py
 ```
 
-Siehe [Validierungsbericht](../../docs/claude-validation.md). Am Auto ist noch
-nichts davon geprüft.
+Siehe [Validierungsbericht](../../docs/claude-validation.md). Seit alpha.8 läuft
+das Paket am Auto (Model Y, Firmware 2026.32.7). Laut Nutzer funktioniert alles.
