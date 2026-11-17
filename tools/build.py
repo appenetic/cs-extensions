@@ -51,13 +51,12 @@ RELEASES = {
                     'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'panel', 'panel/index.html', 'panel/app.js',
                     'panel/style.css', 'panel/settings-schema.js', 'panel/csdk-panel.js', 'panel/csdk-panel.css'},
     },
+    # No panel: the launcher tile is served by the package's own web service.
     'com.appenetic.claude': {
-        'entry': 'panel/claude-{version}.html',
-        'assets': ['app.js', 'app.css'],
         'allowed': {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/link.sh',
                     'hooks/web.sh', 'bin', 'bin/claude-linux-amd64', 'ui', 'ui/card.uiml', 'NOTICE',
-                    'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'panel', 'panel/app.html', 'panel/app.js',
-                    'panel/app.css', 'panel/csdk-panel.js', 'panel/csdk-panel.css', 'panel/icon.png'},
+                    'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'web', 'web/app.html', 'web/app.js',
+                    'web/app.css', 'web/csdk-panel.css', 'web/icon.png'},
     },
 }
 
@@ -73,7 +72,7 @@ def build_package(PACKAGE):
                   'settings': manifest['settings']}
         (PACKAGE / 'panel/settings-schema.js').write_text(
             'window.haSettingsSchema=' + json.dumps(schema, ensure_ascii=True, separators=(',', ':')) + ';\n')
-    if release:
+    if release and 'entry' in release:
         # Change both the iframe URL and every changing asset URL per release.
         html = (PACKAGE / 'panel/index.html').read_text()
         for source in release['assets']:

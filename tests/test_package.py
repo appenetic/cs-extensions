@@ -75,15 +75,17 @@ class Package(unittest.TestCase):
         self.assertEqual(manifest['web'][0]['service'], 'web')
         self.assertFalse(any(c.startswith('dv.write') for c in manifest['capabilities']))
         self.assertNotIn('requires', manifest, 'a missing UI host must not make the package unsupported')
+        self.assertNotIn('panel', manifest, 'the app is the launcher tile; no tab in the CoilShift app')
+        self.assertNotIn('panel', manifest['capabilities'])
         with tarfile.open(fileobj=io.BytesIO(data)) as archive:
             names = set(archive.getnames())
             binary = archive.extractfile('bin/claude-linux-amd64').read()
             self.assertEqual(binary[:4], b'\x7fELF')
             for hook in ['hooks/apply.sh', 'hooks/remove.sh', 'hooks/link.sh', 'hooks/web.sh']:
                 self.assertEqual(archive.getmember(hook).mode, 0o755)
-            for name in ['panel/app.html', 'panel/app.js', 'panel/app.css', 'panel/icon.png', 'ui/card.uiml', manifest['tile']['icon']]:
+            for name in ['web/app.html', 'web/app.js', 'web/app.css', 'web/icon.png', 'ui/card.uiml', manifest['tile']['icon']]:
                 self.assertIn(name, names)
-            self.assertIn('Oberfläche ' + entry['version'], archive.extractfile(manifest['panel']['entry']).read().decode())
+            self.assertFalse(any(n.startswith('panel') for n in names))
             self.assertFalse(any(n.endswith(('.go', '.md', '.mjs', '.py')) for n in names))
             self.assertEqual(json.load(archive.extractfile('coilshift.json')), manifest)
 

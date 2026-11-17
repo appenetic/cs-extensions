@@ -1,16 +1,12 @@
-// The Claude app on the MCU: the same page runs as the launcher tile (served by
-// the package's web service) and as the CoilShift panel (a sandboxed frame).
-// The tile talks to its own origin; the panel reaches the web port with the
-// token from endpoint.json and falls back to reading state.json read-only.
-// Plain ES5, no build step; everything from the car or the Mac is shown with
-// textContent, never as markup. The text fields are built once and never
-// moved, so an update does not close the Tesla keyboard while dictating.
+// The Claude app on the MCU, the launcher tile: a page the package's web service
+// serves, talking to that service on its own origin with the token it gets from
+// /api/bootstrap. Plain ES5, no build step; everything from the car or the Mac
+// is shown with textContent, never as markup. The text fields are built once and
+// never moved, so an update does not close the Tesla keyboard while dictating.
 (function () {
   'use strict';
 
   var root = document.getElementById('root');
-  var inPanel = window.parent && window.parent !== window && window.csdkPanel;
-  var bridge = inPanel ? window.csdkPanel.createClient(window) : null;
   var api = null;
   var view = null;
   var rev = -1;
@@ -69,23 +65,15 @@
   }
 
   function connect() {
-    if (!inPanel) {
-      return window
-        .fetch('/api/bootstrap', { cache: 'no-store' })
-        .then(function (response) {
-          if (!response.ok) throw new Error('bootstrap');
-          return response.json();
-        })
-        .then(function (data) {
-          api = { base: '', token: data.token };
-        });
-    }
-    return bridge.data.get('endpoint.json').then(function (text) {
-      var endpoint = JSON.parse(text);
-      if (!window.fetch || !endpoint || !endpoint.port || !endpoint.token) throw new Error('no endpoint');
-      api = { base: 'http://127.0.0.1:' + endpoint.port, token: endpoint.token };
-      return request('GET', '/api/view?since=-1&wait=0').then(update);
-    });
+    return window
+      .fetch('/api/bootstrap', { cache: 'no-store' })
+      .then(function (response) {
+        if (!response.ok) throw new Error('bootstrap');
+        return response.json();
+      })
+      .then(function (data) {
+        api = { base: '', token: data.token };
+      });
   }
 
   function loop() {
@@ -102,23 +90,6 @@
     );
   }
 
-  // The panel without a reachable web port shows the mirror read-only.
-  function readOnly() {
-    mode = 'readonly';
-    var poll = function () {
-      bridge.data.get('state.json').then(
-        function (text) {
-          update(JSON.parse(text));
-        },
-        function () {
-          render();
-        }
-      );
-    };
-    poll();
-    window.setInterval(poll, 3000);
-  }
-
   function start() {
     connect().then(
       function () {
@@ -126,12 +97,9 @@
         loop();
       },
       function () {
-        if (inPanel) readOnly();
-        else {
-          mode = 'retry';
-          render();
-          window.setTimeout(start, 3000);
-        }
+        mode = 'retry';
+        render();
+        window.setTimeout(start, 3000);
       }
     );
   }
@@ -140,8 +108,8 @@
     if (!data || typeof data !== 'object') return;
     view = data;
     if (typeof data.rev === 'number') rev = data.rev;
-    if (mode !== 'readonly') mode = 'live';
-    if (!inPanel && data.theme) document.documentElement.setAttribute('data-theme', data.theme === 'day' ? 'light' : 'dark');
+    mode = 'live';
+    if (data.theme) document.documentElement.setAttribute('data-theme', data.theme === 'day' ? 'light' : 'dark');
     render();
   }
 
@@ -228,7 +196,6 @@
       });
     });
     els.flash = h('p', { class: 'flash', 'aria-live': 'polite', id: 'flash' });
-    els.notice = h('div', { id: 'notice' });
     els.pairing = h('section', { class: 'card pairing', id: 'pairing' });
 
     // The composer: one textarea for answers and new instructions.
@@ -292,7 +259,6 @@
     root.replaceChildren(
       h('header', { class: 'top' }, h('h1', {}, 'Claude Code'), els.link, els.away),
       els.flash,
-      els.notice,
       els.pairing,
       els.newCard,
       els.split,
@@ -334,11 +300,6 @@
     els.away.textContent = away ? 'Unterwegs-Modus an' : 'Unterwegs-Modus aus';
     els.away.disabled = mode !== 'live' || link.state !== 'online' || sending;
 
-    els.notice.replaceChildren();
-    show(els.notice, mode === 'readonly');
-    if (mode === 'readonly') {
-      els.notice.append(h('p', { class: 'notice', id: 'readonly' }, 'Nur-Lese-Ansicht: Das Panel erreicht den Web-Port des Claude-Dienstes nicht. Antworten gehen über die Claude-Kachel im App-Launcher.'));
-    }
     var pairingOpen = view && view.pairing && view.pairing.state === 'open';
     var needsPairing = !view || link.state === 'unpaired' || link.state === 'rejected' || pairingOpen;
     show(els.pairing, needsPairing);
@@ -436,7 +397,7 @@
     (s.messages || []).forEach(function (m) {
       rows.unshift(h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), h('span', { class: 'text' }, m.text)));
     });
-    if (!rows.length) rows.push(h('li', { class: 'hint' }, mode === 'readonly' ? 'Kein Verlauf in der Nur-Lese-Ansicht.' : 'Noch kein Verlauf.'));
+    if (!rows.length) rows.push(h('li', { class: 'hint' }, 'Noch kein Verlauf.'));
     els.messages.replaceChildren.apply(els.messages, rows);
     renderComposer(s);
   }
@@ -528,7 +489,7 @@
     els.composerHint.textContent = canSend
       ? HINTS[s.delivery] || HINTS.inbox
       : mode !== 'live'
-        ? 'Antworten sind nur in der verbundenen App möglich.'
+        ? 'Verbindung zum Claude-Dienst im Auto wird aufgebaut …'
         : 'Diese Sitzung nimmt gerade keinen Text an. Sie läuft vermutlich ohne das CoilShift-Plugin.';
   }
 
@@ -557,11 +518,11 @@
       ['Verbindung', (LINK[link.state] || link.state || '–') + (link.error ? ' · ' + link.error : '')],
       ['Bridge', view && view.bridge ? (view.bridge.name || '') + ' · ' + (view.bridge.version || '') : '–'],
       ['Web-Port', diag['web.listen'] ? diag['web.listen'] + (diag['web.port'] ? ' · ' + diag['web.port'] + ' (' + (diag['web.mode'] || '') + ')' : '') : 'noch keine Meldung'],
+      ['Web-Dienst', (diag['web.service'] || '–') + (diag['web.bind'] ? ' · Namespace ' + diag['web.bind'] : '')],
       ['Karte über der Navi', diag.card || 'noch keine Meldung'],
       ['Sprachtaste', diag.voice || 'noch keine Meldung'],
       ['Letzte Sprachantwort', diag['voice.last'] || '–'],
-      ['Fahrstufe', (view && view.gear) || '–'],
-      ['Oberfläche', inPanel ? (mode === 'readonly' ? 'Panel, nur lesen' : 'Panel') : 'Kachel']
+      ['Fahrstufe', (view && view.gear) || '–']
     ];
     var cells = [];
     rows.forEach(function (r) {
@@ -571,7 +532,6 @@
     show(els.techActions, mode === 'live' && Boolean(view) && link.state !== 'unpaired');
   }
 
-  if (bridge) bridge.applyChrome(document);
   build();
   render();
   start();

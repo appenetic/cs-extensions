@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "com.appenetic.claude",
-  "version": "0.1.0-alpha.6",
+  "version": "0.1.0-alpha.7",
   "sdk": ">=1.0 <2",
   "title": "Claude Code (experimental)",
   "summary": "Deine Claude-Code-Sitzungen vom Mac auf der MCU: Liste, Verlauf, Fragen als Karte über der Navi, Antworten per Touch, Diktat oder Sprachtaste. Kopplung per QR-Code.",
@@ -13,7 +13,6 @@
   ],
   "capabilities": [
     "service",
-    "panel",
     "tile",
     "web.listen",
     "bind",
@@ -66,7 +65,7 @@
   "tile": {
     "id": "app",
     "title": "Claude Code",
-    "icon": "panel/icon.png",
+    "icon": "web/icon.png",
     "url": "web:app"
   },
   "web": [
@@ -97,14 +96,6 @@
         "run": "hooks/web.sh",
         "restart": "on-failure"
       }
-    ]
-  },
-  "panel": {
-    "entry": "panel/claude-0.1.0-alpha.6.html",
-    "title": "Claude Code",
-    "permissions": [
-      "status",
-      "data"
     ]
   }
 }

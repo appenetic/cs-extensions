@@ -27,16 +27,15 @@ RELEASES = {
         'assets': [('app', 'js'), ('style', 'css'), ('settings-schema', 'js')],
         'binary': 'bin/bridge-linux-amd64',
     },
+    # No panel: the launcher tile is served by the package's own web service.
     CLAUDE: {
         'runtime': {
             'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/link.sh', 'hooks/web.sh',
             'bin/claude-linux-amd64', 'ui/card.uiml', 'NOTICE', 'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code',
-            'panel/app.html', 'panel/app.js', 'panel/app.css', 'panel/csdk-panel.js', 'panel/csdk-panel.css',
-            'panel/icon.png',
+            'web/app.html', 'web/app.js', 'web/app.css', 'web/csdk-panel.css', 'web/icon.png',
         },
-        'directories': {'hooks', 'bin', 'panel', 'ui'},
-        'entry': 'panel/claude-{version}.html',
-        'assets': [('app', 'js'), ('app', 'css')],
+        'directories': {'hooks', 'bin', 'web', 'ui'},
+        'assets': [],
         'binary': 'bin/claude-linux-amd64',
     },
 }
@@ -80,10 +79,10 @@ def validate_package(entry, repository):
         raise ValueError('Manifest checksum mismatch')
     if manifest['id'] != entry['id'] or manifest['version'] != entry['version']:
         raise ValueError('Manifest identity mismatch')
-    release_entry = release['entry'].format(version=manifest['version'])
+    release_entry = release['entry'].format(version=manifest['version']) if 'entry' in release else None
     if manifest.get('panel', {}).get('entry') != release_entry:
-        raise ValueError('Expected versioned panel entry')
-    versioned = '|'.join(re.escape(stem) + r'\.[0-9a-f]{12}\.' + suffix for stem, suffix in release['assets'])
+        raise ValueError('Expected versioned panel entry' if release_entry else 'Unexpected panel')
+    versioned = '|'.join(re.escape(stem) + r'\.[0-9a-f]{12}\.' + suffix for stem, suffix in release['assets']) or '(?!)'
     seen = set()
     files = set()
     with tarfile.open(fileobj=io.BytesIO(data)) as tar:
@@ -102,11 +101,11 @@ def validate_package(entry, repository):
                     and not re.fullmatch(r'panel/(' + versioned + ')', name)):
                 raise ValueError('Source or unexpected file in public archive: ' + name)
             files.add(name)
-        required = release['runtime'] | {release_entry}
+        required = release['runtime'] | ({release_entry} if release_entry else set())
         if not required <= files:
             raise ValueError('Missing runtime artifacts')
-        html = tar.extractfile(release_entry).read().decode()
-        if 'Oberfläche ' + manifest['version'] not in html:
+        html = tar.extractfile(release_entry).read().decode() if release_entry else ''
+        if release_entry and 'Oberfläche ' + manifest['version'] not in html:
             raise ValueError('Missing visible panel version')
         for source, suffix in release['assets']:
             pattern = re.escape(source) + r'\.([0-9a-f]{12})\.' + suffix

@@ -117,3 +117,11 @@ Node 26. Am Auto ist noch nichts davon geprüft.
 - **Handtest:** Ein Bind-Mount über `PUT /v1/binds` und danach
   `POST /v1/services/web/restart` ließen den Web-Dienst laufen. Er lauscht auf
   127.0.0.1:29899 in `chromium-entertainment`. alpha.6 macht das automatisch.
+
+## alpha.7
+
+Wunsch aus dem Auto: Die App reicht als Kachel im Launcher, ein Reiter in der
+CoilShift-App ist überflüssig.
+- Das Panel ist entfernt, die Kachel-Dateien liegen unter `web/`.
+- Die App-Tests laufen jetzt im Kachel-Modus.
+- Archiv- und Export-Tests verlangen, dass das Paket kein Panel deklariert.

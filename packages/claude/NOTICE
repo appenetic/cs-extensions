@@ -39,7 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 CoilShift Zero SDK
 Copyright 2026 Lupine
 
-The unmodified panel bridge and stylesheet are included under the Apache License,
-Version 2.0; see LICENSE-CoilShift-SDK. The panel test host uses the same license.
+The unmodified SDK stylesheet (web/csdk-panel.css) is included under the Apache
+License, Version 2.0; see LICENSE-CoilShift-SDK.
 
 QR code generation uses go-qrcode by skip2, under the license in LICENSE-QR-Code.

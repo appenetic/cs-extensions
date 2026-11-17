@@ -13,7 +13,6 @@ Gekoppelt wird per QR-Code. Am Fahrzeug selbst wird nichts geschrieben.
 | Plugin `coilshift` | Claude Code auf dem Mac | Bridge-Dienst, Hooks und Inbox-Relay je Sitzung, siehe [Plugin-README](../../claude-code/coilshift/README.md) |
 | Paket `com.appenetic.claude` | MCU (CoilShift) | Dienst `link` (Verbindung zum Mac, Kopplung, Karte, Sprache) und Dienst `web` (App) |
 | Kachel „Claude Code“ | App-Launcher | Die App: Sitzungsliste, Verlauf, Fragen, Antwortfeld, neue Sitzung |
-| Panel „Claude Code“ | CoilShift-App | Dieselbe App. Ohne erreichbaren Web-Port nur lesend |
 | Karte über der Navi | QtCar über `dev.coilshift.qtcar-host` | Offene Frage mit Antwort-Buttons, auch während der Fahrt |
 
 Das Auto verbindet sich direkt per HTTPS mit dem Mac, über Tailscale oder das
@@ -45,8 +44,8 @@ Sitzung.
    Datenordner. Hinweise stehen dann in `bridge.log` im Plugin-Datenordner.
 2. **Auto:** Im CoilShift-Paketmanager **Claude Code (experimental)** installieren.
    Die Kachel „Claude Code“ erscheint im App-Launcher. Je nach Firmware geschieht
-   das erst nach einem Neustart der Oberfläche im Stand. Der Dienst steht auch im
-   CoilShift-Panel.
+   das erst nach einem Neustart der Oberfläche im Stand. Einen eigenen Reiter in
+   der CoilShift-App hat das Paket nicht.
 3. **Koppeln:** Die App zeigt ohne Kopplung einen QR-Code.
    - Auf dem Mac `/coilshift:pair` ausführen. Der Kopplungslink landet in der
      Zwischenablage und per Universal Clipboard auch auf dem iPhone.
@@ -141,7 +140,7 @@ Der Paketstatus in CoilShift folgt der Verbindung.
     Der Schlüssel liegt in `pairing.key`, beide mit Modus 0600.
   - Der Web-Port der App prüft den `Host`-Header gegen DNS-Rebinding.
   - Die API verlangt ein Token, das bei jedem Start neu erzeugt wird. Die
-    Kachel holt es nur per Same-Origin. Das Panel liest es über `data.get`.
+    Kachel holt es nur per Same-Origin.
 - **Nachrichten aus dem Auto:**
   - Sie erreichen Claude als Nachricht „einer anderen Sitzung“ mit dem Präfix
     `[Aus dem Auto]`.
@@ -226,15 +225,26 @@ alpha.1 nie.
   `/var/run/netns/<ns>` verwenden (oder `ip netns exec`). Dann wäre der
   Bind-Mount überflüssig.
 
+## Version 0.1.0-alpha.7
+
+Kein eigener Reiter mehr in der CoilShift-App: Die App ist die Kachel im
+Launcher.
+- Das Paket deklariert kein Panel mehr, die Dateien der Kachel liegen unter
+  `web/`.
+- Der Panel-Modus samt Nur-Lese-Ausweichweg (`state.json`, `endpoint.json`)
+  entfällt.
+- Unter **Technik** stehen zusätzlich der Zustand des Web-Dienstes und des
+  Namespace-Binds.
+
 ## Entwicklung und Validierungsstand
 
 Quellcode: `services/claude/` (Go, privat wie der HA-Dienst, ignoriert von git),
-`claude-code/coilshift/` (Node, ohne Abhängigkeiten) und `packages/claude/panel/`.
+`claude-code/coilshift/` (Node, ohne Abhängigkeiten) und `packages/claude/web/`.
 
 ```sh
 GO=go tools/build-claude.sh                     # statisch, linux/amd64 v1, reproduzierbar
 go -C services/claude test -race ./...          # inkl. Ende-zu-Ende gegen die echte Node-Bridge
-node --test claude-code/coilshift/tests/ tests/claude-panel.test.mjs
+node --test claude-code/coilshift/tests/ tests/claude-app.test.mjs
 python3 -m unittest discover -s tests -v
 python3 tools/build.py
 ```

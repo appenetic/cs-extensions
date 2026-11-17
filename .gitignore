@@ -15,7 +15,3 @@ __pycache__/
 # The Claude service source stays local/private like the HA source.
 /services/claude/
 
-# Generated release-specific Claude panel assets (included in the package archive).
-/packages/claude/panel/claude-*.html
-/packages/claude/panel/app.*.js
-/packages/claude/panel/app.*.css
