@@ -191,6 +191,21 @@ grüner Punkt, in der Liste und im Kopf der Sitzung. Eine offene Frage zeigt
 weiterhin den orangen Punkt. Die Animation läuft im Takt der Uhr weiter, auch
 wenn ein Live-Update die Liste neu zeichnet.
 
+## Version 0.1.0-alpha.5
+
+Die Kachel meldete mit alpha.4 weiter „localhost Verbindung abgelehnt“.
+
+- **Lauschen:** Der Web-Dienst sucht die Namespaces jetzt auch über die
+  laufenden Browser-Prozesse (`/proc/<pid>/ns/net` jedes `tesla-chromium-*`).
+  Dort öffnet er den Port, egal wie das Sandbox-Profil heißt. Er lauscht
+  zusätzlich auf `[::1]` für `localhost` und prüft alle 3 Sekunden statt
+  alle 10.
+- **Diagnose am Mac:** Das Auto schickt seine Technik-Werte an die Bridge
+  (Web-Port und Namespaces, Karte, Sprache, Verbindung). `/coilshift:status`
+  zeigt sie, `bridge.log` protokolliert jede Änderung.
+- **Fehlerseite:** Hat Chromium einmal eine Fehlerseite gezeigt, lädt die Kachel
+  nicht von selbst neu. Nach dem Update die Kachel schließen und neu öffnen.
+
 ## Entwicklung und Validierungsstand
 
 Quellcode: `services/claude/` (Go, privat wie der HA-Dienst, ignoriert von git),

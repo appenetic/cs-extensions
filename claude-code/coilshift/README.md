@@ -60,5 +60,7 @@ Umgebungsvariablen:
 Gibt es auf dem Mac keine LAN- oder Tailscale-Adresse, nennt `/coilshift:pair`
 keinen Link.
 
-`/coilshift:status` zeigt die gekoppelten Autos, den Unterwegs-Modus und die
-Sitzungen. `coilshift-bridge.mjs unpair` entkoppelt alle Autos.
+`/coilshift:status` zeigt die gekoppelten Autos, den Unterwegs-Modus, die
+Sitzungen und die letzte Diagnose jedes Autos: Web-Port, Karte, Sprache und
+Verbindung (ab Paket alpha.5). `coilshift-bridge.mjs unpair` entkoppelt alle
+Autos.

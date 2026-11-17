@@ -837,6 +837,20 @@ export class Bridge {
         this.touch()
         return reply(200, { ok: true, away: this.away() })
       }
+      if (req.method === 'POST' && url.pathname === '/v1/diag') {
+        // The car's own diagnostics (web port, card, voice), for /coilshift:status.
+        const values = {}
+        for (const [key, value] of Object.entries(body.values && typeof body.values === 'object' ? body.values : {}).slice(0, 24)) {
+          if (/^[A-Za-z0-9._-]{1,40}$/.test(key)) values[key] = clip(value, 300)
+        }
+        const changed = JSON.stringify((device.diag || {}).values) !== JSON.stringify(values)
+        device.diag = { at: this.now(), version: clip(body.version, 40), firmware: clip(body.firmware, 60), values }
+        if (changed) {
+          const shown = Object.entries(values).filter(([key]) => key !== 'voice.last')
+          log(`car ${device.name} ${device.diag.version}: ${shown.map(([k, v]) => `${k}=${v}`).join(' | ')}`)
+        }
+        return reply(200, { ok: true })
+      }
       if (req.method === 'POST' && url.pathname === '/v1/unpair') {
         this.config.devices = this.config.devices.filter((d) => d !== device)
         this.saveConfig()
@@ -987,7 +1001,7 @@ async function serve(dir) {
         const snap = bridge.snapshot()
         return send(res, 200, {
           name: bridge.name, version: VERSION, port: bridge.config.port, hosts: envHosts() || bridgeHosts(), fingerprint: tls.fingerprint,
-          away: bridge.config.away, awayNow: bridge.away(), devices: bridge.config.devices.map(({ id, name, created, seen }) => ({ id, name, created, seen })),
+          away: bridge.config.away, awayNow: bridge.away(), devices: bridge.config.devices.map(({ id, name, created, seen, diag }) => ({ id, name, created, seen, diag })),
           lastPoll: bridge.lastPoll, relays: bridge.relays.size,
           sessions: snap.sessions.map((s) => ({ title: s.title, kind: s.kind, status: s.status, delivery: s.delivery })),
         })
@@ -1102,6 +1116,12 @@ async function cli() {
         `Gekoppelte Autos: ${body.devices.length ? body.devices.map((d) => `${d.name} (zuletzt ${new Date(d.seen).toLocaleString('de-DE')})`).join(', ') : 'keine'}`,
         `Letzte Abfrage des Autos: ${body.lastPoll ? new Date(body.lastPoll).toLocaleString('de-DE') : 'noch keine'}`,
         `Sitzungen mit Relay: ${body.relays}`,
+        ...body.devices
+          .filter((d) => d.diag)
+          .flatMap((d) => [
+            `Diagnose von ${d.name} (${d.diag.version || '?'}, ${new Date(d.diag.at).toLocaleTimeString('de-DE')}):`,
+            ...Object.entries(d.diag.values).map(([k, v]) => `  ${k}: ${v}`),
+          ]),
         ...body.sessions.slice(0, 10).map((s) => `  · ${s.title} — ${s.kind}, ${s.status}${s.delivery ? ', Antwort per ' + s.delivery : ''}`),
       ]
       return console.log(lines.join('\n'))
