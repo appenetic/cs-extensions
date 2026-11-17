@@ -100,3 +100,20 @@ Node 26. Am Auto ist noch nichts davon geprüft.
   - Ein Paneltest für Liste und Detail im schmalen Fenster.
   - Screenshots aus Chrome headless bei 1280×800 und 760×900. Teslas Browser
     ist laut Firmware Chromium 148.
+
+## Am Auto per SSH, 2026-11-17 (alpha.5)
+
+- **Firmware:** 2026.32.7, Model Y. `/run` und `/var/run` sind getrennte tmpfs,
+  `/run/netns` fehlt. Unter `/var/run/netns` liegen `carplay`, `chromium` und
+  `chromium-entertainment`.
+- **Startskript:** `/run/ssp/services/com.appenetic.claude.web/run` ruft
+  `nsenter --net=/run/netns/chromium-entertainment` auf und scheitert daran.
+  Der Dienst stand mit Backoff 60 auf `down-by-ssp`. Der `link`-Dienst war danach
+  `absent`, sein Dienstverzeichnis fehlte.
+- **Im Browser-Namespace** `chromium-entertainment` lauschen der CoilShift-Port
+  29942 und die Web-Ports anderer Pakete.
+- **Diagnose von alpha.5:** Karte `ok` (UI-Host aktiv), Sprachtaste
+  `bereit · GUI_carAssistUserTranscript` (lesbar, nicht geschwärzt).
+- **Handtest:** Ein Bind-Mount über `PUT /v1/binds` und danach
+  `POST /v1/services/web/restart` ließen den Web-Dienst laufen. Er lauscht auf
+  127.0.0.1:29899 in `chromium-entertainment`. alpha.6 macht das automatisch.

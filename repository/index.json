@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.claude",
-      "version": "0.1.0-alpha.5",
+      "version": "0.1.0-alpha.6",
       "sdk": ">=1.0 <2",
       "title": "Claude Code (experimental)",
       "published_unix": 1794614400,
@@ -106,7 +106,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.claude",
-        "version": "0.1.0-alpha.5",
+        "version": "0.1.0-alpha.6",
         "sdk": ">=1.0 <2",
         "title": "Claude Code (experimental)",
         "summary": "Deine Claude-Code-Sitzungen vom Mac auf der MCU: Liste, Verlauf, Fragen als Karte über der Navi, Antworten per Touch, Diktat oder Sprachtaste. Kopplung per QR-Code.",
@@ -121,6 +121,7 @@
           "panel",
           "tile",
           "web.listen",
+          "bind",
           "events",
           "dv.read",
           "vehicle.read",
@@ -204,7 +205,7 @@
           ]
         },
         "panel": {
-          "entry": "panel/claude-0.1.0-alpha.5.html",
+          "entry": "panel/claude-0.1.0-alpha.6.html",
           "title": "Claude Code",
           "permissions": [
             "status",
@@ -212,11 +213,11 @@
           ]
         }
       },
-      "manifest_sha256": "158c91b83f3522273c07ddb03825c5f41ab58e88677450b584d02b091f595377",
+      "manifest_sha256": "a23377fab6df97a1beb8b735bfd086776e4335c20c5e597da53fe6966326ec2e",
       "archive": {
-        "url": "pool/078a309fe70f86c2c70eeaa3eac7150c74c91b52e188d52f95582e1b089bad6e",
-        "sha256": "078a309fe70f86c2c70eeaa3eac7150c74c91b52e188d52f95582e1b089bad6e",
-        "bytes": 8396800
+        "url": "pool/faa2f0820af554839d6deacd3686f517a6d27b54e3d0e793b9d3c436148e0676",
+        "sha256": "faa2f0820af554839d6deacd3686f517a6d27b54e3d0e793b9d3c436148e0676",
+        "bytes": 8407040
       }
     },
     {

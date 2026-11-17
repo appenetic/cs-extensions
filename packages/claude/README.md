@@ -206,6 +206,26 @@ Die Kachel meldete mit alpha.4 weiter „localhost Verbindung abgelehnt“.
 - **Fehlerseite:** Hat Chromium einmal eine Fehlerseite gezeigt, lädt die Kachel
   nicht von selbst neu. Nach dem Update die Kachel schließen und neu öffnen.
 
+## Version 0.1.0-alpha.6
+
+Per SSH am Auto (Firmware 2026.32.7) gefunden: Der Web-Dienst lief seit
+alpha.1 nie.
+
+- **Ursache:** CoilShift startet einen Dienst mit Web-Port über
+  `nsenter --net=/run/netns/chromium-entertainment`. Auf dieser Firmware sind
+  `/run` und `/var/run` aber getrennte tmpfs, und die Browser-Namespaces liegen
+  nur unter `/var/run/netns`. `nsenter` scheiterte bei jedem Start. Der
+  Supervisor zog den Dienst zurück und räumte dabei auch den `link`-Dienst ab.
+- **Lösung:** Der Apply-Hook legt bei jeder Installation über die Car-API
+  (`PUT /v1/binds`, im Ledger, beim Entfernen rückgängig) einen Bind-Mount
+  `/var/run/netns/<ns>` → `/run/netns/<ns>` an. Das geschieht nur, wenn `/run`
+  und `/var/run` getrennt sind. Entsteht der Namespace erst nach dem Apply,
+  holt der `link`-Dienst den Bind-Mount nach und startet den Web-Dienst neu.
+  **Technik** zeigt dazu `web.bind` und `web.service`.
+- **Für CoilShift:** Der Daemon sollte für `nsenter` den Pfad
+  `/var/run/netns/<ns>` verwenden (oder `ip netns exec`). Dann wäre der
+  Bind-Mount überflüssig.
+
 ## Entwicklung und Validierungsstand
 
 Quellcode: `services/claude/` (Go, privat wie der HA-Dienst, ignoriert von git),
