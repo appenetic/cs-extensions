@@ -191,3 +191,15 @@ test('actual versioned entry loads hashed assets and always includes phone setup
  assert.match(field(h,'root').textContent,/Am Handy einrichten/);
  assert.ok(field(h,'root').textContent.includes('UI '+manifest.version));
 });
+test('advanced values: phone draft fills them, plugin mode points to the phone page',async()=>{
+ const transfer={schema:1,id:'pairing-2',expires:Date.now()/1000+120,values:{url:'https://phone.example',interval:'5',speed_unit:'kph'}};
+ const h=await setup({data:{'phone-input.json':JSON.stringify(transfer),'phone-setup.json':JSON.stringify({schema:1,state:'sent'})}});
+ assert.equal(field(h,'interval').value,'5');
+ assert.equal(field(h,'speed_unit').value,'kph');
+ assert.equal(field(h,'advanced-hint').textContent,'');
+ const views=manifest.settings.map(s=>({...s,id:manifest.id+'.'+s.id,value:s.type==='secret'?{set:true}:s.id==='url'?'https://local.example':s.default}));
+ const local=await setup({answers:{'settings.get':()=>[]},data:{'plugin-settings.json':JSON.stringify({source:'plugin',settings:views})}});
+ assert.equal(field(local,'interval').disabled,true);
+ assert.match(field(local,'advanced-hint').textContent,/am Handy unter „Erweitert“/);
+ assert.match(field(local,'settings-connection').textContent,/Erweitert/);
+});

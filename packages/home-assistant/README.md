@@ -345,3 +345,23 @@ keine Geschwindigkeit abgeleitet. Das Attribut `speed_source` zeigt `datavalue`,
 
 Die Go-Tests decken Latch, Ausgangslage, Verfall, schnellen Retry und die
 Geschwindigkeitsableitung ab; am Auto ist diese Version noch nicht geprüft.
+
+## Erweiterte Werte am Handy, Tailscale zuerst (alpha.16)
+
+Ist die Konfiguration direkt im Plugin gespeichert (siehe alpha.10), sperrt das
+MCU-Panel alle Felder, weil CoilShift dort nicht speichern kann
+(`settings.set: not_found`). Die Handy-Seite bot bisher nur URL und Zugangsdaten
+an. Intervall, Entitätsname, DataValues und Einheit ließen sich damit gar nicht
+mehr ändern.
+
+Ab alpha.16 hat die Handy-Seite einen Bereich **Erweitert** mit diesen Werten.
+Sie sind mit den gespeicherten Werten vorbelegt (`GET /config`, nur mit gültigem
+Einmalcode; Geheimnisse nur als „gesetzt“). Leere Felder bleiben unverändert.
+Ungültige Werte lehnt der Server mit 400 ab, bevor etwas gespeichert wird. Ein
+geändertes Intervall gilt ab dem nächsten Durchlauf. Das MCU-Panel weist im
+Bereich „Erweitert“ auf diesen Weg hin.
+
+Im QR-Code steht eine Tailscale-Adresse jetzt an erster Stelle; die übrigen
+Adressen bleiben über die Adress-Schaltflächen erreichbar. Tailscale wird am
+Interface-Namen `tailscale*` erkannt, weil auch Mobilfunknetze `100.64.0.0/10`
+für Carrier-Grade-NAT verwenden.

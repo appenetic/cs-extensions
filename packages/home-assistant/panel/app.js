@@ -34,6 +34,7 @@
   var message = h('p', { 'aria-live': 'polite', id: 'message' });
   var connection = h('p', { class: 'notice', 'aria-live': 'polite', id: 'settings-connection' }, 'Verbindung zu den CoilShift-Einstellungen wird aufgebaut …');
   var state = h('div', { class: 'notice', 'aria-live': 'polite', id: 'package-status' }, 'Status wird geladen …');
+  var advancedHint = h('p', { class: 'hint', id: 'advanced-hint' });
   var saveButton = h('button', { type: 'button', class: 'primary', 'aria-label': 'Einstellungen speichern' }, 'Einstellungen speichern');
   saveButton.disabled = true;
   function say(text, tone) { message.textContent = text; message.setAttribute('class', tone || ''); }
@@ -46,7 +47,7 @@
     h('p',{class:'hint'},'Die Verbindung verwendet ein lokales HTTPS-Zertifikat, das am Handy einmal bestätigt werden muss. Der Link gilt fünf Minuten und nur einmal. Danach die übernommenen Werte hier prüfen und speichern.'));
   function build() {
     root.replaceChildren(h('h1', {}, 'Home Assistant'), h('p', { class: 'subtitle' }, 'Verbindung und Fahrzeugdaten konfigurieren. UI ' + schema.version), phoneCard, connection, state);
-    var advanced = h('details', { class: 'card', id: 'advanced-settings' }, h('summary', {}, 'Erweitert · Übertragung und Fahrzeugdaten'));
+    var advanced = h('details', { class: 'card', id: 'advanced-settings' }, h('summary', {}, 'Erweitert · Übertragung und Fahrzeugdaten'), advancedHint);
     groups.forEach(function (group) {
       var card = h('section', { class: 'card' }, h('h2', {}, group[0]));
       group[1].forEach(function (spec) {
@@ -107,6 +108,7 @@
     saveButton.disabled = busy || pluginMode || writeBlocked || records.enabled.available === false;
     if (profileButton) profileButton.disabled = busy || pluginMode;
     saveButton.textContent = pluginMode ? 'Konfiguration am Handy verwalten' : 'Einstellungen speichern';
+    advancedHint.textContent = pluginMode ? 'Im Plugin gespeichert: Diese Werte am Handy unter „Erweitert“ ändern (QR-Code oben).' : '';
   }
   function settingsError(error) {
     settingsReady = false;
@@ -149,7 +151,7 @@
         connection.textContent = 'CoilShift liefert ' + list.length + ' Einstellungen (Antwort: ' + shape + '). Gespeicherte Werte sind nicht vollständig bekannt. Lokale Vorgaben und eigene Eingaben bleiben bearbeitbar. Speichern wird über CoilShift angefordert; eine Übernahme ist noch nicht bestätigt.';
         connection.setAttribute('class', 'notice bad');
       } else {
-        connection.textContent = pluginMode ? 'Direkt im Plugin gespeichert und vom Dienst verwendet. Zum Ändern die Handy-Seite verwenden (für einen neuen QR-Code Plugin-Dienst neu starten).' : locked.length ? 'CoilShift sperrt: ' + locked.join(', ') : 'Einstellungen verbunden.';
+        connection.textContent = pluginMode ? 'Direkt im Plugin gespeichert und vom Dienst verwendet. Zum Ändern, auch der Werte unter „Erweitert“, die Handy-Seite verwenden (für einen neuen QR-Code den Plugin-Dienst neu starten).' : locked.length ? 'CoilShift sperrt: ' + locked.join(', ') : 'Einstellungen verbunden.';
         connection.setAttribute('class', locked.length ? 'notice bad' : 'notice ok');
       }
       controls();
@@ -181,7 +183,7 @@
       var values=input.values;
       if (!values || typeof values!=='object') return;
       var imported = 0;
-      ['url','username','password','access_token'].forEach(function(id){
+      Object.keys(fields).filter(function(id){return id!=='enabled';}).forEach(function(id){
         if (typeof values[id]==='string' && !fields[id].input.disabled && (values[id]!=='' || (id!=='password' && id!=='access_token'))) {
           fields[id].input.value=values[id];dirty[id]=true;cleared[id]=false;imported++;
         }
