@@ -1,0 +1,15 @@
+{
+  "name": "appenetic",
+  "description": "Appenetic-Plugins für Claude Code, zum Beispiel die Brücke zur CoilShift-Claude-App im Tesla.",
+  "owner": {
+    "name": "Appenetic",
+    "url": "https://github.com/appenetic/cs-extensions"
+  },
+  "plugins": [
+    {
+      "name": "coilshift",
+      "source": "./claude-code/coilshift",
+      "description": "Claude-Code-Sitzungen auf der Tesla-MCU (CoilShift): Liste, Verlauf, Fragen und Antworten aus dem Auto."
+    }
+  ]
+}

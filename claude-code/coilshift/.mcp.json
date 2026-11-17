@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "inbox": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/coilshift-relay.mjs"]
+    }
+  }
+}

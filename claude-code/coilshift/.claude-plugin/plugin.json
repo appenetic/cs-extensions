@@ -1,0 +1,13 @@
+{
+  "name": "coilshift",
+  "displayName": "CoilShift für Tesla",
+  "version": "0.1.0",
+  "description": "Spiegelt deine Claude-Code-Sitzungen in die Claude-App der CoilShift-Erweiterung auf der Tesla-MCU. Fragen und Freigaben erscheinen im Auto und lassen sich per Touch, Diktat oder Sprachtaste beantworten. Gekoppelt wird per QR-Code.",
+  "author": {
+    "name": "Appenetic",
+    "url": "https://github.com/appenetic/cs-extensions"
+  },
+  "homepage": "https://github.com/appenetic/cs-extensions",
+  "license": "MIT",
+  "keywords": ["tesla", "coilshift", "remote", "notifications"]
+}

@@ -29,6 +29,16 @@ Eine neue Veröffentlichungsstruktur kann früher veröffentlichte Dateien nicht
 nachträglich geheim machen. Der neue Export enthält nur Home Assistant; das
 shellbasierte Welcome-Light-Paket wird absichtlich nicht aufgenommen.
 
+## Claude Code (ab 2026-11-17)
+
+`services/claude/` folgt demselben Muster: privat und von `.gitignore`
+ausgeschlossen. Veröffentlicht werden nur das Linux-Binary, das Panel, die
+UIML-Karte und die Lifecycle-Skripte. Der Export verlangt jetzt genau ein HA-
+und genau ein Claude-Release. Ein Push von `repository/` veröffentlicht also
+beide Pakete im Pages-Feed. Das Mac-Plugin in `claude-code/` ist Node-Quelltext
+und ist absichtlich öffentlich, weil es von dort installiert wird. Eine Sicherung
+des Go-Quelltexts liegt unter `../CS_Plugins-backup/claude-src-alpha.1-2026-11-17.tgz`.
+
 ## Build und Export
 
 Auf dem Entwicklungsrechner mit lokalem/private ausgechecktem Quellcode:

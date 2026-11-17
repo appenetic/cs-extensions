@@ -97,6 +97,129 @@
       }
     },
     {
+      "id": "com.appenetic.claude",
+      "version": "0.1.0-alpha.1",
+      "sdk": ">=1.0 <2",
+      "title": "Claude Code (experimental)",
+      "published_unix": 1794614400,
+      "withdrawn": false,
+      "manifest": {
+        "schema": 1,
+        "id": "com.appenetic.claude",
+        "version": "0.1.0-alpha.1",
+        "sdk": ">=1.0 <2",
+        "title": "Claude Code (experimental)",
+        "summary": "Deine Claude-Code-Sitzungen vom Mac auf der MCU: Liste, Verlauf, Fragen als Karte über der Navi, Antworten per Touch, Diktat oder Sprachtaste. Kopplung per QR-Code.",
+        "authors": [
+          {
+            "name": "Appenetic",
+            "url": "https://github.com/appenetic/cs-extensions"
+          }
+        ],
+        "capabilities": [
+          "service",
+          "panel",
+          "tile",
+          "web.listen",
+          "events",
+          "dv.read",
+          "vehicle.read",
+          "ui.declarative"
+        ],
+        "settings": [
+          {
+            "id": "voice_enabled",
+            "type": "bool",
+            "title": "Antworten per Sprachtaste",
+            "summary": "Liest das Transkript des Tesla-Sprachassistenten mit. Beginnt es mit einem Rufwort, geht der Rest als Antwort an Claude.",
+            "group": "Sprache",
+            "order": 1,
+            "default": true
+          },
+          {
+            "id": "voice_triggers",
+            "type": "string",
+            "title": "Rufwörter",
+            "summary": "Kommagetrennt. Das erste gesprochene Wort muss eines davon sein, zum Beispiel „Claude, nimm Variante zwei“.",
+            "group": "Sprache",
+            "order": 2,
+            "default": "claude, clod, klod, klaud, cloud, glod",
+            "max_bytes": 200
+          },
+          {
+            "id": "voice_dv",
+            "type": "string",
+            "title": "DataValue des Sprach-Transkripts",
+            "summary": "Für Firmware 2026.38.5.12 offline ermittelt, am Auto noch nicht bestätigt. Nur bei abweichender Firmware ändern.",
+            "group": "Sprache",
+            "order": 3,
+            "default": "GUI_carAssistUserTranscript",
+            "max_bytes": 128,
+            "regex": "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+          },
+          {
+            "id": "card_enabled",
+            "type": "bool",
+            "title": "Fragen als Karte über der Navi",
+            "summary": "Braucht den CoilShift-UI-Host (dev.coilshift.qtcar-host). Ohne ihn erscheinen Fragen nur in der App.",
+            "group": "Anzeige",
+            "order": 1,
+            "default": true
+          }
+        ],
+        "tile": {
+          "id": "app",
+          "title": "Claude Code",
+          "icon": "panel/icon.png",
+          "url": "web:app"
+        },
+        "web": [
+          {
+            "name": "app",
+            "service": "web"
+          }
+        ],
+        "hooks": {
+          "apply": {
+            "run": "hooks/apply.sh",
+            "rerun": "in-place",
+            "phase": "late",
+            "timeout": 10
+          },
+          "remove": {
+            "run": "hooks/remove.sh",
+            "timeout": 10
+          },
+          "service": [
+            {
+              "id": "link",
+              "run": "hooks/link.sh",
+              "restart": "on-failure"
+            },
+            {
+              "id": "web",
+              "run": "hooks/web.sh",
+              "restart": "on-failure"
+            }
+          ]
+        },
+        "panel": {
+          "entry": "panel/claude-0.1.0-alpha.1.html",
+          "title": "Claude Code",
+          "permissions": [
+            "status",
+            "data"
+          ]
+        }
+      },
+      "manifest_sha256": "9b2c018ff5c7c2b8a6a38bf60ceded27f19c7008c27106fb1fb7faae20368a6d",
+      "archive": {
+        "url": "pool/b55d3be69a32dbb3df11da79747cd86235ec33d8205c2feede1a7d92a8d97f23",
+        "sha256": "b55d3be69a32dbb3df11da79747cd86235ec33d8205c2feede1a7d92a8d97f23",
+        "bytes": 8376320
+      }
+    },
+    {
       "id": "com.appenetic.home-assistant",
       "version": "0.1.0-alpha.16",
       "sdk": ">=1.0 <2",

@@ -63,6 +63,30 @@ class Package(unittest.TestCase):
             self.assertFalse(any(n.endswith('.pyc') or '__pycache__' in n for n in archive.getnames()))
             self.assertEqual(json.load(archive.extractfile('coilshift.json')), entry['manifest'])
 
+    def test_claude_archive(self):
+        subprocess.run(['python3', 'tools/build.py'], cwd=ROOT, check=True, capture_output=True)
+        entries = json.loads((ROOT / 'repository/index.json').read_text())['packages']
+        entry = next(e for e in entries if e['id'] == 'com.appenetic.claude')
+        manifest = entry['manifest']
+        data = (ROOT / 'repository' / entry['archive']['url']).read_bytes()
+        self.assertEqual(hashlib.sha256(data).hexdigest(), entry['archive']['sha256'])
+        # A tile ID on the car is the package ID with dashes plus the tile: letters and dashes only.
+        self.assertRegex(manifest['id'].replace('.', '-') + '.' + manifest['tile']['id'], r'^[a-z-]+\.[a-z-]+$')
+        self.assertEqual(manifest['web'][0]['service'], 'web')
+        self.assertFalse(any(c.startswith('dv.write') for c in manifest['capabilities']))
+        self.assertNotIn('requires', manifest, 'a missing UI host must not make the package unsupported')
+        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+            names = set(archive.getnames())
+            binary = archive.extractfile('bin/claude-linux-amd64').read()
+            self.assertEqual(binary[:4], b'\x7fELF')
+            for hook in ['hooks/apply.sh', 'hooks/remove.sh', 'hooks/link.sh', 'hooks/web.sh']:
+                self.assertEqual(archive.getmember(hook).mode, 0o755)
+            for name in ['panel/app.html', 'panel/app.js', 'panel/app.css', 'panel/icon.png', 'ui/card.uiml', manifest['tile']['icon']]:
+                self.assertIn(name, names)
+            self.assertIn('Oberfläche ' + entry['version'], archive.extractfile(manifest['panel']['entry']).read().decode())
+            self.assertFalse(any(n.endswith(('.go', '.md', '.mjs', '.py')) for n in names))
+            self.assertEqual(json.load(archive.extractfile('coilshift.json')), manifest)
+
     def test_sdk_enum_tokens(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location('builder', ROOT / 'tools/build.py')

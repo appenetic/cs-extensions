@@ -1,0 +1,76 @@
+/* The Claude app, on top of csdk-panel.css (the touchscreen's palette). Touch
+   targets are at least 48 px; the session list and the conversation scroll on
+   their own so the answer field stays in reach. */
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body { padding: 16px 20px; }
+#root { display: flex; flex-direction: column; gap: 12px; }
+h2 { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
+h3 { font-size: 19px; font-weight: 600; margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+label { display: block; margin: 12px 0 6px; color: var(--text-2); }
+
+header.top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+header.top h1 { margin: 0; }
+.link { flex: 1 1 auto; color: var(--text-2); font-size: 16px; }
+.link::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; background: var(--text-2); }
+.link.online::before { background: var(--green); }
+.link.connecting::before { background: var(--orange); }
+.link.offline::before, .link.rejected::before { background: var(--red); }
+.toggle { min-height: 48px; }
+.toggle[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: #111; }
+
+.flash { min-height: 1.3em; margin: 0; font-size: 16px; }
+.flash.ok { color: var(--green); }
+.flash.bad, .bad { color: var(--red); }
+.notice { background: var(--fill); padding: 12px 14px; border-radius: var(--radius); margin: 0; }
+
+.split { display: grid; grid-template-columns: minmax(240px, 30%) 1fr; gap: 16px; align-items: start; }
+.sessions { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 150px); overflow-y: auto; }
+.session { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 64px; padding: 10px 14px; text-align: left; }
+.session .name { font-weight: 600; overflow-wrap: anywhere; }
+.session .meta { font-size: 14px; color: var(--text-2); }
+.session.on { background: var(--seg-on); border-color: var(--blue); }
+.session.asks .name::after { content: " ●"; color: var(--orange); }
+.new { border-style: dashed; min-height: 56px; }
+
+.detail { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 150px); min-height: 0; }
+.detail .head .hint { margin: 0; }
+.messages { list-style: none; margin: 0; padding: 0 4px 0 0; flex: 1 1 auto; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.message { display: flex; flex-direction: column; gap: 2px; max-width: 92%; padding: 10px 12px; border-radius: 10px; background: var(--raised); border: 1px solid var(--line); }
+.message .who { font-size: 13px; color: var(--text-2); }
+.message .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.message.user, .message.car { align-self: flex-end; background: var(--fill); }
+.message.car { border-color: var(--blue); }
+.message.tool { background: transparent; border-style: dashed; font-size: 14px; color: var(--text-2); }
+
+.prompt { border-color: var(--orange); margin: 0; max-height: 45vh; overflow-y: auto; }
+.options { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
+.option { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 140px; min-height: 56px; text-align: left; }
+.option small { font-size: 13px; color: var(--text-2); }
+.option.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.option.on small { color: #e6ecff; }
+.detail-text { margin: 0 0 8px; padding: 10px 12px; max-height: 160px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; background: var(--fill); border-radius: var(--radius); }
+.prompt .text { white-space: pre-wrap; color: var(--text); font-size: 17px; }
+
+.composer textarea { display: block; width: 100%; min-height: 84px; resize: none; }
+.composer .row { flex-wrap: nowrap; justify-content: space-between; }
+.composer .hint { flex: 1 1 auto; margin: 0; }
+#send, #start { min-width: 150px; min-height: 56px; }
+.danger { background: var(--red); border-color: var(--red); color: #fff; }
+
+.pairing ol { margin: 8px 0 14px; padding-left: 22px; line-height: 1.5; }
+.qr { display: block; width: 256px; height: 256px; padding: 12px; background: #fff; border-radius: 12px; image-rendering: pixelated; }
+.chip.on { border-color: var(--blue); background: var(--seg-on); }
+
+#new select, #new textarea { display: block; width: 100%; min-height: 48px; font: inherit; color: var(--text); background: var(--fill); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; }
+#new select option { color: #111; background: #fff; }
+
+details summary { min-height: 44px; line-height: 44px; font-weight: 600; cursor: pointer; }
+.diag { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 8px 0 12px; font-size: 15px; }
+.diag dt { color: var(--text-2); }
+.diag dd { margin: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+  .split { grid-template-columns: 1fr; }
+  .sessions, .detail { max-height: none; }
+}

@@ -6,9 +6,20 @@ Experimental SDK packages for Tesla MCU.
 
 Publish only the output of `python3 tools/export-public-feed.py --output dist/public-feed`
 into a separate artifacts repository. The export follows the private-source/public-feed
-pattern and includes only the compiled Home Assistant package. Its Go source stays
-local/private and is ignored by this public checkout. See
+pattern and includes only the compiled Home Assistant and Claude Code packages. Their
+Go source stays local/private and is ignored by this public checkout. See
 [release separation and publishing](docs/private-source-public-feed.md).
+
+## Claude Code (neu, experimentell)
+
+Zeigt die Claude-Code-Sitzungen des Macs als eigene App-Kachel auf der MCU. Du
+kannst sie verfolgen und vom Auto aus weiterarbeiten lassen. Fragen erscheinen
+als Karte über der Navi, beantwortet werden sie per Touch, Diktat oder Sprachtaste.
+Gekoppelt wird per QR-Code. Dazu gehört das Claude-Code-Plugin `coilshift` auf
+dem Mac (`claude plugin marketplace add ./` im Repo, dann
+`claude plugin install coilshift@appenetic`).
+[Einrichtung und Grenzen](packages/claude/README.md) ·
+[Validierung](docs/claude-validation.md). Am Auto noch ungeprüft.
 
 ## Home Assistant Bridge
 

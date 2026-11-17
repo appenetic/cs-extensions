@@ -12,19 +12,41 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 HOME_ASSISTANT = 'com.appenetic.home-assistant'
+CLAUDE = 'com.appenetic.claude'
 # Shell lifecycle adapters are intentionally readable; application logic is ELF.
-RUNTIME_FILES = {
-    'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/service.sh',
-    'bin/bridge-linux-amd64', 'NOTICE', 'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code',
-    'panel/index.html', 'panel/app.js', 'panel/style.css', 'panel/settings-schema.js',
-    'panel/csdk-panel.js', 'panel/csdk-panel.css',
+RELEASES = {
+    HOME_ASSISTANT: {
+        'runtime': {
+            'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/service.sh',
+            'bin/bridge-linux-amd64', 'NOTICE', 'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code',
+            'panel/index.html', 'panel/app.js', 'panel/style.css', 'panel/settings-schema.js',
+            'panel/csdk-panel.js', 'panel/csdk-panel.css',
+        },
+        'directories': {'hooks', 'bin', 'panel'},
+        'entry': 'panel/settings-{version}.html',
+        'assets': [('app', 'js'), ('style', 'css'), ('settings-schema', 'js')],
+        'binary': 'bin/bridge-linux-amd64',
+    },
+    CLAUDE: {
+        'runtime': {
+            'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/link.sh', 'hooks/web.sh',
+            'bin/claude-linux-amd64', 'ui/card.uiml', 'NOTICE', 'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code',
+            'panel/app.html', 'panel/app.js', 'panel/app.css', 'panel/csdk-panel.js', 'panel/csdk-panel.css',
+            'panel/icon.png',
+        },
+        'directories': {'hooks', 'bin', 'panel', 'ui'},
+        'entry': 'panel/claude-{version}.html',
+        'assets': [('app', 'js'), ('app', 'css')],
+        'binary': 'bin/claude-linux-amd64',
+    },
 }
 PUBLIC_README = '''# Appenetic CS package feed
 
-This export contains generated Home Assistant package artifacts only.
-The application source belongs in a separate private repository and is not
-included here. The package contains a compiled Linux executable and small,
-readable lifecycle scripts. Compiled executables can still be reverse engineered.
+This export contains generated package artifacts only: the Home Assistant
+Bridge and Claude Code for the MCU. The application source belongs in a separate
+private repository and is not included here. Each package contains a compiled
+Linux executable, its panel files and small, readable lifecycle scripts.
+Compiled executables can still be reverse engineered.
 
 Feed path: `cs-extensions/index.json`
 
@@ -39,8 +61,9 @@ def digest(data):
 
 
 def validate_package(entry, repository):
-    if entry['id'] != HOME_ASSISTANT:
-        raise ValueError('Only the compiled Home Assistant package is approved for this feed')
+    release = RELEASES.get(entry['id'])
+    if not release:
+        raise ValueError('Only the compiled Home Assistant and Claude packages are approved for this feed')
     archive = entry['archive']
     sha = archive['sha256']
     if not re.fullmatch(r'[0-9a-f]{64}', sha) or archive['url'] != 'pool/' + sha:
@@ -57,9 +80,10 @@ def validate_package(entry, repository):
         raise ValueError('Manifest checksum mismatch')
     if manifest['id'] != entry['id'] or manifest['version'] != entry['version']:
         raise ValueError('Manifest identity mismatch')
-    release_entry = 'panel/settings-' + manifest['version'] + '.html'
+    release_entry = release['entry'].format(version=manifest['version'])
     if manifest.get('panel', {}).get('entry') != release_entry:
         raise ValueError('Expected versioned panel entry')
+    versioned = '|'.join(re.escape(stem) + r'\.[0-9a-f]{12}\.' + suffix for stem, suffix in release['assets'])
     seen = set()
     files = set()
     with tarfile.open(fileobj=io.BytesIO(data)) as tar:
@@ -71,30 +95,30 @@ def validate_package(entry, repository):
                 raise ValueError('Unsafe or duplicate archive member')
             seen.add(name)
             if member.isdir():
-                if name not in {'hooks', 'bin', 'panel'}:
+                if name not in release['directories']:
                     raise ValueError('Unexpected package directory: ' + name)
                 continue
-            if not member.isfile() or (name not in RUNTIME_FILES and name != release_entry
-                    and not re.fullmatch(r'panel/(app|style|settings-schema)\.[0-9a-f]{12}\.(js|css)', name)):
+            if not member.isfile() or (name not in release['runtime'] and name != release_entry
+                    and not re.fullmatch(r'panel/(' + versioned + ')', name)):
                 raise ValueError('Source or unexpected file in public archive: ' + name)
             files.add(name)
-        required = RUNTIME_FILES | {release_entry}
+        required = release['runtime'] | {release_entry}
         if not required <= files:
             raise ValueError('Missing runtime artifacts')
         html = tar.extractfile(release_entry).read().decode()
         if 'Oberfläche ' + manifest['version'] not in html:
             raise ValueError('Missing visible panel version')
-        for source, suffix in [('app', 'js'), ('style', 'css'), ('settings-schema', 'js')]:
-            pattern = source + r'\.([0-9a-f]{12})\.' + suffix
+        for source, suffix in release['assets']:
+            pattern = re.escape(source) + r'\.([0-9a-f]{12})\.' + suffix
             references = re.findall(pattern, html)
             if len(references) != 1:
-                raise ValueError('Expected exactly one versioned asset: ' + source)
+                raise ValueError('Expected exactly one versioned asset: ' + source + '.' + suffix)
             filename = 'panel/' + source + '.' + references[0] + '.' + suffix
             if filename not in files or digest(tar.extractfile(filename).read())[:12] != references[0]:
                 raise ValueError('Versioned asset checksum mismatch: ' + source)
         if json.load(tar.extractfile('coilshift.json')) != manifest:
             raise ValueError('Embedded manifest mismatch')
-        binary = tar.extractfile('bin/bridge-linux-amd64').read()
+        binary = tar.extractfile(release['binary']).read()
         if binary[:6] != b'\x7fELF\x02\x01' or binary[18:20] != b'\x3e\x00':
             raise ValueError('Expected compiled Linux AMD64 executable')
     return sha, data
@@ -106,9 +130,9 @@ def export(repository, output):
     if output.exists() or output.is_symlink():
         raise ValueError('Output must be a new directory; do not export into an existing checkout')
     index = json.loads((repository / 'index.json').read_text())
-    entries = [e for e in index['packages'] if e['id'] == HOME_ASSISTANT]
-    if len(entries) != 1:
-        raise ValueError('Expected exactly one Home Assistant release')
+    entries = [e for e in index['packages'] if e['id'] in RELEASES]
+    if sorted(e['id'] for e in entries) != sorted(RELEASES):
+        raise ValueError('Expected exactly one Home Assistant and one Claude release')
     blobs = [validate_package(e, repository) for e in entries]
     public_index = {'schema': index['schema'], 'repository': {
         'name': 'Appenetic CS Extensions',

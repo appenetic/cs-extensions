@@ -39,19 +39,44 @@ def validate_settings(manifest):
             raise ValueError('Invalid SDK enum setting: ' + setting['id'])
 
 
+# Packages with a panel get a versioned HTML entry and content-addressed assets,
+# so a cached old page can never be served under the URLs of a new release. The
+# archive of such a package holds an explicit allowlist: no developer docs or source.
+RELEASES = {
+    'com.appenetic.home-assistant': {
+        'entry': 'panel/settings-{version}.html',
+        'assets': ['app.js', 'style.css', 'settings-schema.js'],
+        'allowed': {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh',
+                    'hooks/service.sh', 'bin', 'bin/bridge-linux-amd64', 'NOTICE',
+                    'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'panel', 'panel/index.html', 'panel/app.js',
+                    'panel/style.css', 'panel/settings-schema.js', 'panel/csdk-panel.js', 'panel/csdk-panel.css'},
+    },
+    'com.appenetic.claude': {
+        'entry': 'panel/claude-{version}.html',
+        'assets': ['app.js', 'app.css'],
+        'allowed': {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/link.sh',
+                    'hooks/web.sh', 'bin', 'bin/claude-linux-amd64', 'ui', 'ui/card.uiml', 'NOTICE',
+                    'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'panel', 'panel/app.html', 'panel/app.js',
+                    'panel/app.css', 'panel/csdk-panel.js', 'panel/csdk-panel.css', 'panel/icon.png'},
+    },
+}
+
+
 def build_package(PACKAGE):
     manifest = json.loads((PACKAGE / 'coilshift.json').read_text())
     validate_settings(manifest)
     release_files = set()
+    release = RELEASES.get(manifest['id'])
     if manifest['id'] == 'com.appenetic.home-assistant':
         # Public declarations/defaults only; never runtime setting values/secrets.
         schema = {'package': manifest['id'], 'version': manifest['version'],
                   'settings': manifest['settings']}
         (PACKAGE / 'panel/settings-schema.js').write_text(
             'window.haSettingsSchema=' + json.dumps(schema, ensure_ascii=True, separators=(',', ':')) + ';\n')
+    if release:
         # Change both the iframe URL and every changing asset URL per release.
         html = (PACKAGE / 'panel/index.html').read_text()
-        for source in ['app.js', 'style.css', 'settings-schema.js']:
+        for source in release['assets']:
             data = (PACKAGE / 'panel' / source).read_bytes()
             stem, suffix = source.rsplit('.', 1)
             filename = stem + '.' + sha(data)[:12] + '.' + suffix
@@ -59,13 +84,16 @@ def build_package(PACKAGE):
             html = html.replace('"' + source + '"', '"' + filename + '"')
             release_files.add('panel/' + filename)
         entry = manifest['panel']['entry']
-        expected = 'panel/settings-' + manifest['version'] + '.html'
+        expected = release['entry'].format(version=manifest['version'])
         if entry != expected:
             raise ValueError('Panel entry must be versioned: ' + expected)
         html = html.replace('<body>', '<body><p class="release-version" id="release-version">Oberfläche '
                             + manifest['version'] + '</p>')
         (PACKAGE / entry).write_text(html)
         release_files.add(entry)
+    tile = manifest.get('tile')
+    if tile and not (PACKAGE / tile['icon']).is_file():
+        raise ValueError('Missing tile icon: ' + tile['icon'])
     # Match JSON Compact without reordering keys or HTML escaping.
     compact = json.dumps(manifest, separators=(',', ':'), ensure_ascii=False).encode()
     for hook in [manifest['hooks']['apply'], manifest['hooks']['remove']] + manifest['hooks']['service']:
@@ -78,14 +106,9 @@ def build_package(PACKAGE):
             if p.is_symlink() or not (p.is_dir() or p.is_file()):
                 raise ValueError('Unsupported archive entry: ' + str(p))
             name = p.relative_to(PACKAGE).as_posix()
-            if manifest['id'] == 'com.appenetic.home-assistant':
-                # Explicit release allowlist: no developer docs or source files.
-                allowed = {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh',
-                           'hooks/service.sh', 'bin', 'bin/bridge-linux-amd64', 'NOTICE',
-                           'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'panel', 'panel/index.html', 'panel/app.js',
-                           'panel/style.css', 'panel/settings-schema.js', 'panel/csdk-panel.js', 'panel/csdk-panel.css'}
-                if name not in allowed | release_files:
-                    continue
+            # Explicit release allowlist: no developer docs or source files.
+            if release and name not in release['allowed'] | release_files:
+                continue
             entry = tarfile.TarInfo(name + '/' if p.is_dir() else name)
             entry.mode = 0o755 if p.is_dir() or p.stat().st_mode & 0o111 else 0o644
             if p.is_dir():

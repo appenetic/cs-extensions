@@ -1,0 +1,9 @@
+{
+  "name": "coilshift-claude-bridge",
+  "private": true,
+  "type": "module",
+  "description": "No dependencies: Node's standard library only.",
+  "scripts": {
+    "test": "node --test tests/"
+  }
+}

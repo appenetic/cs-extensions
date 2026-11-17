@@ -1,0 +1,27 @@
+<!-- Claude's open question as a card over the map, drawn by the CoilShift UI host.
+     The data context is "card" (this file's name); the service writes model/card.
+     The host sets {card.card} to 0 while that file is missing or older than 30 s.
+     Taps on Opt1..Opt4, Allow, Deny and Close reach the package's event stream.
+     Button styles are taken from the firmware's own UIML; not verified on a car. -->
+<Library>
+    <Templates>
+        <DisplayView name="ClaudeCard" enableCssLayout="true" touchBehaviors="IgnoreTouches"
+                     verticalLayoutStyle="PositionType:absolute; X:0; Y:0; Right:0; Bottom:0; Padding:80,60,0,0;"
+                     visible="{card.card}">
+            <DisplayView name="Box" visible="{card.shown}" verticalLayoutStyle="Nav/BackgroundStyle; Padding:24,16,24,16;">
+                <LabelView name="Title" style="Text/Caption1; Color:Text/secondary;" text="{card.title}"/>
+                <LabelView name="Question" style="Text/Body1; Color:Text/primary;" text="{card.text}" maxHeight="120"/>
+                <DisplayView name="Options" horizontalLayoutStyle="Padding:0,12,0,4; AlignItems:center;">
+                    <ButtonView name="Opt1" visible="{card.o1}" label="{card.l1}" style="ProfilePanel/OutlineButton;"/>
+                    <ButtonView name="Opt2" visible="{card.o2}" label="{card.l2}" style="ProfilePanel/OutlineButton;"/>
+                    <ButtonView name="Opt3" visible="{card.o3}" label="{card.l3}" style="ProfilePanel/OutlineButton;"/>
+                    <ButtonView name="Opt4" visible="{card.o4}" label="{card.l4}" style="ProfilePanel/OutlineButton;"/>
+                    <ButtonView name="Allow" visible="{card.decide}" label="Erlauben" style="ProfilePanel/OutlineButton;"/>
+                    <ButtonView name="Deny" visible="{card.decide}" label="Ablehnen" style="ProfilePanel/OutlineButton;"/>
+                    <ButtonView name="Close" visible="{card.close}" label="Schließen" style="ProfilePanel/OutlineButton;"/>
+                </DisplayView>
+                <LabelView name="Hint" style="Text/Caption1; Color:Text/secondary;" text="{card.hint}"/>
+            </DisplayView>
+        </DisplayView>
+    </Templates>
+</Library>
