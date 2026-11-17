@@ -318,3 +318,30 @@ Das Attribut `gps_source` zeigt `datavalues` oder `sensitive_geolocation`.
 Bei Fehlern werden keine alten oder geratenen Koordinaten übertragen.
 Die erfolgreiche Standortabfrage wurde am Auto bestätigt; der vollständige
 Bridge-zu-Home-Assistant-Datenfluss dieser Version erfordert noch das Update.
+
+## Fahrertür und Geschwindigkeit (alpha.15)
+
+Am 17.11.2026 kam das Öffnen der Fahrertür beim Einsteigen nicht in Home
+Assistant an. Zwischen 07:39 und 07:41 meldete die Bridge 14-mal „zu“; das
+Einsteigen fiel zwischen zwei Lesungen im 10-s-Takt. Nach einer Schlafphase kam
+die erste Meldung erst, als bereits D eingelegt war.
+
+Ab alpha.15 liest die Bridge die Tür zwischen den Durchläufen jede Sekunde. Ein
+Öffnen startet sofort einen Durchlauf; darin wird die Tür als Erstes gesendet und
+einmal als `on` gemeldet, auch wenn sie inzwischen wieder geschlossen ist. Der
+nächste Durchlauf sendet wieder den tatsächlichen Zustand. Solange ein Öffnen
+nicht übertragen ist, versucht die Bridge es alle 2 s statt mit dem
+exponentiellen Backoff, höchstens 90 s lang; danach verfällt es. Der erste
+gültige Türwert nach einem Start gilt nur als Ausgangslage, ein Neustart erzeugt
+also kein Öffnen.
+
+`NAV_vehicleSpeedMph` lieferte am Zielauto auch während der Fahrt 0. Ist der
+Geschwindigkeits-DataValue 0 oder ungültig, leitet die Bridge km/h aus zwei
+aufeinanderfolgenden Positionen der Standortabfrage (`sensitive_geolocation`)
+ab: Durchschnitt über das Intervall, auf ganze km/h gerundet, unter 2 km/h als
+0, in P immer 0. Aus gerundeten DataValue-Koordinaten (Raster etwa 111 m) wird
+keine Geschwindigkeit abgeleitet. Das Attribut `speed_source` zeigt `datavalue`,
+`gps` oder `none`.
+
+Die Go-Tests decken Latch, Ausgangslage, Verfall, schnellen Retry und die
+Geschwindigkeitsableitung ab; am Auto ist diese Version noch nicht geprüft.

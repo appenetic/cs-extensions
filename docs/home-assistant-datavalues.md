@@ -14,6 +14,13 @@ Himmelsrichtungen. Ab alpha.14 nutzt die Bridge diesen Leseweg als Fallback für
 die geschwärzten Standard-Koordinaten. Die folgende Offline-Untersuchung beschreibt
 den früher untersuchten Debug-Leseweg und seine Einschränkungen.
 
+**Live-Ergänzung vom 2026-11-17:** `VAPI_driverDoor` meldet am Zielauto `true`
+bei geöffneter Fahrertür (Aussteigen um 08:02:34). Ein kurzes Öffnen beim
+Einsteigen fiel aber zwischen zwei Lesungen im 10-s-Takt; ab alpha.15 wird die
+Tür deshalb sekündlich gelesen. `NAV_vehicleSpeedMph` lieferte während der Fahrt
+durchgehend 0 (122 Meldungen in D). alpha.15 leitet die Geschwindigkeit dann aus
+der Standortabfrage ab. `VAPI_vehicleSpeed` ist weiterhin ungeprüft.
+
 ## Vorgeschlagene Konfiguration
 
 | Plugin-Einstellung | Wert | Evidenz und Grenze |
