@@ -172,3 +172,17 @@ test('narrow screens: an open question opens its session, back shows the list', 
   await poll(h);
   assert.match(el(h, 'messages').children[0].textContent, /Neueste Antwort/, 'newest first');
 });
+
+test('a working session gets a small pulsing green dot, in step across updates', async () => {
+  const calls = [];
+  const state = { view: view() };
+  const h = await setup({ data: { 'endpoint.json': JSON.stringify({ port: 29701, token: 't0k' }) }, fetchState: state, calls });
+  const dots = (label) => root(h).byLabel(label).findAll((e) => e.getAttribute('class') === 'pulse');
+  assert.equal(dots('lb-connect').length, 1, 'working');
+  assert.equal(dots('CS_Plugins').length, 0, 'an open question shows the orange dot instead');
+  assert.match(dots('lb-connect')[0].style.animationDelay, /^-\d+ms$/);
+  assert.equal(dots('lb-connect')[0].getAttribute('aria-label'), 'arbeitet gerade');
+  state.view = view({ rev: 8, sessions: view().sessions.map((x) => ({ ...x, status: 'idle' })) });
+  await poll(h);
+  assert.equal(dots('lb-connect').length, 0, 'gone once the session is idle');
+});

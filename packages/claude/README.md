@@ -184,6 +184,13 @@ Hintergrund, wie Teslas eigene Kachel-Icons. Teslas Launcher kann alte Icons
 zwischenspeichern. Das neue erscheint unter Umständen erst nach einem Neustart
 der Oberfläche im Stand.
 
+## Version 0.1.0-alpha.4
+
+Arbeitet Claude gerade in einer Sitzung, pulsiert vor ihrem Namen ein kleiner
+grüner Punkt, in der Liste und im Kopf der Sitzung. Eine offene Frage zeigt
+weiterhin den orangen Punkt. Die Animation läuft im Takt der Uhr weiter, auch
+wenn ein Live-Update die Liste neu zeichnet.
+
 ## Entwicklung und Validierungsstand
 
 Quellcode: `services/claude/` (Go, privat wie der HA-Dienst, ignoriert von git),

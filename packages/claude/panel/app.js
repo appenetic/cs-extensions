@@ -203,6 +203,15 @@
   var KIND = { interactive: 'Terminal', background: 'Hintergrund', ended: 'beendet' };
   var ROLE = { user: 'Du', assistant: 'Claude', tool: 'Werkzeug', car: 'Aus dem Auto' };
   var LINK = { online: 'Verbunden', connecting: 'Verbinde …', offline: 'Mac nicht erreichbar', rejected: 'Kopplung abgelehnt', unpaired: 'Nicht gekoppelt' };
+  // A small green dot that pulses while Claude works in a session. Every update
+  // redraws the list, so its animation is locked to the clock: a new dot goes
+  // on in step with the old one instead of starting over.
+  function pulse(x) {
+    if (x.status !== 'working' || x.pending) return '';
+    var dot = h('span', { class: 'pulse', role: 'img', 'aria-label': 'arbeitet gerade' });
+    dot.style.animationDelay = '-' + (Date.now() % 1600) + 'ms';
+    return dot;
+  }
   function shortPath(path) {
     var parts = String(path || '').split('/');
     return parts.length > 3 ? '…/' + parts.slice(-2).join('/') : path;
@@ -399,7 +408,7 @@
         render();
       });
       item.append(
-        h('span', { class: 'name' }, x.title),
+        h('span', { class: 'name' }, pulse(x), x.title),
         h('span', { class: 'meta' }, (x.pending ? 'Frage offen' : STATUS[x.status] || x.status) + ' · ' + (KIND[x.kind] || x.kind) + ' · ' + ago(x.updated))
       );
       items.push(item);
@@ -417,7 +426,7 @@
 
   function renderDetail(s) {
     els.head.replaceChildren(
-      h('h2', {}, s.title),
+      h('h2', {}, pulse(s), s.title),
       h('p', { class: 'hint' }, shortPath(s.cwd) + ' · ' + (KIND[s.kind] || s.kind) + ' · ' + (s.pending ? 'wartet auf dich' : STATUS[s.status] || s.status))
     );
     els.prompt.replaceChildren();
