@@ -82,3 +82,21 @@ Node 26. Am Auto ist noch nichts davon geprüft.
 5. Ob die Tesla-Tastatur in Web-Apps ein Diktier-Mikrofon anbietet.
 6. Ob das Auto den Mac über Tailscale oder das WLAN erreicht. Das hängt vom
    Tailnet und der Mac-Firewall ab: Port 47621 muss eingehend erlaubt sein.
+
+## Am Auto, 2026-11-17 (alpha.1)
+
+- **Funktioniert:** Paketinstallation, die Kachel im Launcher, die QR-Kopplung
+  und die Sitzungsliste im CoilShift-Panel.
+- **Fehler:**
+  - Die Kachel zeigt „127.0.0.1 Verbindung abgelehnt“.
+  - Das Panel zeigt in jeder Sitzung „Noch kein Verlauf“.
+  - Die Liste ist im Panel verschoben.
+- **Ursachen und Korrekturen in alpha.2:**
+  - Der Web-Port war nur in einem von mehreren Browser-Namespaces offen.
+  - `state.json` verwarf bei Platzmangel alle Nachrichten.
+  - Das Layout hing an `100vh`, und im Panel-Frame ist diese Höhe unbestimmt.
+- **Geprüft:**
+  - Neue Go-Tests für die Namespace-Liste und die gekürzte `state.json`.
+  - Ein Paneltest für Liste und Detail im schmalen Fenster.
+  - Screenshots aus Chrome headless bei 1280×800 und 760×900. Teslas Browser
+    ist laut Firmware Chromium 148.

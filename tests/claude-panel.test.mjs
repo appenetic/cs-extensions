@@ -152,3 +152,23 @@ test('a new background session starts in a known project', async () => {
   assert.deepEqual(start.body, { cwd: '/Users/s/Developer/CS_Plugins', text: 'Lies die README und fasse sie zusammen', source: 'touch' });
   assert.match(el(h, 'flash').textContent, /Neue Sitzung gestartet/);
 });
+
+test('narrow screens: an open question opens its session, back shows the list', async () => {
+  const calls = [];
+  const state = { view: view() };
+  const h = await setup({ data: { 'endpoint.json': JSON.stringify({ port: 29701, token: 't0k' }) }, fetchState: state, calls });
+  assert.equal(el(h, 'split').getAttribute('class'), 'split show-detail');
+  el(h, 'back').click();
+  await h.settle();
+  assert.equal(el(h, 'split').getAttribute('class'), 'split');
+  root(h).byLabel('lb-connect').click();
+  await h.settle();
+  assert.equal(el(h, 'split').getAttribute('class'), 'split show-detail');
+  const texts = el(h, 'messages').children.map((li) => li.textContent);
+  assert.equal(texts.length, 1);
+  state.view = view({ rev: 9 });
+  state.view.sessions[0].messages.push({ id: 'm3', role: 'assistant', text: 'Neueste Antwort', at: 1799999990000 });
+  root(h).byLabel('CS_Plugins').click();
+  await poll(h);
+  assert.match(el(h, 'messages').children[0].textContent, /Neueste Antwort/, 'newest first');
+});

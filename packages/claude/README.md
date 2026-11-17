@@ -24,16 +24,16 @@ Sitzung.
 
 ## Einrichtung
 
-1. **Mac:** Das Plugin aus dem ausgecheckten Repository installieren:
+1. **Mac:** Das Plugin ist öffentlich auf GitHub, auch für Kollegen:
 
    ```sh
-   cd ~/Developer/Appenetic/CS_Plugins
-   claude plugin marketplace add ./
+   claude plugin marketplace add appenetic/cs-extensions
    claude plugin install coilshift@appenetic
    ```
 
-   `claude plugin marketplace add appenetic/cs-extensions` funktioniert ebenfalls.
-   Es klont aber das ganze Repository mit allen Paketarchiven.
+   Aus einem ausgecheckten Repository geht auch `claude plugin marketplace add ./`.
+   Jeder Kollege koppelt damit sein eigenes Auto, auf dem das CoilShift-Paket
+   installiert ist.
 
    Danach neu gestartete Claude-Code-Sitzungen melden sich bei der Bridge.
    Bereits laufende Sitzungen erscheinen mit Liste und Verlauf. Ihr Verlauf
@@ -151,6 +151,31 @@ Der Paketstatus in CoilShift folgt der Verbindung.
   - Hintergrundsitzungen starten im Standard-Berechtigungsmodus. Freigaben
     erscheinen dann im Auto.
   - Den Modus legt `permission_mode` in der Bridge-Konfiguration fest.
+
+## Version 0.1.0-alpha.2
+
+Erste Rückmeldung vom Auto: Die Kopplung klappt, und die Sitzungen erscheinen im
+CoilShift-Panel. Es gab aber drei Fehler:
+
+1. **„127.0.0.1 Verbindung abgelehnt“ in der Kachel.** Die Firmware hat viele
+   Browser-Profile mit eigenen Netzwerk-Namespaces (`chromium`,
+   `chromium-entertainment`, `chromium1-…`, …). In welchem davon die Kachel
+   öffnet, entscheidet CoilShift. alpha.1 lauschte nur in `chromium-entertainment`.
+   Ab alpha.2 öffnet der Web-Dienst den Port im eigenen Namespace und in jedem
+   `chromium*`-Namespace. Alle zehn Sekunden sucht er nach neuen, denn die
+   Sandbox legt einen Namespace erst beim ersten Start seines Browsers an.
+   **Technik → Web-Port** zeigt alle bedienten Namespaces und Fehler je
+   Namespace.
+2. **„Noch kein Verlauf“ im Panel.** Ohne erreichbaren Web-Port liest das Panel
+   `state.json` (höchstens 64 KiB). War die Datei zu groß, warf alpha.1 sofort
+   alle Nachrichten weg. Jetzt werden erst die Texte gekürzt, dann die Anzahl
+   der Nachrichten, zuletzt der Verlauf älterer Sitzungen. Die Liste bleibt
+   vollständig.
+3. **Layout.** Die Höhen hingen an `100vh`, und im Panel-Frame ist diese Höhe
+   unbestimmt. Die Seite fließt jetzt als Ganzes:
+   - Das Antwortfeld steht direkt unter der Frage, die neuesten Nachrichten oben.
+   - Im schmalen Panel wechseln Liste und Sitzung, mit „‹ Alle Sitzungen“.
+   - Eine neue Frage öffnet ihre Sitzung von selbst.
 
 ## Entwicklung und Validierungsstand
 

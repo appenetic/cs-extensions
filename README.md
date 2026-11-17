@@ -16,8 +16,9 @@ Zeigt die Claude-Code-Sitzungen des Macs als eigene App-Kachel auf der MCU. Du
 kannst sie verfolgen und vom Auto aus weiterarbeiten lassen. Fragen erscheinen
 als Karte über der Navi, beantwortet werden sie per Touch, Diktat oder Sprachtaste.
 Gekoppelt wird per QR-Code. Dazu gehört das Claude-Code-Plugin `coilshift` auf
-dem Mac (`claude plugin marketplace add ./` im Repo, dann
-`claude plugin install coilshift@appenetic`).
+dem Mac. Es ist öffentlich, auch für Kollegen:
+`claude plugin marketplace add appenetic/cs-extensions`, dann
+`claude plugin install coilshift@appenetic`.
 [Einrichtung und Grenzen](packages/claude/README.md) ·
 [Validierung](docs/claude-validation.md). Am Auto noch ungeprüft.
 

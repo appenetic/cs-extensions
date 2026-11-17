@@ -15,6 +15,8 @@
   var view = null;
   var rev = -1;
   var selected = '';
+  var focused = false;
+  var seenPrompt = '';
   var screen = 'sessions';
   var drafts = {};
   var picks = {};
@@ -230,11 +232,16 @@
     els.composerHint = h('p', { class: 'hint', id: 'composer-hint' });
     els.composerBox = h('section', { class: 'composer', id: 'composer-box' }, els.composer, h('div', { class: 'row' }, els.composerHint, els.send));
 
+    // On a narrow screen the list and one session take turns; wide shows both.
     els.nav = h('nav', { class: 'sessions', id: 'sessions', 'aria-label': 'Sitzungen' });
+    els.back = button('‹ Alle Sitzungen', { type: 'button', class: 'back', id: 'back' }, function () {
+      focused = false;
+      render();
+    });
     els.head = h('div', { class: 'head', id: 'detail-head' });
     els.prompt = h('div', { id: 'prompt-box' });
     els.messages = h('ol', { class: 'messages', id: 'messages' });
-    els.detail = h('section', { class: 'detail', id: 'detail' }, els.head, els.prompt, els.messages, els.composerBox);
+    els.detail = h('section', { class: 'detail', id: 'detail' }, els.back, els.head, els.prompt, els.composerBox, els.messages);
     els.split = h('div', { class: 'split', id: 'split' }, els.nav, els.detail);
 
     // New background session: built once as well.
@@ -319,6 +326,7 @@
     els.away.disabled = mode !== 'live' || link.state !== 'online' || sending;
 
     els.notice.replaceChildren();
+    show(els.notice, mode === 'readonly');
     if (mode === 'readonly') {
       els.notice.append(h('p', { class: 'notice', id: 'readonly' }, 'Nur-Lese-Ansicht: Das Panel erreicht den Web-Port des Claude-Dienstes nicht. Antworten gehen über die Claude-Kachel im App-Launcher.'));
     }
@@ -375,11 +383,18 @@
     var list = sessions();
     var s = current();
     if (s) selected = s.id;
+    // A new open question brings its session to the front.
+    if (s && s.pending && s.pending.id !== seenPrompt) {
+      seenPrompt = s.pending.id;
+      focused = true;
+    }
+    els.split.setAttribute('class', 'split' + (focused && s ? ' show-detail' : ''));
     var items = [];
     if (!list.length) items.push(h('p', { class: 'hint' }, 'Noch keine Sitzungen. Sie erscheinen, sobald Claude Code auf dem Mac läuft.'));
     list.forEach(function (x) {
       var item = button('', { type: 'button', class: 'session' + (s && x.id === s.id ? ' on' : '') + (x.pending ? ' asks' : ''), 'aria-label': x.title }, function () {
         selected = x.id;
+        focused = true;
         say('');
         render();
       });
@@ -407,15 +422,13 @@
     );
     els.prompt.replaceChildren();
     if (s.pending) els.prompt.append(promptCard(s, s.pending));
-    var box = els.messages;
-    var atBottom = !(box.scrollHeight - box.scrollTop - box.clientHeight > 40);
+    // Newest first: the latest answer sits right under the answer field.
     var rows = [];
     (s.messages || []).forEach(function (m) {
-      rows.push(h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), h('span', { class: 'text' }, m.text)));
+      rows.unshift(h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), h('span', { class: 'text' }, m.text)));
     });
-    if (!rows.length) rows.push(h('li', { class: 'hint' }, 'Noch kein Verlauf.'));
-    box.replaceChildren.apply(box, rows);
-    if (atBottom) box.scrollTop = box.scrollHeight;
+    if (!rows.length) rows.push(h('li', { class: 'hint' }, mode === 'readonly' ? 'Kein Verlauf in der Nur-Lese-Ansicht.' : 'Noch kein Verlauf.'));
+    els.messages.replaceChildren.apply(els.messages, rows);
     renderComposer(s);
   }
 

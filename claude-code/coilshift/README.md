@@ -4,9 +4,11 @@ Die Mac-Seite der [Claude-App für die Tesla-MCU](../../packages/claude/README.m
 Es hat keine Abhängigkeiten: nur Node (ab 22) und `openssl` aus macOS.
 
 ```sh
-claude plugin marketplace add ./      # im ausgecheckten Repo, oder appenetic/cs-extensions (klont alles)
+claude plugin marketplace add appenetic/cs-extensions   # öffentlich, auch für Kollegen
 claude plugin install coilshift@appenetic
 ```
+
+Aus einem ausgecheckten Repository: `claude plugin marketplace add ./`.
 
 ## Bestandteile
 
