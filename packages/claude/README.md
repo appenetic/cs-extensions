@@ -177,6 +177,13 @@ CoilShift-Panel. Es gab aber drei Fehler:
    - Im schmalen Panel wechseln Liste und Sitzung, mit „‹ Alle Sitzungen“.
    - Eine neue Frage öffnet ihre Sitzung von selbst.
 
+## Version 0.1.0-alpha.3
+
+Das Dock-Icon ist jetzt das Claude-Symbol: 180×180 Pixel mit transparentem
+Hintergrund, wie Teslas eigene Kachel-Icons. Teslas Launcher kann alte Icons
+zwischenspeichern. Das neue erscheint unter Umständen erst nach einem Neustart
+der Oberfläche im Stand.
+
 ## Entwicklung und Validierungsstand
 
 Quellcode: `services/claude/` (Go, privat wie der HA-Dienst, ignoriert von git),
