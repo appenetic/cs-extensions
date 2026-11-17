@@ -134,6 +134,9 @@ test('unpaired: the QR code of the pairing page and no session list', async () =
       { url: 'https://192.168.1.50:41234/#abc', qr: 'data:image/png;base64,Qg==' }] } }) };
   const h = await setup({ fetchState: state, calls });
   assert.equal(el(h, 'pairing-qr').getAttribute('src'), 'data:image/png;base64,QQ==');
+  assert.match(el(h, 'setup-steps').textContent, /claude plugin marketplace add appenetic\/cs-extensions/);
+  assert.match(el(h, 'setup-steps').textContent, /claude plugin install coilshift@appenetic/);
+  assert.match(el(h, 'setup-steps').textContent, /\/coilshift:pair/);
   assert.match(el(h, 'pairing-url').textContent, /^https:\/\/100\.70\.1\.2:41234\//);
   assert.doesNotMatch(el(h, 'pairing-url').textContent, /abc/, 'the one-time code is not printed');
   assert.equal(el(h, 'split').getAttribute('hidden'), '');

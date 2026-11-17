@@ -317,10 +317,15 @@
     var addresses = pairing.addresses || [];
     var parts = [h('h2', {}, 'Mit dem Mac koppeln')];
     if (link.state === 'rejected' && link.error) parts.push(h('p', { class: 'bad' }, link.error));
-    parts.push(h('ol', {},
-      h('li', {}, 'Auf dem Mac in Claude Code das Plugin „coilshift“ installieren und /coilshift:pair ausführen.'),
+    parts.push(h('ol', { class: 'steps', id: 'setup-steps' },
+      h('li', {}, 'Auf dem Mac einmal das Claude-Code-Plugin installieren, im Terminal:',
+        h('code', { class: 'cmd' }, 'claude plugin marketplace add appenetic/cs-extensions'),
+        h('code', { class: 'cmd' }, 'claude plugin install coilshift@appenetic'),
+        h('span', { class: 'hint' }, 'Oder in Claude Code dieselben Befehle mit /plugin statt claude plugin.')),
+      h('li', {}, 'Eine neue Claude-Code-Sitzung starten und ', h('code', {}, '/coilshift:pair'),
+        ' ausführen. Der Kopplungslink landet in der Zwischenablage, per Universal Clipboard auch auf dem iPhone.'),
       h('li', {}, 'Diesen QR-Code mit dem Handy scannen und das lokale Zertifikat einmal bestätigen.'),
-      h('li', {}, 'Auf dem Handy den Kopplungslink vom Mac einfügen und „Koppeln“ tippen.')));
+      h('li', {}, 'Auf der Handy-Seite den Link einfügen und „Koppeln“ tippen.')));
     if (pairing.state === 'open' && addresses.length) {
       var shown = addresses[0];
       for (var i = 0; i < addresses.length; i++) if (addresses[i].url === picks.address) shown = addresses[i];

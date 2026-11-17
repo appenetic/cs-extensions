@@ -236,6 +236,14 @@ Launcher.
 - Unter **Technik** stehen zusätzlich der Zustand des Web-Dienstes und des
   Namespace-Binds.
 
+## Version 0.1.0-alpha.8
+
+Der Einrichtungsschritt in der App und die Handy-Seite hinter dem QR-Code nennen
+die Befehle, mit denen das Claude-Code-Plugin auf dem Mac installiert wird. Der
+Code muss dafür nicht auf der Platte liegen:
+`claude plugin marketplace add appenetic/cs-extensions` und
+`claude plugin install coilshift@appenetic`.
+
 ## Entwicklung und Validierungsstand
 
 Quellcode: `services/claude/` (Go, privat wie der HA-Dienst, ignoriert von git),
