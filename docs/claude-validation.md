@@ -154,7 +154,12 @@ Nutzer „funktioniert alles“.
   - Paketdienste laufen mit umask 0077. alpha.18 legte den Vorlagenordner mit
     0700 an, QtCar konnte die Vorlage nicht lesen (`cannot read the template`).
     Am Auto von Hand korrigiert, in alpha.19 behoben.
-- **Offen (alpha.19):** Bilder aus Prompts in der App, also Vorschau,
+- **Offen (alpha.20):** Vorlesen. Die App meldet `web.audio` (spielt das Auto
+  AAC, hat Chromium eigene Stimmen, bleibt die Seite im Hintergrund) und nach
+  jedem Versuch `web.play`. Teslas eigene Sprachdienste (`NuanceServer`,
+  `SpeechDbus`) waren am 2026-11-18 nicht auf dem System-Bus.
+- **Bestätigt (alpha.19):** Ein eingefügter Screenshot erscheint in der App
+  unter dem Prompt. Früher offen: Bilder aus Prompts in der App, also Vorschau,
   Vergrößern per Tipp und Laden über das Internet-Relay. Auf dem Mac sind sie
   mit Tests und gegen ein echtes Transkript geprüft (28 MB, Bild in 53 ms
   gefunden, in 72 ms auf 1024×685 verkleinert, 123 KB).

@@ -33,6 +33,10 @@ function fakeFetch(state, calls) {
     const call = { url, method: init.method || 'GET', auth: init.headers && init.headers.Authorization, body: init.body ? JSON.parse(init.body) : undefined };
     calls.push(call);
     if (url === '/api/bootstrap') return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ token: 't0k' }) });
+    if (url.startsWith('/api/speech')) {
+      const speech = state.speech.shift();
+      return Promise.resolve({ ok: speech.status === 200, status: speech.status, json: () => Promise.resolve(speech.body) });
+    }
     if (url.startsWith('/api/image')) {
       const image = state.images.shift();
       return Promise.resolve({ ok: image.status === 200, status: image.status, json: () => Promise.resolve(image.body) });
@@ -234,6 +238,63 @@ test('pasted images load from the Mac below the text, grow with a tap, and only 
   second.click();
   await h.settle(25);
   assert.equal(second.children[0].getAttribute('src'), 'data:image/png;base64,cG5n', 'a tap tries again');
+});
+
+test("Claude's answers are read aloud on a tap, one at a time, and the car reports what it plays", async () => {
+  const s = { id: 's1', title: 'Vorlesen', cwd: '/p', kind: 'interactive', status: 'idle', updated: 1799999990000, delivery: 'inbox',
+    messages: [{ id: 'm1', role: 'user', text: 'Wie weit?', at: 1799999900000 }, { id: 'm2', role: 'assistant', text: '**Fertig.**', at: 1799999950000 },
+      { id: 'm3', role: 'assistant', text: 'Noch was.', at: 1799999960000 }] };
+  const calls = [];
+  const speech = [
+    { status: 200, body: { type: 'audio/mp4', data: 'dG9u' } },
+    { status: 200, body: { type: 'image/png', data: 'cG5n' } },
+    { status: 200, body: { type: 'audio/mp4', data: 'bGVpc2U=' } },
+  ];
+  const played = [];
+  const h = createHost({});
+  // Chromium's Audio: this one refuses to play the second sound, as an
+  // autoplay rule would.
+  h.window.Audio = function (src) {
+    const audio = { src, paused: true, canPlayType: () => 'probably', pause() { audio.paused = true; } };
+    audio.play = () => {
+      played.push(audio);
+      if (src.includes('bGVpc2U')) return Promise.reject(Object.assign(new Error('blocked'), { name: 'NotAllowedError' }));
+      audio.paused = false;
+      return Promise.resolve();
+    };
+    return audio;
+  };
+  h.window.fetch = fakeFetch({ view: view({ sessions: [s] }), speech }, calls);
+  h.load([pkg + 'web/app.js']);
+  await h.settle(25);
+  const diag = () => calls.filter((c) => c.url === '/api/diag').map((c) => c.body);
+  assert.match(diag()[0]['web.audio'], /^aac=probably · stimmen=fehlt · /, 'the car says what it plays');
+  const [third, second, first] = el(h, 'messages').children;
+  const speak = (li) => li.find((e) => e.tagName === 'BUTTON' && e.className === 'chip speak');
+  assert.equal(speak(first), null, "only Claude's answers");
+  const b2 = speak(second);
+  const b3 = speak(third);
+  b2.click();
+  assert.equal(b2.textContent, 'Wird vorbereitet …');
+  await h.settle(25);
+  assert.deepEqual(calls.filter((c) => c.url.startsWith('/api/speech')).map((c) => [c.url, c.auth]), [['/api/speech?session=s1&message=m2', 'Bearer t0k']]);
+  assert.equal(played[0].src, 'data:audio/mp4;base64,dG9u');
+  assert.equal(b2.textContent, '■ Stopp');
+  assert.deepEqual(diag().at(-1), { 'web.play': 'ok' });
+  b2.click();
+  assert.equal(played[0].paused, true);
+  assert.equal(b2.textContent, '▶ Vorlesen');
+  b2.click();
+  assert.equal(played.length, 2, 'played again without asking the Mac again');
+  b3.click();
+  assert.equal(played[1].paused, true, 'one answer at a time');
+  await h.settle(25);
+  assert.match(b3.textContent, /^Kein gültiger Ton\. Nochmal antippen\.$/, 'only AAC becomes a data URL');
+  assert.equal(played.length, 2);
+  b3.click();
+  await h.settle(25);
+  assert.match(b3.textContent, /lässt den Ton nicht zu/);
+  assert.deepEqual(diag().at(-1), { 'web.play': 'NotAllowedError' });
 });
 
 test('sessions with an open question lead the list', async () => {

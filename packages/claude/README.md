@@ -114,6 +114,9 @@ nächsten direkten Kontakt selbst.
     Text. Antippen zeigt sie in voller Breite. Der Mac lädt jedes erst, wenn du
     die Sitzung öffnest, und verkleinert es mit `sips` auf höchstens 1024 Pixel.
     Bilder, die Claude selbst mit Werkzeugen liest, zeigt das Auto nicht.
+  - **▶ Vorlesen** unter einer Antwort von Claude liest sie vor. Der Mac
+    spricht sie mit `say` (Vorgabe: Anna), das Auto spielt den Ton ab.
+    Codeblöcke und Tabellen sagt er nur an. Ein zweiter Tipp hält an.
 - **Weiterarbeiten:**
   - Text an eine laufende Sitzung geht direkt hinein. Ist Claude gerade
     beschäftigt, liest Claude ihn zwischen zwei Werkzeugaufrufen, sonst beginnt

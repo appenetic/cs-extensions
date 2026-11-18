@@ -229,6 +229,7 @@
     connect().then(
       function () {
         mode = 'live';
+        audioDiag();
         loop();
       },
       function () {
@@ -363,6 +364,101 @@
     }
     load();
     return entry.node;
+  }
+
+  // ------------------------------------------------------------ reading aloud
+
+  // The Mac reads Claude's answers with its own voice and the car plays the
+  // sound: one answer at a time, a second tap stops it. What the car can play
+  // goes to the Mac as diagnostics.
+  var speakers = {};
+  var playing = null;
+  function speaker(session, m) {
+    var key = session + ' ' + m.id;
+    if (speakers[key]) return speakers[key].node;
+    var entry = (speakers[key] = { state: '', sound: '' });
+    entry.node = button('▶ Vorlesen', { type: 'button', class: 'chip speak' }, function () {
+      if (entry.state === 'loading') return;
+      if (playing && playing.entry === entry) return stop();
+      stop();
+      if (entry.sound) return play(entry);
+      entry.state = 'loading';
+      entry.node.textContent = 'Wird vorbereitet …';
+      request('GET', '/api/speech?session=' + encodeURIComponent(session) + '&message=' + encodeURIComponent(m.id))
+        .then(function (d) {
+          if (!d || d.type !== 'audio/mp4' || typeof d.data !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(d.data)) throw new Error('Kein gültiger Ton.');
+          entry.sound = 'data:' + d.type + ';base64,' + d.data;
+          play(entry);
+        })
+        .catch(function (error) {
+          entry.state = '';
+          entry.node.textContent = ((error && error.message) || 'Vorlesen fehlgeschlagen.') + ' Nochmal antippen.';
+        });
+    });
+    return entry.node;
+  }
+  function play(entry) {
+    if (!window.Audio) {
+      entry.state = '';
+      entry.node.textContent = 'Hier lässt sich kein Ton abspielen.';
+      return;
+    }
+    var audio = new window.Audio(entry.sound);
+    playing = { entry: entry, audio: audio };
+    entry.state = 'playing';
+    entry.node.textContent = '■ Stopp';
+    audio.onended = function () {
+      if (playing && playing.audio === audio) stop();
+    };
+    var started = audio.play();
+    if (!started || !started.then) return;
+    started.then(
+      function () {
+        note('web.play', 'ok');
+      },
+      function (error) {
+        var name = String((error && error.name) || error);
+        note('web.play', name);
+        if (playing && playing.audio === audio) playing = null;
+        entry.state = '';
+        entry.node.textContent = name === 'NotAllowedError' ? 'Das Auto lässt den Ton nicht zu. Einmal auf den Bildschirm tippen, dann nochmal.' : 'Der Ton lässt sich nicht abspielen (' + name + ').';
+      }
+    );
+  }
+  function stop() {
+    if (!playing) return;
+    var p = playing;
+    playing = null;
+    try {
+      p.audio.pause();
+    } catch (e) {}
+    p.entry.state = '';
+    p.entry.node.textContent = '▶ Vorlesen';
+  }
+
+  // note reports a value of the app to the car's diagnostics, once per change.
+  var noted = {};
+  function note(key, value) {
+    if (!api || noted[key] === value) return;
+    noted[key] = value;
+    var body = {};
+    body[key] = value;
+    request('POST', '/api/diag', body).then(null, function () {
+      delete noted[key];
+    });
+  }
+  // Whether the car plays AAC, has voices of its own, and keeps the page when
+  // another app is in front: what reading aloud on its own depends on.
+  function audioDiag() {
+    var aac = 'nein';
+    var voices = 'fehlt';
+    try {
+      aac = (window.Audio && new window.Audio().canPlayType('audio/mp4; codecs="mp4a.40.2"')) || 'nein';
+    } catch (e) {}
+    try {
+      if (window.speechSynthesis) voices = String(window.speechSynthesis.getVoices().length);
+    } catch (e) {}
+    note('web.audio', 'aac=' + aac + ' · stimmen=' + voices + ' · ' + (document.visibilityState || '?'));
   }
 
   function toolBubble(count, live) {
@@ -645,6 +741,7 @@
       var body = m.role === 'assistant' ? markdown(m.text) : h('span', { class: 'text' }, text);
       var item = h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), body);
       if (m.role === 'user' && m.images > 0) item.append(pictures(s.id, m));
+      if (m.role === 'assistant' && m.text) item.append(speaker(s.id, m));
       rows.unshift(item);
     }
     if (!rows.length) rows.push(h('li', { class: 'hint' }, 'Noch kein Verlauf.'));
@@ -788,4 +885,8 @@
   build();
   render();
   start();
+  try {
+    document.addEventListener('visibilitychange', audioDiag);
+    if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = audioDiag;
+  } catch (e) {}
 })();
