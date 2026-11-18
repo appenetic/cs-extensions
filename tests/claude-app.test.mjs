@@ -126,6 +126,20 @@ test('a refused answer is shown and keeps the text', async () => {
   assert.equal(el(h, 'composer').value, 'Weiter');
 });
 
+test('a session without inbox relay still takes text, as a copy in the background', async () => {
+  const calls = [];
+  const old = { id: 'old', title: 'Alte Sitzung', cwd: '/p', kind: 'interactive', status: 'working', updated: 1799999990000, delivery: 'fork', messages: [] };
+  const h = await setup({ fetchState: { view: view({ sessions: [old] }), answer: { ok: true, delivered: 'fork', id: 'abcdef12' } }, calls });
+  assert.equal(el(h, 'composer').disabled, false, 'the field stays open, also while driving');
+  assert.equal(el(h, 'send').textContent, 'Als Kopie senden');
+  assert.match(el(h, 'composer-hint').textContent, /Kopie im Hintergrund/);
+  el(h, 'composer').type('Mach die Tests grün');
+  el(h, 'send').click();
+  await h.settle(25);
+  assert.deepEqual(calls.find((c) => c.url.endsWith('/api/reply')).body, { session: 'old', prompt: '', source: 'touch', text: 'Mach die Tests grün' });
+  assert.match(el(h, 'flash').textContent, /als Kopie im Hintergrund/);
+});
+
 test('sessions with an open question lead the list', async () => {
   const plain = (id, updated) => ({ id, title: id, cwd: '/p', kind: 'interactive', status: 'idle', updated, delivery: 'inbox', messages: [] });
   const asking = { ...plain('asks', 1799990000000), status: 'waiting', delivery: 'hook', pending: question };

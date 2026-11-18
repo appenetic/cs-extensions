@@ -155,6 +155,41 @@ export function parseTranscript(file, maxBytes = 512 * 1024) {
   return result
 }
 
+// transcriptTail reads the end of a transcript: when the conversation last
+// moved (a user or assistant entry; Claude Code also writes metadata, so the
+// file's time says little) and when Remote Control last reported the session
+// as ended or archived from another device (close code 4090).
+export function transcriptTail(file, maxBytes = 128 * 1024) {
+  const result = { talkAt: 0, archivedAt: 0 }
+  let fd
+  try {
+    const size = fs.statSync(file).size
+    const start = Math.max(0, size - maxBytes)
+    const buffer = Buffer.alloc(size - start)
+    fd = fs.openSync(file, 'r')
+    fs.readSync(fd, buffer, 0, buffer.length, start)
+    let lines = buffer.toString('utf8').split('\n')
+    if (start > 0) lines = lines.slice(1)
+    for (const line of lines) {
+      let e
+      try {
+        e = JSON.parse(line)
+      } catch {
+        continue
+      }
+      const at = (e && Date.parse(e.timestamp)) || 0
+      if (!at) continue
+      if ((e.type === 'user' || e.type === 'assistant') && !e.isMeta && !e.isSidechain) result.talkAt = Math.max(result.talkAt, at)
+      if (e.type === 'system' && /code 4090|archived/i.test(String(e.content || ''))) result.archivedAt = Math.max(result.archivedAt, at)
+    }
+  } catch {
+    return result
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd)
+  }
+  return result
+}
+
 // ---------------------------------------------------------------- network helpers
 
 function v4ToInt(ip) {
@@ -242,6 +277,7 @@ export class Bridge {
     this.agentsSource = options.agents || (() => this.runAgents())
     this.spawnClaude = options.spawnClaude || ((args, cwd) => this.runClaude(args, cwd))
     this.projectsDir = options.projectsDir || process.env.COILSHIFT_PROJECTS_DIR || path.join(claudeHome(), 'projects')
+    this.registryDir = options.registryDir || process.env.COILSHIFT_SESSIONS_DIR || path.join(claudeHome(), 'sessions')
     this.name = options.name || computerName()
     this.config = this.loadConfig()
     this.sessions = new Map()
@@ -408,13 +444,41 @@ export class Bridge {
     if (s.messages.length > MAX_MESSAGES) s.messages.splice(0, s.messages.length - MAX_MESSAGES)
   }
 
-  lastActive(s) {
+  // tail is transcriptTail for a session, read again only when the file changed.
+  tail(s) {
     if (!s.transcript) s.transcript = this.findTranscript(s.id)
+    let mtime = 0
     try {
-      return Math.floor(fs.statSync(s.transcript).mtimeMs)
+      mtime = fs.statSync(s.transcript).mtimeMs
     } catch {
-      return 0
+      return { talkAt: 0, archivedAt: 0 }
     }
+    if (s.tailAt !== mtime) {
+      s.tailInfo = transcriptTail(s.transcript)
+      s.tailAt = mtime
+    }
+    return s.tailInfo
+  }
+
+  // Claude Code keeps a file per running session in ~/.claude/sessions with
+  // its current inbox socket and when its status last changed. Internal like
+  // transcripts: anything unexpected is skipped.
+  readRegistry() {
+    const out = new Map()
+    let names = []
+    try {
+      names = fs.readdirSync(this.registryDir)
+    } catch {
+      return out
+    }
+    for (const name of names) {
+      if (!/^\d+\.json$/.test(name)) continue
+      try {
+        const r = JSON.parse(fs.readFileSync(path.join(this.registryDir, name), 'utf8'))
+        if (r && typeof r.sessionId === 'string') out.set(r.sessionId, r)
+      } catch {}
+    }
+    return out
   }
 
   findTranscript(id) {
@@ -450,7 +514,8 @@ export class Bridge {
     if (!s.hooked || s.messages.length === 0) s.messages = t.messages.map((m) => ({ ...m, id: m.id || `m${++this.seq}` }))
     if (t.title && !s.title) s.title = t.title
     if (!s.cwd) s.cwd = t.cwd
-    if (!s.hooked) s.updated = Math.max(s.updated, Math.floor(stat.mtimeMs))
+    const last = t.messages.length ? t.messages[t.messages.length - 1].at : 0
+    if (!s.hooked && last) s.updated = Math.max(s.updated, last)
     return true
   }
 
@@ -468,6 +533,9 @@ export class Bridge {
     if (s.pending && s.pending.waiter) return 'hook'
     if (s.kind !== 'ended' && s.socket && this.relays.has(s.socket)) return 'inbox'
     if (s.kind === 'ended' && s.cwd) return 'resume'
+    // A running session without the plugin's inbox relay (started before the
+    // plugin) cannot take text, but a copy of it can, in the background.
+    if (s.cwd) return 'fork'
     return ''
   }
 
@@ -500,7 +568,7 @@ export class Bridge {
   }
 
   snapshot() {
-    const list = [...this.sessions.values()].sort((a, b) => b.updated - a.updated).slice(0, MAX_SESSIONS)
+    const list = [...this.sessions.values()].filter((s) => !s.archived).sort((a, b) => b.updated - a.updated).slice(0, MAX_SESSIONS)
     let read = false
     for (const s of list) read = this.backfill(s) || read
     // New history is a new revision, or the car would keep its old copy.
@@ -545,20 +613,30 @@ export class Bridge {
     if (!list) return
     let changed = false
     const live = new Set()
+    const registry = this.readRegistry()
     for (const a of list) {
       if (!a || typeof a.sessionId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(a.sessionId)) continue
       const fresh = !this.sessions.has(a.sessionId)
       const s = this.session(a.sessionId)
-      // A session the bridge learns about only now (after a restart, or from
-      // before the plugin) was last active when its transcript was last
-      // written, not now.
-      if (fresh) s.updated = this.lastActive(s) || Number(a.startedAt) || this.now()
+      const reg = registry.get(a.sessionId) || {}
+      const tail = this.tail(s)
+      // Last activity is the last status change or conversation entry. A
+      // session the bridge learns about only now (after a restart, or from
+      // before the plugin) was not active just because the bridge found it.
+      const active = Math.max(Number(reg.statusUpdatedAt) || 0, tail.talkAt)
+      if (fresh) s.updated = active || Number(a.startedAt) || this.now()
       const status = Bridge.status(a.status || a.state)
       const kind = status === 'ended' ? 'ended' : a.kind === 'background' ? 'background' : 'interactive'
       if (kind !== 'ended') live.add(s.id)
-      const next = { cwd: s.cwd || clip(a.cwd, 512), name: clip(a.name, 120), kind, status: status || s.status }
+      // Archived on claude.ai or in the app: hidden until the next prompt.
+      const next = { cwd: s.cwd || clip(a.cwd, 512), name: clip(a.name, 120), kind, status: status || s.status,
+        archived: tail.archivedAt > Math.max(tail.talkAt, s.activeAt || 0) }
+      if (typeof reg.messagingSocketPath === 'string' && reg.messagingSocketPath) next.socket = reg.messagingSocketPath
       if (kind === 'ended') next.status = 'ended'
-      if (s.kind === 'ended' && kind !== 'ended') next.updated = Math.max(s.updated, Number(a.startedAt) || 0)
+      let updated = s.updated
+      if (s.kind === 'ended' && kind !== 'ended') updated = Math.max(updated, Number(a.startedAt) || 0)
+      if (!s.hooked) updated = Math.max(updated, active)
+      if (updated !== s.updated) next.updated = updated
       for (const [k, v] of Object.entries(next)) {
         if (s[k] !== v) {
           s[k] = v
@@ -609,7 +687,9 @@ export class Bridge {
       if (this.sessions.has(t.id)) continue
       const s = this.session(t.id)
       s.transcript = t.file
-      s.updated = Math.floor(t.mtime)
+      const tail = this.tail(s)
+      s.updated = tail.talkAt || Math.floor(t.mtime)
+      s.archived = tail.archivedAt > tail.talkAt
       changed = true
     }
     if (changed) this.touch()
@@ -660,7 +740,10 @@ export class Bridge {
     if (typeof input.transcript_path === 'string' && input.transcript_path) s.transcript = input.transcript_path
     if (typeof input.session_title === 'string' && input.session_title) s.title = clip(input.session_title, 120)
     if (s.kind === 'ended' && event !== 'SessionEnd') s.kind = 'interactive'
-    if (ACTIVITY.has(event) || (event === 'PreToolUse' && input.tool_name === 'AskUserQuestion')) s.updated = this.now()
+    if (ACTIVITY.has(event) || (event === 'PreToolUse' && input.tool_name === 'AskUserQuestion')) {
+      s.updated = s.activeAt = this.now()
+      s.archived = false
+    }
     switch (event) {
       case 'SessionStart':
         s.status = 'idle'
@@ -830,7 +913,7 @@ export class Bridge {
     }
     if (!text) throw fail(400, 'Bitte einen Text eingeben oder diktieren.')
     const message = Bridge.fromCar(text, r.source)
-    if (s.kind !== 'ended') {
+    if (this.delivery(s) === 'inbox') {
       await this.deliverInbox(s, message)
       if (s.pending && s.pending.kind === 'input') s.pending = null
       this.addMessage(s, 'car', text)
@@ -840,6 +923,17 @@ export class Bridge {
       return { ok: true, delivered: 'inbox' }
     }
     if (!s.cwd) throw fail(422, 'Für diese Sitzung ist kein Projektordner bekannt.')
+    if (s.kind !== 'ended') {
+      // The session keeps running in its terminal; a copy with its history
+      // takes the text and works on in the background.
+      const id = await this.spawnClaude(['--bg', '--resume', s.id, '--fork-session', ...this.permissionArgs(), message], s.cwd)
+      if (s.pending && s.pending.kind === 'input') s.pending = null
+      this.addMessage(s, 'car', text)
+      s.updated = this.now()
+      this.touch()
+      setTimeout(() => this.discover().catch(() => {}), 1500)
+      return { ok: true, delivered: 'fork', id }
+    }
     await this.spawnClaude(['--bg', '--resume', s.id, ...this.permissionArgs(), message], s.cwd)
     if (s.pending) s.pending = null
     this.addMessage(s, 'car', text)

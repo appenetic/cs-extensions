@@ -20,6 +20,7 @@ function bridge(options = {}) {
   const b = new Bridge(dir, {
     name: 'Testmac',
     projectsDir: projects,
+    registryDir: path.join(dir, 'sessions'),
     now: () => now,
     spawnClaude: options.spawnClaude || (async () => 'abcdef12'),
     agents: async () => options.agents || [],
@@ -85,7 +86,7 @@ test('a question in the terminal is shown but not held unless away', async () =>
   assert.deepEqual(out, {})
   const s = b.snapshot().sessions[0]
   assert.equal(s.pending.kind, 'question')
-  assert.equal(s.delivery, '')
+  assert.equal(s.delivery, 'fork', 'no relay: free text goes to a copy, the question stays in the terminal')
   await assert.rejects(b.reply({ session: 's1', prompt: s.pending.id, answers: { 'Q?': 'A' }, source: 'touch' }), (e) => e.status === 422)
   await b.hook({ session_id: 's1', hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion', tool_input: {} }, res)
   assert.equal(b.snapshot().sessions[0].pending, undefined)
@@ -194,14 +195,14 @@ test('the list order follows turns and questions, not tool calls or a restart', 
   const project = path.join(b.projectsDir, '-p')
   fs.mkdirSync(project)
   const idle = '11111111-1111-1111-1111-111111111111'
-  fs.writeFileSync(path.join(project, idle + '.jsonl'), '')
-  fs.utimesSync(path.join(project, idle + '.jsonl'), 1_700_000_000, 1_700_000_000)
+  fs.writeFileSync(path.join(project, idle + '.jsonl'), JSON.stringify({ type: 'user', message: { content: 'x' }, timestamp: new Date(1_700_000_000_000).toISOString() }) + '\n')
+  fs.utimesSync(path.join(project, idle + '.jsonl'), 1_790_000_000, 1_790_000_000)
   b.agentsSource = async () => [
     { sessionId: idle, cwd: '/p', kind: 'interactive', status: 'idle', startedAt: 1_600_000_000_000 },
     { sessionId: 'notranscript', cwd: '/q', kind: 'interactive', status: 'idle', startedAt: 1_650_000_000_000 },
   ]
   await b.discover()
-  assert.equal(b.sessions.get(idle).updated, 1_700_000_000_000, 'last written transcript, not the restart')
+  assert.equal(b.sessions.get(idle).updated, 1_700_000_000_000, 'the last conversation entry, not the restart or the file time')
   assert.equal(b.sessions.get('notranscript').updated, 1_650_000_000_000, 'else its start')
   const res = { on() {} }
   const hook = (id, event, extra = {}) => b.hook({ session_id: id, hook_event_name: event, cwd: '/w', ...extra }, res)
@@ -217,6 +218,34 @@ test('the list order follows turns and questions, not tool calls or a restart', 
   b.advance(1000)
   await hook('w1', 'Stop', { last_assistant_message: 'Fertig.' })
   assert.deepEqual(order().slice(0, 2), ['w1', 'w2'], 'the end of a turn moves up')
+})
+
+test('sessions archived on another device leave the list; the registry gives activity and inbox socket', async () => {
+  const b = bridge()
+  const project = path.join(b.projectsDir, '-p')
+  fs.mkdirSync(project)
+  fs.mkdirSync(b.registryDir)
+  const at = (iso) => ({ timestamp: iso })
+  const write = (id, entries) => fs.writeFileSync(path.join(project, id + '.jsonl'), entries.map((e) => JSON.stringify(e)).join('\n') + '\n')
+  const archived = '11111111-1111-1111-1111-111111111111'
+  const revived = '22222222-2222-2222-2222-222222222222'
+  const plain = '33333333-3333-3333-3333-333333333333'
+  const gone = { type: 'system', subtype: 'informational', content: 'Remote Control disconnected — this session was ended or archived from another device or app (code 4090)' }
+  write(archived, [{ type: 'user', message: { content: 'Hallo' }, ...at('2026-11-17T10:00:00Z') }, { ...gone, ...at('2026-11-18T08:09:43Z') }, { type: 'bridge-session', ...at('2026-11-18T08:09:44Z') }])
+  write(revived, [{ ...gone, ...at('2026-11-18T08:00:00Z') }, { type: 'user', message: { content: 'Weiter' }, ...at('2026-11-18T08:30:00Z') }])
+  write(plain, [{ type: 'assistant', message: { content: [{ type: 'text', text: 'Fertig.' }] }, ...at('2026-11-17T12:00:00Z') }, { type: 'pr-link', ...at('2026-11-18T08:00:00Z') }])
+  fs.writeFileSync(path.join(b.registryDir, '4242.json'), JSON.stringify({ pid: 4242, sessionId: plain, messagingSocketPath: '/tmp/cc-socks/4242.sock', statusUpdatedAt: Date.parse('2026-11-17T12:00:05Z') }))
+  fs.writeFileSync(path.join(b.registryDir, 'junk.json'), '{')
+  b.agentsSource = async () => [archived, revived, plain].map((sessionId) => ({ sessionId, cwd: '/p', kind: 'interactive', status: 'idle', startedAt: 1 }))
+  b.relays.set('/tmp/cc-socks/4242.sock', { socket: null, results: new Map() })
+  await b.discover()
+  const shown = b.snapshot().sessions
+  assert.deepEqual(shown.map((s) => s.id), [revived, plain], 'the archived session is hidden')
+  assert.equal(shown[1].updated, Date.parse('2026-11-17T12:00:05Z'), 'activity from the registry, not the pr-link write')
+  assert.equal(shown[1].delivery, 'inbox', 'the inbox socket from the registry matches the relay at once')
+  await b.hook({ session_id: archived, hook_event_name: 'UserPromptSubmit', cwd: '/p', prompt: 'Noch eins' }, { on() {} })
+  await b.discover()
+  assert.equal(b.snapshot().sessions[0].id, archived, 'a new prompt brings it back')
 })
 
 test('discovery ends sessions it no longer lists and maps states', async () => {
@@ -239,21 +268,25 @@ test('discovery ends sessions it no longer lists and maps states', async () => {
   assert.equal(Bridge.status('blocked'), 'waiting')
 })
 
-test('replies: unknown session, text without relay, resume with the project folder', async () => {
+test('replies: unknown session, a copy for a session without relay, resume with the project folder', async () => {
   const calls = []
   const b = bridge({ spawnClaude: async (args, cwd) => calls.push([args, cwd]) && 'abcdef12' })
   await assert.rejects(b.reply({ session: 'nope', text: 'x', source: 'touch' }), (e) => e.status === 404)
   await b.hook({ session_id: 's4', hook_event_name: 'SessionStart', cwd: '/p' }, { on() {} })
   await b.hook({ session_id: 's4', hook_event_name: 'UserPromptSubmit', prompt: 'Los' }, { on() {} })
-  await assert.rejects(b.reply({ session: 's4', text: 'x', source: 'touch' }), (e) => e.status === 422 && /Relay/.test(e.message))
+  assert.equal(b.snapshot().sessions[0].delivery, 'fork')
+  const copy = await b.reply({ session: 's4', text: 'Mach die Tests grün', source: 'touch' })
+  assert.deepEqual([copy.delivered, copy.id], ['fork', 'abcdef12'])
+  assert.deepEqual(calls[0], [['--bg', '--resume', 's4', '--fork-session', '[Aus dem Auto] Mach die Tests grün'], '/p'])
+  assert.equal(b.sessions.get('s4').kind, 'interactive', 'the original keeps running in its terminal')
   await b.hook({ session_id: 's4', hook_event_name: 'SessionEnd', reason: 'other' }, { on() {} })
   assert.equal(b.snapshot().sessions[0].delivery, 'resume')
   const result = await b.reply({ session: 's4', text: 'Weiter', source: 'voice' })
   assert.equal(result.delivered, 'resume')
-  assert.deepEqual(calls, [[['--bg', '--resume', 's4', '[Aus dem Auto, per Sprache diktiert] Weiter'], '/p']])
+  assert.deepEqual(calls[1], [['--bg', '--resume', 's4', '[Aus dem Auto, per Sprache diktiert] Weiter'], '/p'])
   b.config.permission_mode = 'bypassPermissions'
   await b.start({ cwd: '/p', text: 'Neue Idee', source: 'touch' })
-  assert.deepEqual(calls[1], [['--bg', '-n', 'Auto · Neue Idee', '--dangerously-skip-permissions', '[Aus dem Auto] Neue Idee'], '/p'])
+  assert.deepEqual(calls[2], [['--bg', '-n', 'Auto · Neue Idee', '--dangerously-skip-permissions', '[Aus dem Auto] Neue Idee'], '/p'])
   await assert.rejects(b.start({ cwd: '/etc', text: 'x' }), (e) => e.status === 400)
 })
 

@@ -133,7 +133,7 @@
     );
   }
 
-  var HOW = { hook: 'an die wartende Frage', inbox: 'in die laufende Sitzung', resume: 'als Fortsetzung im Hintergrund' };
+  var HOW = { hook: 'an die wartende Frage', inbox: 'in die laufende Sitzung', resume: 'als Fortsetzung im Hintergrund', fork: 'als Kopie im Hintergrund' };
 
   function answer(session, prompt, fields, label, after) {
     var body = { session: session.id, prompt: prompt ? prompt.id : '', source: 'touch' };
@@ -519,7 +519,8 @@
   var HINTS = {
     inbox: 'Geht direkt in die laufende Sitzung. Diktieren über das Mikrofon der Tesla-Tastatur.',
     hook: 'Beantwortet die offene Frage mit eigenem Text.',
-    resume: 'Setzt die beendete Sitzung auf dem Mac im Hintergrund fort.'
+    resume: 'Setzt die beendete Sitzung auf dem Mac im Hintergrund fort.',
+    fork: 'Diese Sitzung läuft ohne Postfach, weil sie vor dem Plugin gestartet wurde. Deine Nachricht startet eine Kopie im Hintergrund, die mit dem bisherigen Verlauf weiterarbeitet.'
   };
 
   function renderComposer(s) {
@@ -528,10 +529,10 @@
       els.composer.value = drafts[s.id] || '';
       els.composer.setAttribute('data-session', s.id);
     }
-    els.composer.setAttribute('placeholder', s.delivery === 'resume' ? 'Woran soll Claude weiterarbeiten?' : 'Nachricht an Claude …');
+    els.composer.setAttribute('placeholder', s.delivery === 'resume' || s.delivery === 'fork' ? 'Woran soll Claude weiterarbeiten?' : 'Nachricht an Claude …');
     els.composer.disabled = !canSend;
     els.send.disabled = !canSend;
-    els.send.textContent = sending ? 'Wird gesendet …' : s.delivery === 'resume' ? 'Fortsetzen' : 'Senden';
+    els.send.textContent = sending ? 'Wird gesendet …' : s.delivery === 'resume' ? 'Fortsetzen' : s.delivery === 'fork' ? 'Als Kopie senden' : 'Senden';
     els.composerHint.textContent = canSend
       ? HINTS[s.delivery] || HINTS.inbox
       : mode !== 'live'

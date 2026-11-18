@@ -175,7 +175,7 @@ function bridge(brokers = ['broker.example:8883']) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'csr-'))
   fs.mkdirSync(path.join(dir, 'projects'))
   let now = 1_800_000_000_000
-  const b = new Bridge(dir, { name: 'Testmac', projectsDir: path.join(dir, 'projects'), now: () => now, agents: async () => [] })
+  const b = new Bridge(dir, { name: 'Testmac', projectsDir: path.join(dir, 'projects'), registryDir: path.join(dir, 'sessions'), now: () => now, agents: async () => [] })
   const added = new Map()
   const sent = []
   b.attachRelay({ add: (name, ch, info) => added.set(name, { ch, info }), remove: (name) => added.delete(name), broadcast: (ch, value) => sent.push(value) }, brokers)
