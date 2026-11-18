@@ -8,7 +8,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const VERSION = '0.2.0'
+export const VERSION = '0.2.1'
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 // The plugin data directory survives plugin updates and goes with an uninstall.
@@ -76,17 +76,41 @@ export function local(dir, method, route, body, timeoutMs = 3000) {
 }
 
 export async function running(dir) {
+  return (await daemonVersion(dir)) !== ''
+}
+
+// daemonVersion is the version of the daemon that answers, '' for none.
+async function daemonVersion(dir) {
   try {
     const answer = await local(dir, 'GET', '/ping', undefined, 1500)
-    return answer.status === 200
+    return answer.status === 200 ? String((answer.body && answer.body.version) || '0') : ''
   } catch {
-    return false
+    return ''
   }
 }
 
+// older says whether version a comes before b (dotted numbers).
+export function older(a, b) {
+  const x = String(a).split('.').map((n) => parseInt(n, 10) || 0)
+  const y = String(b).split('.').map((n) => parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0)
+  }
+  return false
+}
+
 // Starts the daemon detached unless it answers already; waits until it does.
+// A daemon of an older plugin version is stopped and replaced, so an update
+// takes effect with the next session. A newer one stays, for sessions that
+// still run the old plugin.
 export async function ensureBridge(dir, waitMs = 4000) {
-  if (await running(dir)) return true
+  const version = await daemonVersion(dir)
+  if (version && !older(version, VERSION)) return true
+  if (version) {
+    await local(dir, 'POST', '/stop', {}).catch(() => {})
+    const until = Date.now() + 3000
+    while (Date.now() < until && (await running(dir))) await new Promise((r) => setTimeout(r, 100))
+  }
   const log = fs.openSync(path.join(dir, 'bridge.log'), 'a', 0o600)
   const child = spawn(process.execPath, [path.join(ROOT, 'bin', 'coilshift-bridge.mjs'), 'serve', '--data', dir], {
     detached: true,

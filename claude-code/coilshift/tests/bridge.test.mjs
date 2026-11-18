@@ -3,7 +3,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import http from 'node:http'
+import net from 'node:net'
 import { Bridge, allowedPeer, bridgeHosts, closingQuestion, parseTranscript, toolSummary, userText } from '../bin/coilshift-bridge.mjs'
+import { VERSION, ensureBridge, local, older, socketPath } from '../lib/common.mjs'
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'csb-'))
@@ -100,6 +103,51 @@ test('tool calls count into one entry per run, without names or arguments', asyn
   assert.deepEqual(messages.map((m) => [m.role, m.count || 0]), [['user', 0], ['tool', 3], ['assistant', 0], ['tool', 1]])
   assert.equal(JSON.stringify(messages).includes('ssh'), false)
   assert.equal(new Set(messages.map((m) => m.id)).size, 4)
+})
+
+test('a plugin update replaces an older daemon, a newer one stays', async () => {
+  assert.equal(older('0.1.0', '0.2.1'), true)
+  assert.equal(older('0.2.1', '0.2.1'), false)
+  assert.equal(older('0.10.0', '0.9.9'), false)
+  assert.equal(older('0.2', '0.2.1'), true)
+  const dir = tmp()
+  const free = await new Promise((resolve) => {
+    const s = net.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = s.address()
+      s.close(() => resolve(port))
+    })
+  })
+  const saved = { port: process.env.COILSHIFT_PORT, relay: process.env.COILSHIFT_RELAY }
+  Object.assign(process.env, { COILSHIFT_PORT: String(free), COILSHIFT_RELAY: 'off' })
+  // A daemon that says it is 9.0.0 stays; one that says 0.1.0 is stopped.
+  let version = '9.0.0'
+  let stopped = 0
+  const fake = http.createServer((req, res) => {
+    if (req.url === '/stop') {
+      stopped++
+      res.end('{"ok":true}')
+      fake.close()
+      fake.closeAllConnections()
+      return
+    }
+    res.end(JSON.stringify({ ok: true, version }))
+  })
+  await new Promise((resolve) => fake.listen(socketPath(dir), resolve))
+  try {
+    assert.equal(await ensureBridge(dir), true)
+    assert.equal(stopped, 0, 'a newer daemon stays')
+    version = '0.1.0'
+    assert.equal(await ensureBridge(dir, 8000), true)
+    assert.equal(stopped, 1)
+    const ping = await local(dir, 'GET', '/ping')
+    assert.equal(ping.body.version, VERSION, 'the new daemon answers')
+  } finally {
+    await local(dir, 'POST', '/stop', {}).catch(() => {})
+    if (saved.port === undefined) delete process.env.COILSHIFT_PORT
+    else process.env.COILSHIFT_PORT = saved.port
+    if (saved.relay === undefined) delete process.env.COILSHIFT_RELAY
+    else process.env.COILSHIFT_RELAY = saved.relay
+  }
 })
 
 test('a background session holds a permission until the car decides', async () => {

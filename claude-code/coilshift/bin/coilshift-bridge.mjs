@@ -1285,7 +1285,7 @@ async function cli() {
       const lines = [
         `CoilShift-Bridge ${body.version} auf ${body.name}, Port ${body.port}`,
         `Adressen: ${body.hosts.join(', ') || 'keine LAN-/Tailscale-Adresse'}`,
-        `Internet-Relay: ${body.mqtt.length ? body.mqtt.map((b) => `${b.broker} ${RELAY_STATE[b.state] || b.state}${b.error && b.state !== 'up' ? ' (' + b.error + ')' : ''}`).join(', ') : 'aus'}`,
+        `Internet-Relay: ${(body.mqtt || []).length ? body.mqtt.map((b) => `${b.broker} ${RELAY_STATE[b.state] || b.state}${b.error && b.state !== 'up' ? ' (' + b.error + ')' : ''}`).join(', ') : 'aus'}`,
         `Unterwegs-Modus: ${body.away}${body.awayNow ? ' (gerade aktiv)' : ''}`,
         `Gekoppelte Autos: ${body.devices.length ? body.devices.map((d) => `${d.name} (zuletzt ${new Date(d.seen).toLocaleString('de-DE')}${d.relay ? ', mit Internet-Relay' : ''})`).join(', ') : 'keine'}`,
         `Letzte Abfrage des Autos: ${body.lastPoll ? new Date(body.lastPoll).toLocaleString('de-DE') : 'noch keine'}`,
