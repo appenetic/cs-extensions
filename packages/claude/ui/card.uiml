@@ -2,7 +2,9 @@
      The host names the data context after this file without .uiml, so the file
      must stay card.uiml for {card.*} to resolve; the service writes model/card.
      The host sets {card.card} to 0 while that file is missing or older than 30 s.
-     Taps on Opt1..Opt4, Allow, Deny and Close reach the package's event stream.
+     Taps on Opt1..Opt4, Allow, Deny and Close reach the package's event stream,
+     with the element in lower case. Answers are disabled while the question is
+     open in the terminal ({card.live} 0).
      It sits below the firmware's search field and navigation cards, which are
      drawn over this slot at the top of the map, and spans the map between fixed
      margins: a wrapped label needs a box of definite width. Answers stack at
@@ -18,15 +20,15 @@
                 <LabelView name="Title" style="Text/Caption1; Color:Text/secondary; Alignment:left; ElideMode:languageaware;" text="{card.title}"/>
                 <LabelView name="Question" style="Text/Body1; Color:Text/primary; Alignment:left|wordwrap; MaxHeight:120;" text="{card.text}"/>
                 <DisplayView name="Options" verticalLayoutStyle="Padding:0,4,0,0;">
-                    <ButtonView name="Opt1" visible="{card.o1}" label="{card.l1}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
-                    <ButtonView name="Opt2" visible="{card.o2}" label="{card.l2}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
-                    <ButtonView name="Opt3" visible="{card.o3}" label="{card.l3}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
-                    <ButtonView name="Opt4" visible="{card.o4}" label="{card.l4}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
+                    <ButtonView name="Opt1" enabled="{card.live}" visible="{card.o1}" label="{card.l1}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
+                    <ButtonView name="Opt2" enabled="{card.live}" visible="{card.o2}" label="{card.l2}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
+                    <ButtonView name="Opt3" enabled="{card.live}" visible="{card.o3}" label="{card.l3}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
+                    <ButtonView name="Opt4" enabled="{card.live}" visible="{card.o4}" label="{card.l4}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
                 </DisplayView>
                 <DisplayView name="Footer" horizontalLayoutStyle="Padding:0,12,0,0; AlignItems:center;">
                     <LabelView name="Hint" style="Text/Caption1; Color:Text/secondary; Alignment:left|wordwrap; Flex:1;" text="{card.hint}"/>
-                    <ButtonView name="Allow" visible="{card.decide}" label="Erlauben" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
-                    <ButtonView name="Deny" visible="{card.decide}" label="Ablehnen" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
+                    <ButtonView name="Allow" enabled="{card.live}" visible="{card.decide}" label="Erlauben" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
+                    <ButtonView name="Deny" enabled="{card.live}" visible="{card.decide}" label="Ablehnen" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
                     <ButtonView name="Close" visible="{card.close}" label="Schließen" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
                 </DisplayView>
             </DisplayView>
