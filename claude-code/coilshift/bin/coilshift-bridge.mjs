@@ -283,7 +283,9 @@ export class Bridge {
     this.sessions = new Map()
     this.relays = new Map()
     this.codes = new Map()
-    this.rev = 1
+    // Revisions start at the clock, so a restarted bridge is ahead of the one
+    // the car last polled and answers its first long poll at once.
+    this.rev = Math.floor(this.now())
     this.waiters = []
     this.lastPoll = 0
     this.lastDriving = 0

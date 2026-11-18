@@ -215,6 +215,7 @@ export class MqttClient {
     this.dial = options.dial || dialBroker
     this.onMessage = options.onMessage || (() => {})
     this.onChange = options.onChange || (() => {})
+    this.onUp = options.onUp || (() => {})
     this.topics = new Set()
     this.state = 'idle'
     this.error = ''
@@ -278,6 +279,7 @@ export class MqttClient {
             this.delay = 1000
             this.set('up', '')
             for (const topic of this.topics) socket.write(packet(0x82, Buffer.concat([this.id(), mqttString(topic), Buffer.from([0])])))
+            this.onUp(this)
             pinger = setInterval(() => {
               if (Date.now() - heard > 75000) socket.destroy(new Error('broker silent'))
               else socket.write(packet(0xc0))
@@ -353,6 +355,7 @@ export class Relay {
           dial,
           onMessage: (topic, payload, client) => this.receive(client, topic, payload),
           onChange: (client) => log(`relay ${client.broker}: ${client.state}${client.error ? ' (' + client.error + ')' : ''}`),
+          onUp: (client) => this.announce(client),
         }),
     )
   }
@@ -410,6 +413,14 @@ export class Relay {
       .then(() => this.handle(entry, request))
       .catch(() => ({ status: 500, body: { error: 'failed' } }))
       .then((answer) => this.send(client, entry.ch, { id: request.id, status: answer.status, body: answer.body }))
+  }
+
+  // announce tells every paired car on this broker that the bridge is (back)
+  // there: what it sent before got no answer and should go again now, not
+  // when its long poll runs out. Published after the subscriptions on the
+  // same connection, so the retry finds them in place.
+  announce(client) {
+    for (const entry of this.channels.values()) if (entry.info.device) this.send(client, entry.ch, { type: 'restart' })
   }
 
   send(client, ch, value) {

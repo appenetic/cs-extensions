@@ -97,6 +97,18 @@ test('a question in the terminal is shown but not held unless away', async () =>
   assert.equal(b.snapshot().sessions[0].pending, undefined)
 })
 
+test('a restarted bridge answers the car at once: its revisions start at the clock', async () => {
+  const before = bridge()
+  for (let i = 0; i < 50; i++) before.touch()
+  const after = bridge()
+  after.advance(1000)
+  const restarted = new Bridge(after.dir, { name: 'Testmac', projectsDir: after.projectsDir, registryDir: after.registryDir, now: after.now, agents: async () => [] })
+  assert.ok(restarted.rev > before.snapshot().rev, 'ahead of the revision the car knows')
+  const started = Date.now()
+  await restarted.waitRev(before.snapshot().rev, 25000)
+  assert.ok(Date.now() - started < 1000, 'no wait for the long poll to run out')
+})
+
 test('a question that was rejected or turned into a clarification does not stay open', async () => {
   const b = bridge()
   const res = { on() {} }

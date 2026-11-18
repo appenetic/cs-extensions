@@ -171,6 +171,27 @@ test('the relay answers each fresh request once, on the broker it came from', as
   }
 })
 
+test('a bridge that connects tells its cars to ask again', async () => {
+  const { server, broker } = await fakeBroker()
+  const ch = channel('device', crypto.randomBytes(32))
+  const heard = []
+  const car = new MqttClient(broker, { dial: plain, onMessage: (topic, payload) => heard.push(open(ch.kDown, topic, payload.subarray(13))) })
+  car.subscribe(ch.down)
+  car.start()
+  await until(() => car.state === 'up')
+  const relay = new Relay({ brokers: [broker], dial: plain, handle: () => ({ status: 200, body: {} }) })
+  relay.add('device:d1', ch, { device: 'd1' })
+  relay.add('pair:x', channel('pair', 'a'.repeat(32)), { code: 'a'.repeat(32) })
+  try {
+    await until(() => heard.length === 1)
+    assert.deepEqual(heard, [{ type: 'restart' }])
+  } finally {
+    car.stop()
+    relay.stop()
+    server.close()
+  }
+})
+
 function bridge(brokers = ['broker.example:8883']) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'csr-'))
   fs.mkdirSync(path.join(dir, 'projects'))
