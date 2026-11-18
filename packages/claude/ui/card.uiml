@@ -1,29 +1,34 @@
 <!-- Claude's open question as a card over the map, drawn by the CoilShift UI host.
-     The data context is "card" (this file's name); the service writes model/card.
+     The host names the data context after this file without .uiml, so the file
+     must stay card.uiml for {card.*} to resolve; the service writes model/card.
      The host sets {card.card} to 0 while that file is missing or older than 30 s.
      Taps on Opt1..Opt4, Allow, Deny and Close reach the package's event stream.
-     It sits at the bottom middle of the map: the top of the map belongs to the
-     firmware's search field and navigation cards, which are drawn over this slot.
-     Layout keys and values as the firmware's own UIML spells them (flexEnd,
-     MaxWidth, Alignment:wordwrap). -->
+     It sits below the firmware's search field and navigation cards, which are
+     drawn over this slot at the top of the map, and spans the map between fixed
+     margins: a wrapped label needs a box of definite width. Answers stack at
+     full width so long labels are not cut; Close, Allow and Deny sit in the
+     footer next to the hint. Layout keys as the firmware's own UIML spells them
+     (Alignment:left|wordwrap, Width:100%, Flex:1). -->
 <Library>
     <Templates>
         <DisplayView name="ClaudeCard" enableCssLayout="true" touchBehaviors="IgnoreTouches"
-                     verticalLayoutStyle="PositionType:absolute; X:0; Y:0; Right:0; Bottom:0; Padding:80,0,80,40; JustifyContent:flexEnd; AlignItems:center;"
+                     verticalLayoutStyle="PositionType:absolute; X:0; Y:0; Right:0; Bottom:0; Padding:24,300,24,0;"
                      visible="{card.card}">
-            <DisplayView name="Box" visible="{card.shown}" verticalLayoutStyle="Nav/BackgroundStyle; Padding:24,16,24,16; MaxWidth:960;">
-                <LabelView name="Title" style="Text/Caption1; Color:Text/secondary; ElideMode:languageaware; MaxWidth:912;" text="{card.title}"/>
-                <LabelView name="Question" style="Text/Body1; Color:Text/primary; Alignment:wordwrap; ElideMode:languageaware; MaxWidth:912; MaxHeight:120;" text="{card.text}"/>
-                <DisplayView name="Options" horizontalLayoutStyle="Padding:0,12,0,4; AlignItems:center;">
-                    <ButtonView name="Opt1" visible="{card.o1}" label="{card.l1}" style="ProfilePanel/OutlineButton;"/>
-                    <ButtonView name="Opt2" visible="{card.o2}" label="{card.l2}" style="ProfilePanel/OutlineButton;"/>
-                    <ButtonView name="Opt3" visible="{card.o3}" label="{card.l3}" style="ProfilePanel/OutlineButton;"/>
-                    <ButtonView name="Opt4" visible="{card.o4}" label="{card.l4}" style="ProfilePanel/OutlineButton;"/>
-                    <ButtonView name="Allow" visible="{card.decide}" label="Erlauben" style="ProfilePanel/OutlineButton;"/>
-                    <ButtonView name="Deny" visible="{card.decide}" label="Ablehnen" style="ProfilePanel/OutlineButton;"/>
-                    <ButtonView name="Close" visible="{card.close}" label="Schließen" style="ProfilePanel/OutlineButton;"/>
+            <DisplayView name="Box" visible="{card.shown}" verticalLayoutStyle="Nav/BackgroundStyle; Padding:24,16,24,16;">
+                <LabelView name="Title" style="Text/Caption1; Color:Text/secondary; Alignment:left; ElideMode:languageaware;" text="{card.title}"/>
+                <LabelView name="Question" style="Text/Body1; Color:Text/primary; Alignment:left|wordwrap; MaxHeight:120;" text="{card.text}"/>
+                <DisplayView name="Options" verticalLayoutStyle="Padding:0,4,0,0;">
+                    <ButtonView name="Opt1" visible="{card.o1}" label="{card.l1}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
+                    <ButtonView name="Opt2" visible="{card.o2}" label="{card.l2}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
+                    <ButtonView name="Opt3" visible="{card.o3}" label="{card.l3}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
+                    <ButtonView name="Opt4" visible="{card.o4}" label="{card.l4}" style="ProfilePanel/OutlineButton; Width:100%; Margin:0,8,0,0;"/>
                 </DisplayView>
-                <LabelView name="Hint" style="Text/Caption1; Color:Text/secondary;" text="{card.hint}"/>
+                <DisplayView name="Footer" horizontalLayoutStyle="Padding:0,12,0,0; AlignItems:center;">
+                    <LabelView name="Hint" style="Text/Caption1; Color:Text/secondary; Alignment:left|wordwrap; Flex:1;" text="{card.hint}"/>
+                    <ButtonView name="Allow" visible="{card.decide}" label="Erlauben" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
+                    <ButtonView name="Deny" visible="{card.decide}" label="Ablehnen" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
+                    <ButtonView name="Close" visible="{card.close}" label="Schließen" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
+                </DisplayView>
             </DisplayView>
         </DisplayView>
     </Templates>
