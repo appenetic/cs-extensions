@@ -97,6 +97,24 @@ test('a question in the terminal is shown but not held unless away', async () =>
   assert.equal(b.snapshot().sessions[0].pending, undefined)
 })
 
+test('a question that was rejected or turned into a clarification does not stay open', async () => {
+  const b = bridge()
+  const res = { on() {} }
+  const hook = (event, extra = {}) => b.hook({ session_id: 's1', hook_event_name: event, cwd: '/p', ...extra }, res)
+  const ask = () => hook('PreToolUse', { tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: 'Q?', options: [{ label: 'A' }] }] } })
+  const pending = () => b.snapshot().sessions[0].pending
+  await ask()
+  assert.equal(pending().kind, 'question')
+  await hook('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' } })
+  assert.equal(pending(), undefined, 'the next tool call ends it')
+  await ask()
+  await hook('Stop', { last_assistant_message: 'Was möchtest du klären?' })
+  assert.equal(pending().kind, 'input', 'the end of the turn ends it; a closing question may follow')
+  await ask()
+  await hook('UserPromptSubmit', { prompt: 'Darstellung kaputt' })
+  assert.equal(pending(), undefined, 'a new prompt ends it')
+})
+
 test('tool calls count into one entry per run, without names or arguments', async () => {
   const b = bridge()
   const res = { on() {} }

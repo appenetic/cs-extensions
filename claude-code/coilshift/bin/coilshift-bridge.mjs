@@ -697,6 +697,14 @@ export class Bridge {
 
   // -------------------------------------------------------------- hooks
 
+  // settle ends a question or permission nobody holds once Claude takes the
+  // next step: a dialog is over when another tool ran, the turn ended or a new
+  // prompt came. A question that was rejected or turned into a clarification
+  // never reaches a PostToolUse of its own.
+  settle(s) {
+    if (s.pending && !s.pending.waiter && s.pending.kind !== 'input') s.pending = null
+  }
+
   release(s, output = {}) {
     if (s.pending && s.pending.waiter) s.pending.waiter(output)
     s.pending = null
@@ -750,7 +758,7 @@ export class Bridge {
         if (s.messages.length === 0) this.backfill(s)
         break
       case 'UserPromptSubmit':
-        if (s.pending && s.pending.kind === 'input') s.pending = null
+        if (s.pending && !s.pending.waiter) s.pending = null
         this.addMessage(s, 'user', userText(input.prompt))
         s.status = 'working'
         break
@@ -792,8 +800,7 @@ export class Bridge {
         break
       }
       case 'PostToolUse':
-        if (input.tool_name === 'AskUserQuestion' && s.pending && s.pending.kind === 'question' && !s.pending.waiter) s.pending = null
-        if (s.pending && s.pending.kind === 'permission' && !s.pending.waiter) s.pending = null
+        this.settle(s)
         this.addTool(s)
         s.status = 'working'
         break
@@ -801,6 +808,7 @@ export class Bridge {
         if (input.notification_type === 'idle_prompt' && !s.pending) s.status = 'waiting'
         break
       case 'Stop': {
+        this.settle(s)
         const text = clip(input.last_assistant_message)
         if (text) this.addMessage(s, 'assistant', text)
         s.status = 'idle'
