@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.claude",
-      "version": "0.1.0-alpha.20",
+      "version": "0.1.0-alpha.21",
       "sdk": ">=1.0 <2",
       "title": "Claude Code (experimental)",
       "published_unix": 1794614400,
@@ -106,7 +106,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.claude",
-        "version": "0.1.0-alpha.20",
+        "version": "0.1.0-alpha.21",
         "sdk": ">=1.0 <2",
         "title": "Claude Code (experimental)",
         "summary": "Deine Claude-Code-Sitzungen vom Mac auf der MCU: Liste, Verlauf, Fragen als Karte über der Navi, Antworten per Touch, Diktat oder Sprachtaste. Kopplung per Code oder QR-Code, auch ohne Tailscale.",
@@ -165,6 +165,15 @@
             "group": "Anzeige",
             "order": 1,
             "default": true
+          },
+          {
+            "id": "music_pause",
+            "type": "bool",
+            "title": "Musik beim Vorlesen anhalten",
+            "summary": "Hält Apple Music und andere Web-App-Quellen an, solange Claude vorliest, und spielt danach weiter. Nutzt eine interne Schnittstelle von Tesla, nicht CoilShift; geprüft mit Apple Music.",
+            "group": "Vorlesen",
+            "order": 1,
+            "default": true
           }
         ],
         "tile": {
@@ -204,11 +213,11 @@
           ]
         }
       },
-      "manifest_sha256": "3f6f314b0240c57adb0000c886cd5dd76453f51b8b0a6096ab69e4a1f885a358",
+      "manifest_sha256": "65f8efc08ce94fe22c368027742285b1b21aed9fd15e87299db91cf11516120b",
       "archive": {
-        "url": "pool/ccb9c9495fae21cdde8a0ee261edad6d2c73562e9bb81d013573e4aae7bcb9ae",
-        "sha256": "ccb9c9495fae21cdde8a0ee261edad6d2c73562e9bb81d013573e4aae7bcb9ae",
-        "bytes": 8499200
+        "url": "pool/9061fa31ec3d81e1d5c521586c8dd9227ea070d79f28718fbf2585aee541e2df",
+        "sha256": "9061fa31ec3d81e1d5c521586c8dd9227ea070d79f28718fbf2585aee541e2df",
+        "bytes": 8601600
       }
     },
     {

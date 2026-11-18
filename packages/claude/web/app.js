@@ -369,8 +369,9 @@
   // ------------------------------------------------------------ reading aloud
 
   // The Mac reads Claude's answers with its own voice and the car plays the
-  // sound: one answer at a time, a second tap stops it. What the car can play
-  // goes to the Mac as diagnostics.
+  // sound: one answer at a time, a second tap stops it. The car's music pauses
+  // meanwhile and plays on after. What the car can play goes to the Mac as
+  // diagnostics.
   var speakers = {};
   var playing = null;
   function speaker(session, m) {
@@ -380,7 +381,8 @@
     entry.node = button('▶ Vorlesen', { type: 'button', class: 'chip speak' }, function () {
       if (entry.state === 'loading') return;
       if (playing && playing.entry === entry) return stop();
-      stop();
+      // Another answer takes over: the music stays paused for it.
+      stop(true);
       if (entry.sound) return play(entry);
       entry.state = 'loading';
       entry.node.textContent = 'Wird vorbereitet …';
@@ -388,11 +390,15 @@
         .then(function (d) {
           if (!d || d.type !== 'audio/mp4' || typeof d.data !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(d.data)) throw new Error('Kein gültiger Ton.');
           entry.sound = 'data:' + d.type + ';base64,' + d.data;
-          play(entry);
+          if (!playing) return play(entry);
+          // Another answer started meanwhile; this one waits for a tap.
+          entry.state = '';
+          entry.node.textContent = '▶ Vorlesen';
         })
         .catch(function (error) {
           entry.state = '';
           entry.node.textContent = ((error && error.message) || 'Vorlesen fehlgeschlagen.') + ' Nochmal antippen.';
+          if (!playing) music('resume');
         });
     });
     return entry.node;
@@ -401,6 +407,7 @@
     if (!window.Audio) {
       entry.state = '';
       entry.node.textContent = 'Hier lässt sich kein Ton abspielen.';
+      music('resume');
       return;
     }
     var audio = new window.Audio(entry.sound);
@@ -410,22 +417,30 @@
     audio.onended = function () {
       if (playing && playing.audio === audio) stop();
     };
-    var started = audio.play();
-    if (!started || !started.then) return;
-    started.then(
-      function () {
-        note('web.play', 'ok');
-      },
-      function (error) {
-        var name = String((error && error.name) || error);
-        note('web.play', name);
-        if (playing && playing.audio === audio) playing = null;
-        entry.state = '';
-        entry.node.textContent = name === 'NotAllowedError' ? 'Das Auto lässt den Ton nicht zu. Einmal auf den Bildschirm tippen, dann nochmal.' : 'Der Ton lässt sich nicht abspielen (' + name + ').';
-      }
-    );
+    // The music pauses first, for about as long as the answer lasts (AAC at
+    // 32 kbit/s); the answer is read either way.
+    var seconds = isFinite(audio.duration) && audio.duration > 0 ? Math.ceil(audio.duration) : Math.ceil((entry.sound.length * 3) / 4 / 4000) + 3;
+    music('pause', seconds).then(function () {
+      if (!playing || playing.audio !== audio) return;
+      var started = audio.play();
+      if (!started || !started.then) return;
+      started.then(
+        function () {
+          note('web.play', 'ok');
+        },
+        function (error) {
+          var name = String((error && error.name) || error);
+          note('web.play', name);
+          if (playing && playing.audio === audio) playing = null;
+          entry.state = '';
+          entry.node.textContent = name === 'NotAllowedError' ? 'Das Auto lässt den Ton nicht zu. Einmal auf den Bildschirm tippen, dann nochmal.' : 'Der Ton lässt sich nicht abspielen (' + name + ').';
+          music('resume');
+        }
+      );
+    });
   }
-  function stop() {
+  // stop ends the answer that plays; the music plays on unless keep.
+  function stop(keep) {
     if (!playing) return;
     var p = playing;
     playing = null;
@@ -434,6 +449,15 @@
     } catch (e) {}
     p.entry.state = '';
     p.entry.node.textContent = '▶ Vorlesen';
+    if (!keep) music('resume');
+  }
+  // music asks the car to pause its music for an answer, or to play it on.
+  // It never fails: reading aloud does not wait for the music.
+  function music(action, seconds) {
+    var body = action === 'pause' ? { action: action, seconds: seconds } : { action: action };
+    return request('POST', '/api/media', body).then(null, function () {
+      return null;
+    });
   }
 
   // note reports a value of the app to the car's diagnostics, once per change.
@@ -872,6 +896,7 @@
       ['Karte über der Navi', diag.card || 'noch keine Meldung'],
       ['Sprachtaste', diag.voice || 'noch keine Meldung'],
       ['Letzte Sprachantwort', diag['voice.last'] || '–'],
+      ['Musik beim Vorlesen', diag.media || '–'],
       ['Fahrstufe', (view && view.gear) || '–']
     ];
     var cells = [];

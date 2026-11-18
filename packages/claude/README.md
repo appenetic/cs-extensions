@@ -117,6 +117,13 @@ nächsten direkten Kontakt selbst.
   - **▶ Vorlesen** unter einer Antwort von Claude liest sie vor. Der Mac
     spricht sie mit `say` (Vorgabe: Anna), das Auto spielt den Ton ab.
     Codeblöcke und Tabellen sagt er nur an. Ein zweiter Tipp hält an.
+  - Läuft dabei Musik aus Apple Music, hält das Auto sie an und spielt sie
+    nach dem Vorlesen weiter. Hat man sie inzwischen selbst bedient, bleibt
+    sie, wie sie ist. Abschalten lässt sich das mit „Musik beim Vorlesen
+    anhalten“. Dafür nutzt das Paket eine interne Schnittstelle von Tesla
+    (`ChromiumAdapterDbus`), nicht CoilShift. Geprüft ist sie mit Apple Music
+    auf Firmware 2026.32.7; andere Quellen wie Spotify, Bluetooth oder Radio
+    sind ungeprüft, und ein Firmware-Update kann sie ändern.
 - **Weiterarbeiten:**
   - Text an eine laufende Sitzung geht direkt hinein. Ist Claude gerade
     beschäftigt, liest Claude ihn zwischen zwei Werkzeugaufrufen, sonst beginnt

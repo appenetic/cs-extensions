@@ -33,6 +33,7 @@ function fakeFetch(state, calls) {
     const call = { url, method: init.method || 'GET', auth: init.headers && init.headers.Authorization, body: init.body ? JSON.parse(init.body) : undefined };
     calls.push(call);
     if (url === '/api/bootstrap') return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ token: 't0k' }) });
+    if (url === '/api/media') return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ paused: true }) });
     if (url.startsWith('/api/speech')) {
       const speech = state.speech.shift();
       return Promise.resolve({ ok: speech.status === 200, status: speech.status, json: () => Promise.resolve(speech.body) });
@@ -257,6 +258,7 @@ test("Claude's answers are read aloud on a tap, one at a time, and the car repor
   h.window.Audio = function (src) {
     const audio = { src, paused: true, canPlayType: () => 'probably', pause() { audio.paused = true; } };
     audio.play = () => {
+      audio.held = calls.filter((c) => c.url === '/api/media').map((c) => c.body.action).at(-1);
       played.push(audio);
       if (src.includes('bGVpc2U')) return Promise.reject(Object.assign(new Error('blocked'), { name: 'NotAllowedError' }));
       audio.paused = false;
@@ -278,23 +280,32 @@ test("Claude's answers are read aloud on a tap, one at a time, and the car repor
   assert.equal(b2.textContent, 'Wird vorbereitet …');
   await h.settle(25);
   assert.deepEqual(calls.filter((c) => c.url.startsWith('/api/speech')).map((c) => [c.url, c.auth]), [['/api/speech?session=s1&message=m2', 'Bearer t0k']]);
+  const music = () => calls.filter((c) => c.url === '/api/media').map((c) => c.body.action);
   assert.equal(played[0].src, 'data:audio/mp4;base64,dG9u');
+  assert.equal(played[0].held, 'pause', "the car's music pauses before the answer plays");
+  assert.ok(calls.find((c) => c.url === '/api/media').body.seconds > 0, 'for about as long as the answer');
   assert.equal(b2.textContent, '■ Stopp');
   assert.deepEqual(diag().at(-1), { 'web.play': 'ok' });
   b2.click();
   assert.equal(played[0].paused, true);
   assert.equal(b2.textContent, '▶ Vorlesen');
+  await h.settle(25);
+  assert.deepEqual(music(), ['pause', 'resume'], 'and plays on after');
   b2.click();
+  await h.settle(25);
   assert.equal(played.length, 2, 'played again without asking the Mac again');
   b3.click();
   assert.equal(played[1].paused, true, 'one answer at a time');
+  assert.deepEqual(music(), ['pause', 'resume', 'pause'], 'the next answer keeps the music paused');
   await h.settle(25);
   assert.match(b3.textContent, /^Kein gültiger Ton\. Nochmal antippen\.$/, 'only AAC becomes a data URL');
   assert.equal(played.length, 2);
+  assert.deepEqual(music(), ['pause', 'resume', 'pause', 'resume'], 'nothing to read: the music plays on');
   b3.click();
   await h.settle(25);
   assert.match(b3.textContent, /lässt den Ton nicht zu/);
   assert.deepEqual(diag().at(-1), { 'web.play': 'NotAllowedError' });
+  assert.deepEqual(music().slice(-2), ['pause', 'resume'], 'a refused sound lets the music play on');
 });
 
 test('sessions with an open question lead the list', async () => {
