@@ -33,6 +33,10 @@ function fakeFetch(state, calls) {
     const call = { url, method: init.method || 'GET', auth: init.headers && init.headers.Authorization, body: init.body ? JSON.parse(init.body) : undefined };
     calls.push(call);
     if (url === '/api/bootstrap') return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ token: 't0k' }) });
+    if (url.startsWith('/api/image')) {
+      const image = state.images.shift();
+      return Promise.resolve({ ok: image.status === 200, status: image.status, json: () => Promise.resolve(image.body) });
+    }
     const body = url.includes('/api/view') ? state.view : state.answer || { ok: true, delivered: 'hook' };
     return Promise.resolve({ ok: !state.fail, status: state.fail ? 409 : 200, json: () => Promise.resolve(JSON.parse(JSON.stringify(body))) });
   };
@@ -195,6 +199,41 @@ test("Claude's Markdown is drawn: tables, lists, emphasis, code; HTML stays text
   assert.doesNotMatch(box.textContent, /\*\*|\|---|```/, 'no Markdown syntax left');
   assert.match(box.textContent, /<b>kein HTML<\/b> und a \| b ohne Tabelle/, 'HTML and a lone pipe stay text');
   assert.equal(all('b').length, 0);
+});
+
+test('pasted images load from the Mac below the text, grow with a tap, and only pictures become data URLs', async () => {
+  const s = { id: 's1', title: 'Bilder', cwd: '/p', kind: 'interactive', status: 'idle', updated: 1799999990000, delivery: 'inbox',
+    messages: [{ id: 'm1', role: 'user', text: '[Image #3] [Image #4] Schau mal', images: 2, at: 1799999950000 }] };
+  const calls = [];
+  const images = [
+    { status: 200, body: { type: 'image/jpeg', data: 'a2xlaW4=' } },
+    { status: 200, body: { type: 'text/html', data: 'PGI+' } },
+    { status: 404, body: { error: 'bridge', message: 'Das Bild ist nicht mehr im Verlauf.' } },
+    { status: 200, body: { type: 'image/png', data: 'cG5n' } },
+  ];
+  const h = await setup({ fetchState: { view: view({ sessions: [s] }), images }, calls });
+  const item = el(h, 'messages').children[0];
+  assert.equal(item.find((e) => e.className === 'text').textContent, 'Schau mal', 'no "[Image #n]" left');
+  const shots = () => item.findAll((e) => e.tagName === 'BUTTON' && e.className.startsWith('shot'));
+  const asked = () => calls.filter((c) => c.url.startsWith('/api/image')).map((c) => [c.url, c.auth]);
+  assert.deepEqual(asked(), [['/api/image?session=s1&message=m1&n=0', 'Bearer t0k'], ['/api/image?session=s1&message=m1&n=1', 'Bearer t0k']]);
+  const [first, second] = shots();
+  const img = first.children[0];
+  assert.equal(img.tagName, 'IMG');
+  assert.equal(img.getAttribute('src'), 'data:image/jpeg;base64,a2xlaW4=');
+  assert.equal(second.find((e) => e.tagName === 'IMG'), null, 'other content never becomes a data URL');
+  assert.match(second.textContent, /Kein gültiges Bild\. Antippen/);
+  first.click();
+  assert.equal(first.getAttribute('class'), 'shot zoom');
+  await poll(h);
+  assert.equal(el(h, 'messages').children[0].find((e) => e.tagName === 'IMG'), img, 'an update keeps the loaded image');
+  assert.equal(asked().length, 2, 'and does not fetch it again');
+  second.click();
+  await h.settle(25);
+  assert.match(second.textContent, /nicht mehr im Verlauf/);
+  second.click();
+  await h.settle(25);
+  assert.equal(second.children[0].getAttribute('src'), 'data:image/png;base64,cG5n', 'a tap tries again');
 });
 
 test('sessions with an open question lead the list', async () => {

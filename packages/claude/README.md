@@ -102,9 +102,15 @@ nächsten direkten Kontakt selbst.
 ## Bedienung
 
 - **Sitzungen:** alle laufenden Sitzungen (Terminal und Hintergrund) und die der
-  letzten drei Tage. Ein Punkt markiert eine offene Frage.
-- **Verlauf:** Prompts, Antworten von Claude und Werkzeugaufrufe in Kurzform.
-  Text aus dem Auto ist als „Aus dem Auto“ markiert.
+  letzten drei Tage. Ein Punkt markiert eine offene Frage. **Ausblenden** nimmt
+  eine Sitzung aus der Liste, bis dort wieder etwas passiert.
+- **Verlauf:** Prompts, Claudes Antworten mit Tabellen und Listen, und
+  Werkzeugaufrufe als kleine Blase mit Punkten. Text aus dem Auto ist als „Aus
+  dem Auto“ markiert.
+  - Bilder, die du in einen Prompt eingefügt hast, stehen als Vorschau unter dem
+    Text. Antippen zeigt sie in voller Breite. Der Mac lädt jedes erst, wenn du
+    die Sitzung öffnest, und verkleinert es mit `sips` auf höchstens 1024 Pixel.
+    Bilder, die Claude selbst mit Werkzeugen liest, zeigt das Auto nicht.
 - **Weiterarbeiten:**
   - Text an eine laufende Sitzung geht direkt hinein. Ist Claude gerade
     beschäftigt, liest Claude ihn zwischen zwei Werkzeugaufrufen, sonst beginnt

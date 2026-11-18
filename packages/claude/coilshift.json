@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "com.appenetic.claude",
-  "version": "0.1.0-alpha.18",
+  "version": "0.1.0-alpha.19",
   "sdk": ">=1.0 <2",
   "title": "Claude Code (experimental)",
   "summary": "Deine Claude-Code-Sitzungen vom Mac auf der MCU: Liste, Verlauf, Fragen als Karte über der Navi, Antworten per Touch, Diktat oder Sprachtaste. Kopplung per Code oder QR-Code, auch ohne Tailscale.",

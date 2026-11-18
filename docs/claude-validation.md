@@ -140,3 +140,21 @@ Nutzer „funktioniert alles“.
 - **Plugin:** Die Installation von GitHub
   (`claude plugin marketplace add appenetic/cs-extensions`) funktioniert in
   einer isolierten Claude-Code-Konfiguration.
+
+## Am Auto, 2026-11-18 (bis alpha.18)
+
+- **Karte über der Navi:**
+  - Der UI-Host benennt den Datenkontext nach der Vorlagendatei. alpha.13
+    nannte sie `card-<hash>.uiml`, alle Bindungen blieben leer, die Karte war
+    unsichtbar. Seit alpha.14 liegt sie als `ui/card-<hash>/card.uiml` in einem
+    Ordner, der nach ihrem Inhalt heißt.
+  - Tipps kommen kleingeschrieben an (`card tap opt4`). Bis alpha.17 hat der
+    Link-Dienst sie deshalb verworfen. Mit alpha.18 beantwortet ein Tipp die
+    Frage, am Auto bestätigt.
+  - Paketdienste laufen mit umask 0077. alpha.18 legte den Vorlagenordner mit
+    0700 an, QtCar konnte die Vorlage nicht lesen (`cannot read the template`).
+    Am Auto von Hand korrigiert, in alpha.19 behoben.
+- **Offen (alpha.19):** Bilder aus Prompts in der App, also Vorschau,
+  Vergrößern per Tipp und Laden über das Internet-Relay. Auf dem Mac sind sie
+  mit Tests und gegen ein echtes Transkript geprüft (28 MB, Bild in 53 ms
+  gefunden, in 72 ms auf 1024×685 verkleinert, 123 KB).

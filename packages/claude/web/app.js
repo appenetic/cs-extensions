@@ -321,6 +321,50 @@
   // Tool calls are not for reading while driving: a run of them is one small
   // bubble of dots. Its dots move while it is Claude's latest step; like the
   // pulse, their animation is locked to the clock across redraws.
+  // ------------------------------------------------------------ images
+
+  // Images pasted into a prompt come from the Mac one by one, made small there.
+  // Each is fetched once and kept as its element, so an update neither loads nor
+  // decodes it again; a tap shows it across the full width.
+  var IMAGE_TYPES = { 'image/jpeg': true, 'image/png': true, 'image/gif': true, 'image/webp': true };
+  var shots = {};
+  function pictures(session, m) {
+    var row = h('div', { class: 'shots' });
+    for (var n = 0; n < Math.min(m.images, 4); n++) row.append(picture(session, m.id, n));
+    return row;
+  }
+  function picture(session, message, n) {
+    var key = session + ' ' + message + ' ' + n;
+    if (shots[key]) return shots[key].node;
+    var entry = (shots[key] = { state: '', zoom: false });
+    entry.node = button('', { type: 'button', 'aria-label': 'Bild ' + (n + 1) }, function () {
+      if (entry.state === 'failed') load();
+      if (entry.state !== 'ok') return;
+      entry.zoom = !entry.zoom;
+      entry.node.setAttribute('class', entry.zoom ? 'shot zoom' : 'shot');
+    });
+    function load() {
+      entry.state = 'loading';
+      entry.node.setAttribute('class', 'shot wait');
+      entry.node.textContent = 'Bild wird geladen …';
+      request('GET', '/api/image?session=' + encodeURIComponent(session) + '&message=' + encodeURIComponent(message) + '&n=' + n)
+        .then(function (d) {
+          // Only a picture becomes the data URL, nothing else the answer holds.
+          if (!d || !IMAGE_TYPES[d.type] || typeof d.data !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(d.data)) throw new Error('Kein gültiges Bild.');
+          entry.state = 'ok';
+          entry.node.setAttribute('class', 'shot');
+          entry.node.replaceChildren(h('img', { src: 'data:' + d.type + ';base64,' + d.data, alt: 'Bild ' + (n + 1) }));
+        })
+        .catch(function (error) {
+          entry.state = 'failed';
+          entry.node.setAttribute('class', 'shot wait');
+          entry.node.textContent = ((error && error.message) || 'Bild nicht verfügbar.') + ' Antippen für einen neuen Versuch.';
+        });
+    }
+    load();
+    return entry.node;
+  }
+
   function toolBubble(count, live) {
     var dots = h('span', { class: 'typing' + (live ? ' live' : ''), role: 'img',
       'aria-label': count > 1 ? count + ' Werkzeugaufrufe' : 'ein Werkzeugaufruf' });
@@ -596,8 +640,12 @@
         rows.unshift(toolBubble(count, i === messages.length - 1 && s.status === 'working' && !s.pending));
         continue;
       }
-      var body = m.role === 'assistant' ? markdown(m.text) : h('span', { class: 'text' }, m.text);
-      rows.unshift(h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), body));
+      // The images stand below the text instead of their "[Image #n]".
+      var text = m.images ? trim(String(m.text || '').replace(/\[Image #\d+\]/g, '')) : m.text;
+      var body = m.role === 'assistant' ? markdown(m.text) : h('span', { class: 'text' }, text);
+      var item = h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), body);
+      if (m.role === 'user' && m.images > 0) item.append(pictures(s.id, m));
+      rows.unshift(item);
     }
     if (!rows.length) rows.push(h('li', { class: 'hint' }, 'Noch kein Verlauf.'));
     els.messages.replaceChildren.apply(els.messages, rows);
