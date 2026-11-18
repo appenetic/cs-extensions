@@ -189,6 +189,36 @@ test('away follows driving in auto mode', async () => {
   assert.equal(b.away(), false)
 })
 
+test('the list order follows turns and questions, not tool calls or a restart', async () => {
+  const b = bridge()
+  const project = path.join(b.projectsDir, '-p')
+  fs.mkdirSync(project)
+  const idle = '11111111-1111-1111-1111-111111111111'
+  fs.writeFileSync(path.join(project, idle + '.jsonl'), '')
+  fs.utimesSync(path.join(project, idle + '.jsonl'), 1_700_000_000, 1_700_000_000)
+  b.agentsSource = async () => [
+    { sessionId: idle, cwd: '/p', kind: 'interactive', status: 'idle', startedAt: 1_600_000_000_000 },
+    { sessionId: 'notranscript', cwd: '/q', kind: 'interactive', status: 'idle', startedAt: 1_650_000_000_000 },
+  ]
+  await b.discover()
+  assert.equal(b.sessions.get(idle).updated, 1_700_000_000_000, 'last written transcript, not the restart')
+  assert.equal(b.sessions.get('notranscript').updated, 1_650_000_000_000, 'else its start')
+  const res = { on() {} }
+  const hook = (id, event, extra = {}) => b.hook({ session_id: id, hook_event_name: event, cwd: '/w', ...extra }, res)
+  await hook('w1', 'UserPromptSubmit', { prompt: 'eins' })
+  b.advance(1000)
+  await hook('w2', 'UserPromptSubmit', { prompt: 'zwei' })
+  const order = () => b.snapshot().sessions.map((s) => s.id)
+  assert.deepEqual(order().slice(0, 2), ['w2', 'w1'])
+  b.advance(1000)
+  await hook('w1', 'PostToolUse', { tool_name: 'Bash', tool_input: { command: 'make' } })
+  await hook('w1', 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'make' } })
+  assert.deepEqual(order().slice(0, 2), ['w2', 'w1'], 'tool calls keep the places')
+  b.advance(1000)
+  await hook('w1', 'Stop', { last_assistant_message: 'Fertig.' })
+  assert.deepEqual(order().slice(0, 2), ['w1', 'w2'], 'the end of a turn moves up')
+})
+
 test('discovery ends sessions it no longer lists and maps states', async () => {
   let list = [
     { sessionId: 'a', cwd: '/a', kind: 'interactive', pid: 1, status: 'idle', name: 'a-1' },

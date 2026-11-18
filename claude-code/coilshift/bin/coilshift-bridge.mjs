@@ -32,6 +32,10 @@ const MAX_TEXT = 4000
 const MAX_SESSIONS = 24
 const PAIR_TTL = 10 * 60 * 1000
 const CAR_OFFER_TTL = 3 * 60 * 1000
+// Hook events that move a session up the car's list: a turn, a question or the
+// session's start or end. Single tool calls do not, so sessions at work keep
+// their places.
+const ACTIVITY = new Set(['SessionStart', 'UserPromptSubmit', 'PermissionRequest', 'Stop', 'SessionEnd'])
 const DRIVING_GRACE = 5 * 60 * 1000
 
 // An error the car shows as is: a status and a German message.
@@ -404,6 +408,15 @@ export class Bridge {
     if (s.messages.length > MAX_MESSAGES) s.messages.splice(0, s.messages.length - MAX_MESSAGES)
   }
 
+  lastActive(s) {
+    if (!s.transcript) s.transcript = this.findTranscript(s.id)
+    try {
+      return Math.floor(fs.statSync(s.transcript).mtimeMs)
+    } catch {
+      return 0
+    }
+  }
+
   findTranscript(id) {
     if (this.transcripts.has(id)) return this.transcripts.get(id)
     try {
@@ -534,7 +547,12 @@ export class Bridge {
     const live = new Set()
     for (const a of list) {
       if (!a || typeof a.sessionId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(a.sessionId)) continue
+      const fresh = !this.sessions.has(a.sessionId)
       const s = this.session(a.sessionId)
+      // A session the bridge learns about only now (after a restart, or from
+      // before the plugin) was last active when its transcript was last
+      // written, not now.
+      if (fresh) s.updated = this.lastActive(s) || Number(a.startedAt) || this.now()
       const status = Bridge.status(a.status || a.state)
       const kind = status === 'ended' ? 'ended' : a.kind === 'background' ? 'background' : 'interactive'
       if (kind !== 'ended') live.add(s.id)
@@ -642,7 +660,7 @@ export class Bridge {
     if (typeof input.transcript_path === 'string' && input.transcript_path) s.transcript = input.transcript_path
     if (typeof input.session_title === 'string' && input.session_title) s.title = clip(input.session_title, 120)
     if (s.kind === 'ended' && event !== 'SessionEnd') s.kind = 'interactive'
-    s.updated = this.now()
+    if (ACTIVITY.has(event) || (event === 'PreToolUse' && input.tool_name === 'AskUserQuestion')) s.updated = this.now()
     switch (event) {
       case 'SessionStart':
         s.status = 'idle'

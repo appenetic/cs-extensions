@@ -126,6 +126,13 @@ test('a refused answer is shown and keeps the text', async () => {
   assert.equal(el(h, 'composer').value, 'Weiter');
 });
 
+test('sessions with an open question lead the list', async () => {
+  const plain = (id, updated) => ({ id, title: id, cwd: '/p', kind: 'interactive', status: 'idle', updated, delivery: 'inbox', messages: [] });
+  const asking = { ...plain('asks', 1799990000000), status: 'waiting', delivery: 'hook', pending: question };
+  const h = await setup({ fetchState: { view: view({ sessions: [plain('newest', 1799999990000), asking, plain('older', 1799980000000)] }) }, calls: [] });
+  assert.deepEqual(el(h, 'sessions').findAll((e) => e.className.startsWith('session')).map((e) => e.getAttribute('aria-label')), ['asks', 'newest', 'older']);
+});
+
 test('unpaired: the QR code of the pairing page and no session list', async () => {
   const calls = [];
   const state = { view: view({ link: { state: 'unpaired', since: 1 }, sessions: [], bridge: undefined,

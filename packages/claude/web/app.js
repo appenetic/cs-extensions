@@ -148,8 +148,11 @@
 
   // ------------------------------------------------------------ helpers
 
+  // Sessions with an open question first, then by last activity as the bridge
+  // sends them.
   function sessions() {
-    return (view && view.sessions) || [];
+    var list = (view && view.sessions) || [];
+    return list.filter(function (x) { return x.pending; }).concat(list.filter(function (x) { return !x.pending; }));
   }
   function current() {
     var list = sessions();
