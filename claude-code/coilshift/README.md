@@ -65,6 +65,10 @@ Umgebungsvariablen:
 Gibt es auf dem Mac keine LAN- oder Tailscale-Adresse, nennt `/coilshift:pair`
 keinen Link. Die Kopplung per Code geht dann trotzdem.
 
+Bilder aus Prompts liest die Bridge erst, wenn ein gekoppeltes Auto sie anzeigt:
+aus dem Transkript der Sitzung, verkleinert mit `sips` (höchstens 1024 Pixel,
+JPEG). Die letzten 16 hält sie im Speicher, auf der Platte bleibt nichts.
+
 ## Internet-Relay
 
 Ohne Tailscale und ohne gemeinsames WLAN erreichen sich Mac und Auto nicht

@@ -5,7 +5,8 @@ import path from 'node:path'
 import { test } from 'node:test'
 import http from 'node:http'
 import net from 'node:net'
-import { Bridge, allowedPeer, bridgeHosts, closingQuestion, parseTranscript, toolSummary, userText } from '../bin/coilshift-bridge.mjs'
+import { execFileSync } from 'node:child_process'
+import { Bridge, allowedPeer, bridgeHosts, closingQuestion, imageCount, parseTranscript, shrinkImage, toolSummary, transcriptImages, userText } from '../bin/coilshift-bridge.mjs'
 import { VERSION, ensureBridge, local, older, socketPath } from '../lib/common.mjs'
 
 function tmp() {
@@ -24,6 +25,7 @@ function bridge(options = {}) {
     now: () => now,
     spawnClaude: options.spawnClaude || (async () => 'abcdef12'),
     agents: async () => options.agents || [],
+    shrink: options.shrink,
   })
   b.advance = (ms) => (now += ms)
   return b
@@ -107,6 +109,78 @@ test('a restarted bridge answers the car at once: its revisions start at the clo
   const started = Date.now()
   await restarted.waitRev(before.snapshot().rev, 25000)
   assert.ok(Date.now() - started < 1000, 'no wait for the long poll to run out')
+})
+
+// A 1×1 PNG, as Claude Code keeps a pasted image in the transcript.
+const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+const pasted = (data) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data } })
+
+test('pasted images: counted on the message, found in the transcript, made small once', async () => {
+  assert.equal(imageCount('[Image #1] schau [Image #12]'), 2)
+  assert.equal(imageCount('[Image #1][Image #2][Image #3][Image #4][Image #5]'), 4, 'at most four')
+  assert.equal(imageCount('kein Bild'), 0)
+  const shrunk = []
+  const b = bridge({ shrink: async (image) => (shrunk.push(image.data), { type: 'image/jpeg', data: 'a2xlaW4=' }) })
+  const file = path.join(b.projectsDir, 's2.jsonl')
+  const lines = [
+    { type: 'user', uuid: 'u1', timestamp: '2026-11-18T10:00:00Z', message: { role: 'user', content: [{ type: 'text', text: '[Image #1] Schau' }, pasted('AAAA')] } },
+    { type: 'user', uuid: 'u2', timestamp: '2026-11-18T10:00:05Z', message: { role: 'user', content: [{ type: 'tool_result', content: [pasted('TOOL')] }] } },
+    { type: 'user', uuid: 'u3', timestamp: '2026-11-18T10:01:00Z', message: { role: 'user', content: [{ type: 'text', text: '[Image #2] [Image #3] zwei' }, pasted('BBBB'), pasted('CCCC')] } },
+  ]
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  assert.deepEqual(parseTranscript(file).messages.map((m) => [m.id, m.images]), [['u1', 1], ['u3', 2]], 'images of tool results are not pasted ones')
+  assert.deepEqual((await transcriptImages(file, { id: 'u1' })).map((i) => i.data), ['AAAA'])
+  assert.deepEqual((await transcriptImages(file, { id: 'm9', text: '[Image #2] [Image #3] zwei', at: 0 })).map((i) => i.data), ['BBBB', 'CCCC'])
+  assert.deepEqual((await transcriptImages(file, { id: 'm9', text: 'anders', at: Date.parse('2026-11-18T10:00:50Z') })).map((i) => i.data), ['BBBB', 'CCCC'], 'else the closest in time')
+  assert.equal((await transcriptImages(file, { id: 'm9', text: 'anders', at: Date.parse('2026-11-18T10:05:00Z') })).length, 0, 'but not further than a minute')
+
+  const res = { on() {} }
+  // From the hooks: only the prompt, with a mark for each image.
+  await b.hook({ session_id: 's1', hook_event_name: 'UserPromptSubmit', cwd: '/p', transcript_path: file, prompt: '[Image #2] [Image #3] zwei' }, res)
+  // Backfilled at the start: the transcript's entries with their ids.
+  await b.hook({ session_id: 's2', hook_event_name: 'SessionStart', cwd: '/p', transcript_path: file }, res)
+  const snap = b.snapshot()
+  const hooked = snap.sessions.find((s) => s.id === 's1').messages[0]
+  assert.equal(hooked.images, 2)
+  assert.deepEqual(snap.sessions.find((s) => s.id === 's2').messages.map((m) => m.images), [1, 2])
+  const device = b.redeem(b.newCode(), 'Tesla')
+  const get = (q) => b.handle({ method: 'GET', url: new URL('https://bridge/v1/image?' + new URLSearchParams(q)), authorization: 'Bearer ' + device, body: {} })
+  assert.deepEqual(await get({ session: 's1', message: hooked.id, n: 1 }), { status: 200, body: { type: 'image/jpeg', data: 'a2xlaW4=' } })
+  await get({ session: 's1', message: hooked.id, n: 1 })
+  assert.deepEqual(shrunk, ['CCCC'], 'made small once')
+  assert.equal((await get({ session: 's2', message: 'u1', n: 0 })).status, 200)
+  assert.deepEqual(shrunk, ['CCCC', 'AAAA'])
+  for (const q of [{ session: 's1', message: hooked.id, n: 2 }, { session: 's1', message: 'nope', n: 0 }, { session: 'x', message: 'u1', n: 0 }, { session: 's2', message: 'u1', n: 'a' }]) {
+    assert.equal((await get(q)).status, 404, JSON.stringify(q))
+  }
+  assert.equal((await b.handle({ method: 'GET', url: new URL('https://bridge/v1/image?session=s2&message=u1&n=0'), authorization: 'Bearer nope', body: {} })).status, 401)
+
+  // Without sips a small original goes as it is.
+  const plain = bridge({ shrink: async () => { throw new Error('no sips') } })
+  const plainFile = path.join(plain.projectsDir, 's3.jsonl')
+  fs.writeFileSync(plainFile, JSON.stringify(lines[0]) + '\n')
+  await plain.hook({ session_id: 's3', hook_event_name: 'SessionStart', cwd: '/p', transcript_path: plainFile }, res)
+  const token = plain.redeem(plain.newCode(), 'Tesla')
+  const out = await plain.handle({ method: 'GET', url: new URL('https://bridge/v1/image?session=s3&message=u1&n=0'), authorization: 'Bearer ' + token, body: {} })
+  assert.deepEqual(out, { status: 200, body: { type: 'image/png', data: 'AAAA' } })
+})
+
+test('sips makes an image a JPEG of at most 1024 pixels a side and never larger', { skip: process.platform !== 'darwin' }, async () => {
+  const dir = tmp()
+  const size = (data) => {
+    const file = path.join(dir, 'check.jpg')
+    fs.writeFileSync(file, Buffer.from(data, 'base64'))
+    return [...execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', file], { encoding: 'utf8' }).matchAll(/: *(\d+)/g)].map((m) => Number(m[1]))
+  }
+  const small = await shrinkImage({ type: 'image/png', data: PIXEL }, dir)
+  assert.equal(small.type, 'image/jpeg')
+  assert.deepEqual(size(small.data), [1, 1], 'not blown up')
+  const big = path.join(dir, 'big.png')
+  fs.writeFileSync(path.join(dir, 'pixel.png'), Buffer.from(PIXEL, 'base64'))
+  execFileSync('sips', ['-z', '1500', '2400', path.join(dir, 'pixel.png'), '--out', big], { stdio: 'ignore' })
+  const made = await shrinkImage({ type: 'image/png', data: fs.readFileSync(big).toString('base64') }, dir)
+  assert.deepEqual(size(made.data), [1024, 640])
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.startsWith('image-')), [], 'no work files left')
 })
 
 test('a session hidden in the car stays hidden until it is active again', async () => {

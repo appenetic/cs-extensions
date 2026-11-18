@@ -30,6 +30,13 @@ import { ANSWER_LABEL, OFFER_LABEL, Relay, boxKey, boxKeys, carCode, carCodeFor,
 const MAX_MESSAGES = 60
 const MAX_TEXT = 4000
 const MAX_SESSIONS = 24
+// Pasted images: at most this many per message, made at most this many pixels
+// a side for the car, and as base64 at most this large before and after.
+const MAX_IMAGES = 4
+const IMAGE_EDGE = 1024
+const MAX_IMAGE_SOURCE = 32 << 20
+const MAX_IMAGE = 2 << 20
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const PAIR_TTL = 10 * 60 * 1000
 const CAR_OFFER_TTL = 3 * 60 * 1000
 // Hook events that move a session up the car's list: a turn, a question or the
@@ -78,6 +85,12 @@ export function userText(content) {
   }
   s = s.replace(/<(system-reminder|local-command-stdout|local-command-stderr|local-command-caveat)>[\s\S]*?<\/\1>/g, '')
   return clip(s)
+}
+
+// Claude Code writes each pasted image into the prompt as "[Image #n]"; the
+// image itself is only in the transcript.
+export function imageCount(text) {
+  return Math.min(MAX_IMAGES, (String(text || '').match(/\[Image #\d+\]/g) || []).length)
 }
 
 // The car shows tool calls only as a bubble of dots: a run of them is one entry
@@ -137,7 +150,9 @@ export function parseTranscript(file, maxBytes = 512 * 1024) {
       const id = typeof e.uuid === 'string' ? e.uuid : undefined
       if (e.type === 'user') {
         const text = userText(e.message.content)
-        if (text) result.messages.push({ id, role: 'user', text, at })
+        // Images of tool results sit inside those; only pasted ones are top level.
+        const images = Array.isArray(e.message.content) ? Math.min(MAX_IMAGES, e.message.content.filter((b) => b && b.type === 'image').length) : 0
+        if (text || images) result.messages.push({ id, role: 'user', text, at, ...(images ? { images } : {}) })
       } else if (e.type === 'assistant' && Array.isArray(e.message.content)) {
         e.message.content.forEach((b, i) => {
           const bid = id ? `${id}.${i}` : undefined
@@ -153,6 +168,76 @@ export function parseTranscript(file, maxBytes = 512 * 1024) {
   }
   result.messages = result.messages.slice(-MAX_MESSAGES)
   return result
+}
+
+// transcriptImages finds the images of a user turn in a transcript: the entry
+// with the message's id, or else the last one with images and the same text
+// (the hooks see only the prompt), or else the one closest in time. Pasted
+// images are base64 in the transcript, so only lines with one are parsed.
+export async function transcriptImages(file, message, maxBytes = 64 << 20) {
+  let size
+  try {
+    size = (await fs.promises.stat(file)).size
+  } catch {
+    return []
+  }
+  const input = fs.createReadStream(file, { start: Math.max(0, size - maxBytes), encoding: 'utf8' })
+  const lines = readline.createInterface({ input, crlfDelay: Infinity })
+  let byId = null
+  let byText = null
+  let byTime = null
+  let gap = 60000
+  try {
+    for await (const line of lines) {
+      if (!line.includes('"image"')) continue
+      let e
+      try {
+        e = JSON.parse(line)
+      } catch {
+        continue
+      }
+      if (!e || e.type !== 'user' || e.isMeta || e.isSidechain || !e.message || !Array.isArray(e.message.content)) continue
+      const images = e.message.content.filter((b) => b && b.type === 'image' && b.source && b.source.type === 'base64' && typeof b.source.data === 'string')
+      if (!images.length) continue
+      if (e.uuid === message.id) {
+        byId = images
+        break
+      }
+      if (userText(e.message.content) === message.text) byText = images
+      const off = Math.abs((Date.parse(e.timestamp) || 0) - message.at)
+      if (off < gap) {
+        gap = off
+        byTime = images
+      }
+    }
+  } catch {
+    return []
+  } finally {
+    lines.close()
+    input.destroy()
+  }
+  return (byId || byText || byTime || []).map((b) => ({ type: String(b.source.media_type || ''), data: b.source.data }))
+}
+
+const sips = (args) =>
+  new Promise((resolve, reject) => execFile('sips', args, { timeout: 20000, maxBuffer: 1 << 20 }, (error, stdout) => (error ? reject(error) : resolve(String(stdout)))))
+
+// shrinkImage makes an image small enough for the car with macOS's sips: a
+// JPEG of at most IMAGE_EDGE pixels a side, never larger than it was.
+export async function shrinkImage(image, dir) {
+  const work = fs.mkdtempSync(path.join(dir, 'image-'))
+  try {
+    const source = path.join(work, 'source.' + (String(image.type).split('/')[1] || 'img').replace(/[^a-z]/g, ''))
+    const target = path.join(work, 'small.jpg')
+    fs.writeFileSync(source, Buffer.from(image.data, 'base64'))
+    const sizes = [...(await sips(['-g', 'pixelWidth', '-g', 'pixelHeight', source])).matchAll(/pixel(?:Width|Height): *(\d+)/g)].map((m) => Number(m[1]))
+    if (sizes.length !== 2 || !(Math.min(...sizes) > 0)) throw new Error('not an image')
+    const resize = Math.max(...sizes) > IMAGE_EDGE ? ['-Z', String(IMAGE_EDGE)] : []
+    await sips(['-s', 'format', 'jpeg', '-s', 'formatOptions', '70', ...resize, source, '--out', target])
+    return { type: 'image/jpeg', data: fs.readFileSync(target).toString('base64') }
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true })
+  }
 }
 
 // transcriptTail reads the end of a transcript: when the conversation last
@@ -274,6 +359,9 @@ export class Bridge {
     this.dir = dir
     this.now = options.now || Date.now
     this.claude = options.claude || claudeBinary()
+    this.shrink = options.shrink || shrinkImage
+    // Images made small for the car, by session, message and position.
+    this.images = new Map()
     this.agentsSource = options.agents || (() => this.runAgents())
     this.spawnClaude = options.spawnClaude || ((args, cwd) => this.runClaude(args, cwd))
     this.projectsDir = options.projectsDir || process.env.COILSHIFT_PROJECTS_DIR || path.join(claudeHome(), 'projects')
@@ -443,9 +531,11 @@ export class Bridge {
 
   addMessage(s, role, text, id) {
     text = clip(text)
-    if (!text) return
-    s.messages.push({ id: id || `m${++this.seq}`, role, text, at: this.now() })
+    if (!text) return null
+    const m = { id: id || `m${++this.seq}`, role, text, at: this.now() }
+    s.messages.push(m)
     if (s.messages.length > MAX_MESSAGES) s.messages.splice(0, s.messages.length - MAX_MESSAGES)
+    return m
   }
   addTool(s) {
     if (countTool(s.messages, `m${this.seq + 1}`, this.now())) this.seq++
@@ -562,6 +652,38 @@ export class Bridge {
         : undefined,
       messages: s.messages,
     }
+  }
+
+  // image is one image of a user's message, made small for the car. The
+  // transcript is read once per image; the result stays for the next request.
+  async image(session, message, n) {
+    const s = this.sessions.get(session)
+    const m = s && s.messages.find((x) => x.id === message && x.role === 'user')
+    if (!m || !Number.isInteger(n) || n < 0 || n >= (m.images || 0)) throw fail(404, 'Dieses Bild kennt der Mac nicht.')
+    const key = `${s.id}\n${m.id}\n${n}`
+    let job = this.images.get(key)
+    if (job) {
+      this.images.delete(key)
+    } else {
+      job = (async () => {
+        if (!s.transcript) s.transcript = this.findTranscript(s.id)
+        const image = (await transcriptImages(s.transcript, m))[n]
+        if (!image || image.data.length > MAX_IMAGE_SOURCE) throw fail(404, 'Das Bild ist nicht mehr im Verlauf.')
+        try {
+          return await this.shrink(image, this.dir)
+        } catch {
+          // Without sips a small original still goes.
+          if (IMAGE_TYPES.has(image.type) && image.data.length <= MAX_IMAGE) return image
+          throw fail(422, 'Das Bild lässt sich nicht verkleinern.')
+        }
+      })()
+      job.catch(() => this.images.get(key) === job && this.images.delete(key))
+    }
+    this.images.set(key, job)
+    while (this.images.size > 16) this.images.delete(this.images.keys().next().value)
+    const out = await job
+    if (!IMAGE_TYPES.has(out.type) || out.data.length > MAX_IMAGE) throw fail(413, 'Das Bild ist zu groß für das Auto.')
+    return out
   }
 
   projects() {
@@ -769,11 +891,14 @@ export class Bridge {
         s.status = 'idle'
         if (s.messages.length === 0) this.backfill(s)
         break
-      case 'UserPromptSubmit':
+      case 'UserPromptSubmit': {
         if (s.pending && !s.pending.waiter) s.pending = null
-        this.addMessage(s, 'user', userText(input.prompt))
+        const text = userText(input.prompt)
+        const m = this.addMessage(s, 'user', text)
+        if (m && imageCount(text)) m.images = imageCount(text)
         s.status = 'working'
         break
+      }
       case 'PreToolUse': {
         s.status = 'working'
         if (input.tool_name !== 'AskUserQuestion') break
@@ -1106,6 +1231,10 @@ export class Bridge {
         }
         await this.waitRev(Number.isFinite(since) ? since : 0, wait * 1000)
         return reply(200, this.snapshot())
+      }
+      if (method === 'GET' && url.pathname === '/v1/image') {
+        const n = Number(url.searchParams.get('n') || 0)
+        return reply(200, await this.image(url.searchParams.get('session'), url.searchParams.get('message'), n))
       }
       if (method === 'POST' && url.pathname === '/v1/reply') return reply(200, await this.reply(body))
       if (method === 'POST' && url.pathname === '/v1/start') return reply(200, await this.start(body))
