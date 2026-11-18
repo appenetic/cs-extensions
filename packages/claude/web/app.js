@@ -553,15 +553,35 @@
         render();
       }));
     }
+    if (view.hidden > 0 && mode === 'live') {
+      var back = button(view.hidden + ' ausgeblendet · wieder einblenden', { type: 'button', class: 'new', id: 'unhide' }, function () {
+        act('/api/unhide', {}, function () {
+          say('Alle Sitzungen wieder eingeblendet.', 'ok');
+        });
+      });
+      back.disabled = sending;
+      items.push(back);
+    }
     els.nav.replaceChildren.apply(els.nav, items);
     show(els.detail, Boolean(s));
     if (s) renderDetail(s);
   }
 
   function renderDetail(s) {
+    // Hidden until something happens in the session again.
+    var hide = button('Ausblenden', { type: 'button', class: 'chip', id: 'hide' }, function () {
+      act('/api/hide', { session: s.id }, function () {
+        selected = null;
+        focused = false;
+        say('Ausgeblendet. Die Sitzung kommt zurück, sobald dort wieder etwas passiert.', 'ok');
+      });
+    });
+    hide.disabled = sending || mode !== 'live';
     els.head.replaceChildren(
-      h('h2', {}, pulse(s), s.title),
-      h('p', { class: 'hint' }, shortPath(s.cwd) + ' · ' + (KIND[s.kind] || s.kind) + ' · ' + (s.pending ? 'wartet auf dich' : STATUS[s.status] || s.status))
+      h('div', { class: 'title' },
+        h('h2', {}, pulse(s), s.title),
+        h('p', { class: 'hint' }, shortPath(s.cwd) + ' · ' + (KIND[s.kind] || s.kind) + ' · ' + (s.pending ? 'wartet auf dich' : STATUS[s.status] || s.status))),
+      hide
     );
     els.prompt.replaceChildren();
     if (s.pending) els.prompt.append(promptCard(s, s.pending));

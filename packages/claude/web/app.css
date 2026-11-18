@@ -104,6 +104,9 @@ code.pair-code { font-size: 26px; letter-spacing: 0.04em; padding: 12px 16px; }
 .pairing h3 { margin: 18px 0 4px; font-size: 17px; }
 .qr { display: block; width: 256px; height: 256px; padding: 12px; background: #fff; border-radius: 12px; image-rendering: pixelated; }
 .chip.on { border-color: var(--blue); background: var(--seg-on); }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.head .title { min-width: 0; }
+.head #hide { flex: 0 0 auto; }
 
 #new select, #new textarea { display: block; width: 100%; min-height: 48px; font: inherit; color: var(--text); background: var(--fill); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; }
 #new select option { color: #111; background: #fff; }

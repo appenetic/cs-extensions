@@ -73,6 +73,19 @@ test('before the service answers the tile says so and keeps the fields closed', 
   assert.equal(el(h, 'away').disabled, true);
 });
 
+test('a session can be hidden in the car and all of them shown again', async () => {
+  const calls = [];
+  const h = await setup({ fetchState: { view: view({ hidden: 2 }), answer: { ok: true } }, calls });
+  assert.equal(el(h, 'unhide').textContent, '2 ausgeblendet · wieder einblenden');
+  el(h, 'hide').click();
+  await h.settle(25);
+  assert.deepEqual(calls.find((c) => c.url.endsWith('/api/hide')).body, { session: 's1' });
+  assert.match(el(h, 'flash').textContent, /Ausgeblendet/);
+  el(h, 'unhide').click();
+  await h.settle(25);
+  assert.ok(calls.some((c) => c.url.endsWith('/api/unhide')));
+});
+
 test('answers of a question stand one per row', async () => {
   const h = await setup({ fetchState: { view: view() }, calls: [] });
   const rows = el(h, 'prompt').findAll((e) => e.className === 'options stack');
