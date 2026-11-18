@@ -31,11 +31,12 @@ const MAX_MESSAGES = 60
 const MAX_TEXT = 4000
 const MAX_SESSIONS = 24
 // Pasted images: at most this many per message, made at most this many pixels
-// a side for the car, and as base64 at most this large before and after.
+// a side for the car, and as base64 at most this large before. Images and
+// speech for the car are at most MAX_MEDIA as base64.
 const MAX_IMAGES = 4
 const IMAGE_EDGE = 1024
 const MAX_IMAGE_SOURCE = 32 << 20
-const MAX_IMAGE = 2 << 20
+const MAX_MEDIA = 2 << 20
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const PAIR_TTL = 10 * 60 * 1000
 const CAR_OFFER_TTL = 3 * 60 * 1000
@@ -229,8 +230,9 @@ export async function transcriptImages(file, message, maxBytes = 64 << 20) {
   return (byId || byText || byTime || []).map((b) => ({ type: String(b.source.media_type || ''), data: b.source.data }))
 }
 
-const sips = (args) =>
-  new Promise((resolve, reject) => execFile('sips', args, { timeout: 20000, maxBuffer: 1 << 20 }, (error, stdout) => (error ? reject(error) : resolve(String(stdout)))))
+// tool runs one of macOS's command line tools and answers its output.
+const tool = (name, args, timeout = 20000) =>
+  new Promise((resolve, reject) => execFile(name, args, { timeout, maxBuffer: 1 << 20 }, (error, stdout) => (error ? reject(error) : resolve(String(stdout)))))
 
 // shrinkImage makes an image small enough for the car with macOS's sips: a
 // JPEG of at most IMAGE_EDGE pixels a side, never larger than it was.
@@ -240,11 +242,81 @@ export async function shrinkImage(image, dir) {
     const source = path.join(work, 'source.' + (String(image.type).split('/')[1] || 'img').replace(/[^a-z]/g, ''))
     const target = path.join(work, 'small.jpg')
     fs.writeFileSync(source, Buffer.from(image.data, 'base64'))
-    const sizes = [...(await sips(['-g', 'pixelWidth', '-g', 'pixelHeight', source])).matchAll(/pixel(?:Width|Height): *(\d+)/g)].map((m) => Number(m[1]))
+    const sizes = [...(await tool('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', source])).matchAll(/pixel(?:Width|Height): *(\d+)/g)].map((m) => Number(m[1]))
     if (sizes.length !== 2 || !(Math.min(...sizes) > 0)) throw new Error('not an image')
     const resize = Math.max(...sizes) > IMAGE_EDGE ? ['-Z', String(IMAGE_EDGE)] : []
-    await sips(['-s', 'format', 'jpeg', '-s', 'formatOptions', '70', ...resize, source, '--out', target])
+    await tool('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '70', ...resize, source, '--out', target])
     return { type: 'image/jpeg', data: fs.readFileSync(target).toString('base64') }
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true })
+  }
+}
+
+// ---------------------------------------------------------------- speech
+
+// speakable makes Claude's Markdown into text for a voice: code blocks and
+// tables are named, not read; marks, bullets and link targets go.
+export function speakable(text) {
+  const out = []
+  let code = false
+  let table = false
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim()
+    if (/^(```|~~~)/.test(line)) {
+      if (!code) out.push('Codeblock ausgelassen.')
+      code = !code
+      continue
+    }
+    if (code) continue
+    if (/^\|.*\|$/.test(line)) {
+      if (!table) out.push('Tabelle ausgelassen.')
+      table = true
+      continue
+    }
+    table = false
+    let s = line
+      .replace(/^#{1,6}\s+/, '')
+      .replace(/^>\s?/, '')
+      .replace(/^[-*+]\s+/, '')
+      .replace(/^-{3,}$/, '')
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/https?:\/\/\S+/g, 'Link')
+      .replace(/`([^`]*)`/g, '$1')
+      .replace(/(\*\*|__|~~)(.+?)\1/g, '$2')
+      .replace(/(^|[\s(„"])[*_]([^*_\s](?:[^*_]*[^*_\s])?)[*_](?=[\s.,:;!?)“"]|$)/g, '$1$2')
+      .replace(/\s*(→|->|=>)\s*/g, ', ')
+      .replace(/\s+·\s+/g, ', ')
+      .trim()
+    if (!s) continue
+    if (!/[.!?:;…]$/.test(s)) s += '.'
+    out.push(s)
+  }
+  return out.join('\n')
+}
+
+// germanVoice is the voice say speaks German with: Anna, else the first one
+// for German, else say's own choice.
+export async function germanVoice() {
+  const names = (await tool('say', ['-v', '?']))
+    .split('\n')
+    .filter((line) => /\sde_[A-Z]{2}\s/.test(line))
+    .map((line) => line.split(' (')[0].trim())
+    .filter(Boolean)
+  return names.includes('Anna') ? 'Anna' : names[0] || ''
+}
+
+// speakText makes speech with macOS's say, as AAC at 32 kbit/s: about 4 KB a
+// second, so even the longest message stays far below MAX_MEDIA.
+export async function speakText(text, voice, dir) {
+  const work = fs.mkdtempSync(path.join(dir, 'speech-'))
+  try {
+    const source = path.join(work, 'text.txt')
+    const raw = path.join(work, 'speech.aiff')
+    const target = path.join(work, 'speech.m4a')
+    fs.writeFileSync(source, text)
+    await tool('say', [...(voice ? ['-v', voice] : []), '-f', source, '-o', raw], 120000)
+    await tool('afconvert', ['-f', 'm4af', '-d', 'aac', '-b', '32000', raw, target], 60000)
+    return { type: 'audio/mp4', data: fs.readFileSync(target).toString('base64') }
   } finally {
     fs.rmSync(work, { recursive: true, force: true })
   }
@@ -370,6 +442,10 @@ export class Bridge {
     this.now = options.now || Date.now
     this.claude = options.claude || claudeBinary()
     this.shrink = options.shrink || shrinkImage
+    this.speak = options.speak || speakText
+    this.pickVoice = options.voice || germanVoice
+    // Speech made for the car, by session and message.
+    this.speeches = new Map()
     this.later = options.later || ((fn, ms) => setTimeout(fn, ms).unref())
     // Images made small for the car, by session, message and position.
     this.images = new Map()
@@ -482,6 +558,8 @@ export class Bridge {
       away: ['on', 'off', 'auto'].includes(c.away) ? c.away : 'auto',
       permission_mode: ['default', 'acceptEdits', 'plan', 'bypassPermissions'].includes(c.permission_mode) ? c.permission_mode : 'default',
       wait_minutes: Number.isInteger(c.wait_minutes) && c.wait_minutes >= 1 && c.wait_minutes <= 120 ? c.wait_minutes : 20,
+      // The voice of say for reading aloud in the car, as `say -v '?'` names it.
+      voice: typeof c.voice === 'string' && /^[\p{L}\p{N} ()._-]{1,64}$/u.test(c.voice) ? c.voice : '',
       // Sessions the driver hid in the car, with when: hidden until active again.
       hidden: Object.fromEntries(
         Object.entries(c.hidden && typeof c.hidden === 'object' && !Array.isArray(c.hidden) ? c.hidden : {}).filter(
@@ -684,7 +762,7 @@ export class Bridge {
           return await this.shrink(image, this.dir)
         } catch {
           // Without sips a small original still goes.
-          if (IMAGE_TYPES.has(image.type) && image.data.length <= MAX_IMAGE) return image
+          if (IMAGE_TYPES.has(image.type) && image.data.length <= MAX_MEDIA) return image
           throw fail(422, 'Das Bild lässt sich nicht verkleinern.')
         }
       })()
@@ -693,7 +771,38 @@ export class Bridge {
     this.images.set(key, job)
     while (this.images.size > 16) this.images.delete(this.images.keys().next().value)
     const out = await job
-    if (!IMAGE_TYPES.has(out.type) || out.data.length > MAX_IMAGE) throw fail(413, 'Das Bild ist zu groß für das Auto.')
+    if (!IMAGE_TYPES.has(out.type) || out.data.length > MAX_MEDIA) throw fail(413, 'Das Bild ist zu groß für das Auto.')
+    return out
+  }
+
+  // speech is one of Claude's answers read aloud on the Mac, made once; the
+  // car plays it. The voice is config.voice, else German as say has it.
+  async speech(session, message) {
+    const s = this.sessions.get(session)
+    const m = s && s.messages.find((x) => x.id === message && x.role === 'assistant')
+    if (!m) throw fail(404, 'Diese Antwort kennt der Mac nicht.')
+    const text = speakable(m.text)
+    if (!text) throw fail(404, 'In dieser Antwort gibt es nichts vorzulesen.')
+    const key = `${s.id}\n${m.id}`
+    let job = this.speeches.get(key)
+    if (job) {
+      this.speeches.delete(key)
+    } else {
+      job = (async () => {
+        if (!this.config.voice && this.voice === undefined) this.voice = await this.pickVoice().catch(() => '')
+        return this.speak(text, this.config.voice || this.voice, this.dir)
+      })()
+      job.catch(() => this.speeches.get(key) === job && this.speeches.delete(key))
+    }
+    this.speeches.set(key, job)
+    while (this.speeches.size > 8) this.speeches.delete(this.speeches.keys().next().value)
+    let out
+    try {
+      out = await job
+    } catch {
+      throw fail(422, 'Der Mac kann gerade nicht vorlesen.')
+    }
+    if (out.type !== 'audio/mp4' || out.data.length > MAX_MEDIA) throw fail(413, 'Die Antwort ist zu lang zum Vorlesen.')
     return out
   }
 
@@ -1262,6 +1371,9 @@ export class Bridge {
       if (method === 'GET' && url.pathname === '/v1/image') {
         const n = Number(url.searchParams.get('n') || 0)
         return reply(200, await this.image(url.searchParams.get('session'), url.searchParams.get('message'), n))
+      }
+      if (method === 'GET' && url.pathname === '/v1/speech') {
+        return reply(200, await this.speech(url.searchParams.get('session'), url.searchParams.get('message')))
       }
       if (method === 'POST' && url.pathname === '/v1/reply') return reply(200, await this.reply(body))
       if (method === 'POST' && url.pathname === '/v1/start') return reply(200, await this.start(body))

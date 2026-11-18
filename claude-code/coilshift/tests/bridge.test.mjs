@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import http from 'node:http'
 import net from 'node:net'
 import { execFileSync } from 'node:child_process'
-import { Bridge, allowedPeer, bridgeHosts, closingQuestion, imageCount, parseTranscript, shrinkImage, toolSummary, transcriptImages, userText } from '../bin/coilshift-bridge.mjs'
+import { Bridge, allowedPeer, bridgeHosts, closingQuestion, germanVoice, imageCount, parseTranscript, shrinkImage, speakText, speakable, toolSummary, transcriptImages, userText } from '../bin/coilshift-bridge.mjs'
 import { VERSION, ensureBridge, local, older, socketPath } from '../lib/common.mjs'
 
 function tmp() {
@@ -27,6 +27,8 @@ function bridge(options = {}) {
     agents: async () => options.agents || [],
     shrink: options.shrink,
     later: options.later,
+    speak: options.speak,
+    voice: options.voice,
   })
   b.advance = (ms) => (now += ms)
   return b
@@ -182,6 +184,63 @@ test('sips makes an image a JPEG of at most 1024 pixels a side and never larger'
   const made = await shrinkImage({ type: 'image/png', data: fs.readFileSync(big).toString('base64') }, dir)
   assert.deepEqual(size(made.data), [1024, 640])
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.startsWith('image-')), [], 'no work files left')
+})
+
+test("Claude's answers read aloud: Markdown made speakable, speech made once, only for answers", async () => {
+  const markdown = [
+    '**Fertig:** `alpha.20` steht → im [Feed](https://example.com/x).',
+    '- eins',
+    '- zwei!',
+    '',
+    '| a | b |',
+    '|---|---|',
+    '```',
+    'go test ./...',
+    '```',
+    'Mehr unter https://example.com/doku',
+  ].join('\n')
+  assert.equal(speakable(markdown), 'Fertig: alpha.20 steht, im Feed.\neins.\nzwei!\nTabelle ausgelassen.\nCodeblock ausgelassen.\nMehr unter Link.')
+  const spoken = []
+  let broken = false
+  const b = bridge({
+    speak: async (text, voice) => {
+      spoken.push([text, voice])
+      if (broken) throw new Error('say failed')
+      return { type: 'audio/mp4', data: 'dG9u' }
+    },
+    voice: async () => 'Anna',
+  })
+  const res = { on() {} }
+  await b.hook({ session_id: 's1', hook_event_name: 'UserPromptSubmit', cwd: '/p', prompt: 'Wie weit?' }, res)
+  await b.hook({ session_id: 's1', hook_event_name: 'Stop', cwd: '/p', last_assistant_message: '**Fertig.** Alles grün.' }, res)
+  const [question, answer] = b.snapshot().sessions[0].messages
+  const device = b.redeem(b.newCode(), 'Tesla')
+  const get = (q) => b.handle({ method: 'GET', url: new URL('https://bridge/v1/speech?' + new URLSearchParams(q)), authorization: 'Bearer ' + device, body: {} })
+  assert.deepEqual(await get({ session: 's1', message: answer.id }), { status: 200, body: { type: 'audio/mp4', data: 'dG9u' } })
+  await get({ session: 's1', message: answer.id })
+  assert.deepEqual(spoken, [['Fertig. Alles grün.', 'Anna']], 'made once, in German')
+  assert.equal((await get({ session: 's1', message: question.id })).status, 404, "only Claude's answers")
+  assert.equal((await get({ session: 's1', message: 'nope' })).status, 404)
+  // The configured voice wins; a failing say is a German message and is tried again.
+  b.config.voice = 'Petra'
+  broken = true
+  await b.hook({ session_id: 's1', hook_event_name: 'Stop', cwd: '/p', last_assistant_message: 'Noch eins.' }, res)
+  const next = b.snapshot().sessions[0].messages.at(-1)
+  const failed = await get({ session: 's1', message: next.id })
+  assert.deepEqual([failed.status, failed.body.message], [422, 'Der Mac kann gerade nicht vorlesen.'])
+  broken = false
+  assert.equal((await get({ session: 's1', message: next.id })).status, 200)
+  assert.deepEqual(spoken.slice(1), [['Noch eins.', 'Petra'], ['Noch eins.', 'Petra']])
+})
+
+test('say speaks German as AAC and leaves no work files', { skip: process.platform !== 'darwin' }, async () => {
+  const dir = tmp()
+  const voice = await germanVoice()
+  assert.equal(typeof voice, 'string')
+  const out = await speakText('Hallo aus dem Auto.', voice, dir)
+  assert.equal(out.type, 'audio/mp4')
+  assert.ok(out.data.length > 1000 && Buffer.from(out.data, 'base64').subarray(4, 8).toString() === 'ftyp', 'an MP4 file')
+  assert.deepEqual(fs.readdirSync(dir), [])
 })
 
 test('sessions without a word stay out of the car, like the half-hourly probes of CodexBar', async () => {

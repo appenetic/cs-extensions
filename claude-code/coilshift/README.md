@@ -50,7 +50,9 @@ Die Daten liegen in `~/.claude/plugins/data/coilshift-appenetic/` (Modus 0700):
 - `config.json`: Port, gekoppelte Autos (Token nur als Hash, dazu je Auto der
   Schlüssel des Internet-Relays), Unterwegs-Modus,
   `permission_mode` für Sitzungen aus dem Auto (`default`, `acceptEdits`, `plan`
-  oder `bypassPermissions`) und `wait_minutes` (1–120, Vorgabe 20)
+  oder `bypassPermissions`), `wait_minutes` (1–120, Vorgabe 20) und `voice`,
+  die Stimme fürs Vorlesen im Auto, wie `say -v '?'` sie nennt (Vorgabe: Anna,
+  sonst die erste deutsche)
 - `cert.pem` und `key.pem`: das selbst signierte Zertifikat, das das Auto pinnt
 - `bridge.log`
 
@@ -68,6 +70,8 @@ keinen Link. Die Kopplung per Code geht dann trotzdem.
 Bilder aus Prompts liest die Bridge erst, wenn ein gekoppeltes Auto sie anzeigt:
 aus dem Transkript der Sitzung, verkleinert mit `sips` (höchstens 1024 Pixel,
 JPEG). Die letzten 16 hält sie im Speicher, auf der Platte bleibt nichts.
+Zum Vorlesen spricht sie eine Antwort mit `say` als AAC (32 kbit/s), die
+letzten 8 hält sie ebenso im Speicher.
 
 ## Internet-Relay
 
