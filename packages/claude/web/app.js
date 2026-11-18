@@ -44,6 +44,141 @@
     return String(text || '').replace(/^\s+|\s+$/g, '');
   }
 
+  // ------------------------------------------------------------ markdown
+
+  // Claude answers in Markdown. The app draws its common parts as elements,
+  // built from text nodes only: nothing in a message ever becomes HTML. Links
+  // keep their text; the car does not open them.
+  var INLINE = /\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|\*([^*\s](?:[^*]*[^*\s])?)\*|~~([^~]+)~~|\[([^\]]+)\]\([^)\s]+\)/g;
+  function inline(text) {
+    var out = [];
+    var last = 0;
+    var m;
+    INLINE.lastIndex = 0;
+    var re = new RegExp(INLINE.source, 'g');
+    while ((m = re.exec(text))) {
+      if (m.index > last) out.push(text.slice(last, m.index));
+      if (m[1] || m[2]) out.push(h.apply(null, ['strong', {}].concat(inline(m[1] || m[2]))));
+      else if (m[3]) out.push(h('code', {}, m[3]));
+      else if (m[4]) out.push(h.apply(null, ['em', {}].concat(inline(m[4]))));
+      else if (m[5]) out.push(h('s', {}, m[5]));
+      else out.push(m[6]);
+      last = re.lastIndex;
+    }
+    if (last < text.length) out.push(text.slice(last));
+    return out;
+  }
+  function lineBreaks(lines) {
+    var out = [];
+    lines.forEach(function (line, i) {
+      if (i) out.push(h('br', {}));
+      out = out.concat(inline(trim(line)));
+    });
+    return out;
+  }
+  var ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+  var RULE = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+  function cells(line) {
+    var s = trim(line).replace(/\\\|/g, '\u0000');
+    if (s.charAt(0) === '|') s = s.slice(1);
+    if (s.charAt(s.length - 1) === '|') s = s.slice(0, -1);
+    return s.split('|').map(function (c) { return trim(c.replace(/\u0000/g, '|')); });
+  }
+  function table(lines, i, box) {
+    var head = cells(lines[i]);
+    var body = h('tbody', {});
+    for (i += 2; i < lines.length && lines[i].indexOf('|') >= 0 && trim(lines[i]); i++) {
+      var row = cells(lines[i]);
+      body.append(h.apply(null, ['tr', {}].concat(head.map(function (x, c) {
+        return h.apply(null, ['td', {}].concat(inline(row[c] || '')));
+      }))));
+    }
+    var top = h.apply(null, ['tr', {}].concat(head.map(function (c) { return h.apply(null, ['th', {}].concat(inline(c))); })));
+    box.append(h('div', { class: 'table' }, h('table', {}, h('thead', {}, top), body)));
+    return i;
+  }
+  function list(lines, i, box) {
+    var first = ITEM.exec(lines[i]);
+    var indent = first[1].length;
+    var ordered = /\d/.test(first[2]);
+    var el = h(ordered ? 'ol' : 'ul', {});
+    if (ordered && parseInt(first[2], 10) !== 1) el.setAttribute('start', String(parseInt(first[2], 10)));
+    var li = null;
+    while (i < lines.length) {
+      var line = lines[i];
+      var m = ITEM.exec(line);
+      if (!trim(line)) {
+        var next = ITEM.exec(lines[i + 1] || '');
+        if (next && next[1].length >= indent) {
+          i++;
+          continue;
+        }
+        break;
+      }
+      if (m && m[1].length === indent) {
+        li = h.apply(null, ['li', {}].concat(inline(m[3])));
+        el.append(li);
+        i++;
+      } else if (m && m[1].length > indent && li) {
+        i = list(lines, i, li);
+      } else if (!m && /^\s+\S/.test(line) && li) {
+        li.append.apply(li, [h('br', {})].concat(inline(trim(line))));
+        i++;
+      } else {
+        break;
+      }
+    }
+    box.append(el);
+    return i;
+  }
+  function markdown(text) {
+    var lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    var box = h('div', { class: 'text md' });
+    var para = [];
+    var flush = function () {
+      if (para.length) box.append(h.apply(null, ['p', {}].concat(lineBreaks(para))));
+      para = [];
+    };
+    for (var i = 0; i < lines.length; ) {
+      var line = lines[i];
+      var heading = /^\s*#{1,6}\s+(.*)$/.exec(line);
+      if (/^\s*```/.test(line)) {
+        flush();
+        var code = [];
+        for (i++; i < lines.length && !/^\s*```/.test(lines[i]); i++) code.push(lines[i]);
+        box.append(h('pre', { class: 'code' }, code.join('\n')));
+        i++;
+      } else if (!trim(line)) {
+        flush();
+        i++;
+      } else if (heading) {
+        flush();
+        box.append(h.apply(null, ['h4', {}].concat(inline(heading[1]))));
+        i++;
+      } else if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+        flush();
+        box.append(h('hr', {}));
+        i++;
+      } else if (line.indexOf('|') >= 0 && RULE.test(lines[i + 1] || '')) {
+        flush();
+        i = table(lines, i, box);
+      } else if (ITEM.test(line)) {
+        flush();
+        i = list(lines, i, box);
+      } else if (/^\s*>/.test(line)) {
+        flush();
+        var quote = [];
+        for (; i < lines.length && /^\s*>/.test(lines[i]); i++) quote.push(lines[i].replace(/^\s*>\s?/, ''));
+        box.append(h('blockquote', {}, markdown(quote.join('\n'))));
+      } else {
+        para.push(line);
+        i++;
+      }
+    }
+    flush();
+    return box;
+  }
+
   // ------------------------------------------------------------ transport
 
   function request(method, path, body) {
@@ -441,7 +576,8 @@
         rows.unshift(toolBubble(count, i === messages.length - 1 && s.status === 'working' && !s.pending));
         continue;
       }
-      rows.unshift(h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), h('span', { class: 'text' }, m.text)));
+      var body = m.role === 'assistant' ? markdown(m.text) : h('span', { class: 'text' }, m.text);
+      rows.unshift(h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), body));
     }
     if (!rows.length) rows.push(h('li', { class: 'hint' }, 'Noch kein Verlauf.'));
     els.messages.replaceChildren.apply(els.messages, rows);
@@ -506,7 +642,7 @@
       deny.disabled = !live;
       card.append(h('div', { class: 'options' }, allow, deny));
     } else {
-      card.append(h('h3', {}, 'Claude wartet auf dich'), h('p', { class: 'text' }, p.text));
+      card.append(h('h3', {}, 'Claude wartet auf dich'), markdown(p.text));
     }
     if (p.kind !== 'input' && s.delivery !== 'hook') {
       card.append(h('p', { class: 'hint' }, 'Diese Frage ist im Terminal auf dem Mac offen. Mit eingeschaltetem Unterwegs-Modus warten künftige Fragen auf deine Antwort im Auto.'));

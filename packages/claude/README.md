@@ -42,6 +42,13 @@ Internet-Relay über die Variable `COILSHIFT_RELAY` steuern:
 Die Variable gehört etwa unter `env` in `~/.claude/settings.json`. Das Auto
 übernimmt die Brokerliste bei der nächsten Verbindung.
 
+Ein gekoppeltes Auto hält seine Verbindung zum Broker ständig offen, mit
+einem Ping alle 15 Sekunden, auch wenn es den Mac gerade direkt erreicht. So
+geht der Wechsel aufs Relay ohne Verbindungsaufbau, wenn der direkte Weg
+wegfällt. Der Broker sieht dabei, dass das Auto online ist, aber keine
+Inhalte. Mit `COILSHIFT_RELAY=off` auf dem Mac gibt das Auto bei der
+nächsten direkten Verbindung auch diese Verbindung auf.
+
 ## Einrichtung
 
 1. **Mac:** Das Plugin ist öffentlich auf GitHub, auch für Kollegen:

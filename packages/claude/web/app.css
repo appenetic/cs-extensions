@@ -49,6 +49,24 @@ h2 .pulse { width: 12px; height: 12px; }
 .message .who { display: block; margin-bottom: 2px; font-size: 13px; color: var(--text-2); }
 .message .text { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
 .message.user, .message.car { align-self: flex-end; background: var(--fill); }
+.md { white-space: normal; }
+.md p { color: inherit; font-size: inherit; }
+.md ul { list-style: disc; }
+.md ul ul { list-style: circle; }
+.md ol { list-style: decimal; }
+.md > :last-child { margin-bottom: 0; }
+.md p, .md ul, .md ol, .md pre, .md blockquote, .md .table { margin: 0 0 10px; }
+.md h4 { margin: 12px 0 6px; font-size: 18px; }
+.md ul, .md ol { padding-left: 24px; }
+.md li { margin: 3px 0; }
+.md li > ul, .md li > ol { margin: 3px 0 0; }
+.md pre.code { padding: 8px 12px; overflow-x: auto; white-space: pre; font: 15px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--fill); border-radius: var(--radius); }
+.md .table { overflow-x: auto; }
+.md table { border-collapse: collapse; font-size: 16px; line-height: 1.35; }
+.md th, .md td { padding: 7px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+.md th { background: var(--fill); font-weight: 600; }
+.md blockquote { padding-left: 12px; border-left: 3px solid var(--line); color: var(--text-2); }
+.md hr { margin: 12px 0; border: 0; border-top: 1px solid var(--line); }
 .message.car { border-color: var(--blue); }
 .message.tool { align-self: flex-start; padding: 9px 14px; border-radius: 18px; line-height: 0; }
 .typing { display: inline-flex; gap: 5px; align-items: center; }

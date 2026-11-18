@@ -140,6 +140,43 @@ test('a session without inbox relay still takes text, as a copy in the backgroun
   assert.match(el(h, 'flash').textContent, /als Kopie im Hintergrund/);
 });
 
+test("Claude's Markdown is drawn: tables, lists, emphasis, code; HTML stays text", async () => {
+  const text = [
+    '**Vorher-Messung** mit `alpha.11`:',
+    '',
+    '| Zeit | Zustand |',
+    '|---|:---:|',
+    '| 0–44 s | „online“ |',
+    '| 107 s | Relay über **EMQX** |',
+    '',
+    '- Warm',
+    '  - parallel',
+    '- 4 s Timeout',
+    '',
+    '1. eins',
+    '2. zwei',
+    '',
+    '```',
+    'go test ./...',
+    '```',
+    '<b>kein HTML</b> und a | b ohne Tabelle',
+  ].join('\n');
+  const s = { id: 'md', title: 'Markdown', cwd: '/p', kind: 'interactive', status: 'idle', updated: 1799999990000, delivery: 'inbox',
+    messages: [{ id: 'm1', role: 'assistant', text, at: 1799999950000 }] };
+  const h = await setup({ fetchState: { view: view({ sessions: [s] }) }, calls: [] });
+  const box = el(h, 'messages').find((e) => e.className === 'text md');
+  const all = (tag) => box.findAll((e) => e.tagName === tag.toUpperCase());
+  assert.deepEqual(all('th').map((e) => e.textContent), ['Zeit', 'Zustand']);
+  assert.deepEqual(all('td').map((e) => e.textContent), ['0–44 s', '„online“', '107 s', 'Relay über EMQX']);
+  assert.deepEqual(all('strong').map((e) => e.textContent), ['Vorher-Messung', 'EMQX']);
+  assert.deepEqual(all('li').map((e) => e.textContent), ['Warmparallel', 'parallel', '4 s Timeout', 'eins', 'zwei']);
+  assert.equal(all('pre')[0].textContent, 'go test ./...');
+  assert.equal(all('code')[0].textContent, 'alpha.11');
+  assert.doesNotMatch(box.textContent, /\*\*|\|---|```/, 'no Markdown syntax left');
+  assert.match(box.textContent, /<b>kein HTML<\/b> und a \| b ohne Tabelle/, 'HTML and a lone pipe stay text');
+  assert.equal(all('b').length, 0);
+});
+
 test('sessions with an open question lead the list', async () => {
   const plain = (id, updated) => ({ id, title: id, cwd: '/p', kind: 'interactive', status: 'idle', updated, delivery: 'inbox', messages: [] });
   const asking = { ...plain('asks', 1799990000000), status: 'waiting', delivery: 'hook', pending: question };
