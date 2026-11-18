@@ -776,6 +776,9 @@ export class Bridge {
         break
       }
       case 'PermissionRequest': {
+        // The dialog of AskUserQuestion is the question PreToolUse already
+        // showed, not a permission; it must not replace it in the car.
+        if (input.tool_name === 'AskUserQuestion') break
         const prompt = this.newPrompt('permission', {
           title: 'Freigabe',
           tool: clip(input.tool_name, 64),

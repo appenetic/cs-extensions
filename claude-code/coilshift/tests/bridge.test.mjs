@@ -88,6 +88,11 @@ test('a question in the terminal is shown but not held unless away', async () =>
   assert.equal(s.pending.kind, 'question')
   assert.equal(s.delivery, 'fork', 'no relay: free text goes to a copy, the question stays in the terminal')
   await assert.rejects(b.reply({ session: 's1', prompt: s.pending.id, answers: { 'Q?': 'A' }, source: 'touch' }), (e) => e.status === 422)
+  // Claude Code also asks for the question's dialog; it stays the question.
+  const ask = { session_id: 's1', hook_event_name: 'PermissionRequest', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: 'Q?', options: [{ label: 'A' }] }] } }
+  assert.deepEqual(await b.hook(ask, res), {})
+  assert.equal(b.snapshot().sessions[0].pending.kind, 'question')
+  assert.equal(b.snapshot().sessions[0].pending.questions[0].options[0].label, 'A')
   await b.hook({ session_id: 's1', hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion', tool_input: {} }, res)
   assert.equal(b.snapshot().sessions[0].pending, undefined)
 })
