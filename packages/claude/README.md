@@ -104,6 +104,9 @@ nächsten direkten Kontakt selbst.
 - **Sitzungen:** alle laufenden Sitzungen (Terminal und Hintergrund) und die der
   letzten drei Tage. Ein Punkt markiert eine offene Frage. **Ausblenden** nimmt
   eine Sitzung aus der Liste, bis dort wieder etwas passiert.
+  - Sitzungen ohne ein Wort mit Claude fehlen, etwa die Proben, die CodexBar
+    alle halbe Stunde mit `/usage` startet. Eine neue, noch leere Sitzung
+    erscheint nach einer Minute oder mit ihrem ersten Prompt.
 - **Verlauf:** Prompts, Claudes Antworten mit Tabellen und Listen, und
   Werkzeugaufrufe als kleine Blase mit Punkten. Text aus dem Auto ist als „Aus
   dem Auto“ markiert.

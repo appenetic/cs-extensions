@@ -26,6 +26,7 @@ function bridge(options = {}) {
     spawnClaude: options.spawnClaude || (async () => 'abcdef12'),
     agents: async () => options.agents || [],
     shrink: options.shrink,
+    later: options.later,
   })
   b.advance = (ms) => (now += ms)
   return b
@@ -181,6 +182,45 @@ test('sips makes an image a JPEG of at most 1024 pixels a side and never larger'
   const made = await shrinkImage({ type: 'image/png', data: fs.readFileSync(big).toString('base64') }, dir)
   assert.deepEqual(size(made.data), [1024, 640])
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f.startsWith('image-')), [], 'no work files left')
+})
+
+test('sessions without a word stay out of the car, like the half-hourly probes of CodexBar', async () => {
+  const timers = []
+  const b = bridge({ later: (fn, ms) => timers.push({ fn, ms }) })
+  const res = { on() {} }
+  const probe = '/Users/s/Library/Application Support/CodexBar/ClaudeProbe'
+  const hook = (id, event, extra = {}) => b.hook({ session_id: id, hook_event_name: event, cwd: probe, ...extra }, res)
+  const ids = () => b.snapshot().sessions.map((s) => s.id)
+  await b.hook({ session_id: 'real', hook_event_name: 'UserPromptSubmit', cwd: '/p', prompt: 'Baue die Kachel' }, res)
+  // One with a fixed id waits half a minute without a word ...
+  await hook('fixed', 'SessionStart', { source: 'startup' })
+  assert.deepEqual(ids(), ['real'])
+  b.advance(25000)
+  await hook('fixed', 'SessionEnd')
+  // ... then a new one only runs "/usage".
+  await hook('usage', 'SessionStart', { source: 'startup' })
+  await hook('usage', 'UserPromptSubmit', { prompt: '/usage' })
+  assert.deepEqual(ids(), ['real'])
+  await hook('usage', 'SessionEnd')
+  const snap = b.snapshot()
+  assert.deepEqual([snap.sessions.map((s) => s.id), snap.projects.map((p) => p.cwd), snap.hidden], [['real'], ['/p'], 0], 'not in the list, not offered as a project')
+  assert.deepEqual([...b.sessions.keys()], ['real'], 'nothing kept of them')
+  // A new terminal session without a word joins after a minute.
+  await b.hook({ session_id: 'fresh', hook_event_name: 'SessionStart', cwd: '/q', source: 'startup' }, res)
+  assert.deepEqual(ids(), ['real'])
+  b.advance(60000)
+  const rev = b.snapshot().rev
+  assert.equal(timers.at(-1).ms, 60000)
+  timers.at(-1).fn()
+  assert.ok(b.snapshot().rev > rev, 'a new revision tells the car')
+  assert.deepEqual(ids(), ['fresh', 'real'])
+  // A plugin command with an answer is a conversation, and so is a prompt
+  // that starts with a path.
+  await b.hook({ session_id: 'pair', hook_event_name: 'UserPromptSubmit', cwd: '/h', prompt: '/coilshift:pair' }, res)
+  await b.hook({ session_id: 'pair', hook_event_name: 'Stop', cwd: '/h', last_assistant_message: 'Kopplungslink' }, res)
+  await b.hook({ session_id: 'pair', hook_event_name: 'SessionEnd', cwd: '/h' }, res)
+  await b.hook({ session_id: 'path', hook_event_name: 'UserPromptSubmit', cwd: '/h', prompt: '/Users/s/plan.md lesen' }, res)
+  assert.deepEqual(ids().sort(), ['fresh', 'pair', 'path', 'real'])
 })
 
 test('a session hidden in the car stays hidden until it is active again', async () => {

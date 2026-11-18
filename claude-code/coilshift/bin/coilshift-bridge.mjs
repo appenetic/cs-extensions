@@ -44,6 +44,10 @@ const CAR_OFFER_TTL = 3 * 60 * 1000
 // their places.
 const ACTIVITY = new Set(['SessionStart', 'UserPromptSubmit', 'PermissionRequest', 'Stop', 'SessionEnd'])
 const DRIVING_GRACE = 5 * 60 * 1000
+// A slash command alone, as "/usage" or "/coilshift:pair", is no word to Claude.
+const SLASH = /^\/[\w:-]+(\s|$)/
+// How long a new session without a word stays out of the car's list.
+const QUIET_START = 60 * 1000
 
 // An error the car shows as is: a status and a German message.
 const fail = (status, message) => Object.assign(new Error(message), { status })
@@ -91,6 +95,12 @@ export function userText(content) {
 // image itself is only in the transcript.
 export function imageCount(text) {
   return Math.min(MAX_IMAGES, (String(text || '').match(/\[Image #\d+\]/g) || []).length)
+}
+
+// talked says whether a history holds a conversation: anything from Claude, a
+// tool or the car, or a prompt that is more than a slash command.
+export function talked(messages) {
+  return messages.some((m) => m.role !== 'user' || !SLASH.test(m.text))
 }
 
 // The car shows tool calls only as a bubble of dots: a run of them is one entry
@@ -360,6 +370,7 @@ export class Bridge {
     this.now = options.now || Date.now
     this.claude = options.claude || claudeBinary()
     this.shrink = options.shrink || shrinkImage
+    this.later = options.later || ((fn, ms) => setTimeout(fn, ms).unref())
     // Images made small for the car, by session, message and position.
     this.images = new Map()
     this.agentsSource = options.agents || (() => this.runAgents())
@@ -686,10 +697,21 @@ export class Bridge {
     return out
   }
 
+  // quiet says whether a session has nothing for the car yet: it ended without
+  // a word with Claude, or it is new and has none for less than a minute.
+  // Tools such as CodexBar start sessions every half hour that only run
+  // "/usage" or wait half a minute. A held prompt is never quiet, and history
+  // not read yet counts as words.
+  quiet(s) {
+    if (s.pending || talked(s.messages)) return false
+    if (s.kind === 'ended') return Boolean(s.hooked || s.backfilled)
+    return this.now() - (s.startedAt || 0) < QUIET_START
+  }
+
   projects() {
     const seen = new Set()
     const list = []
-    for (const s of [...this.sessions.values()].sort((a, b) => b.updated - a.updated)) {
+    for (const s of [...this.sessions.values()].filter((s) => !this.quiet(s)).sort((a, b) => b.updated - a.updated)) {
       if (!s.cwd || seen.has(s.cwd) || list.length >= 12) continue
       seen.add(s.cwd)
       list.push({ cwd: s.cwd, title: path.basename(s.cwd) || s.cwd })
@@ -700,7 +722,7 @@ export class Bridge {
   snapshot() {
     // Hidden in the car until something happens there again.
     const hidden = (s) => (this.config.hidden[s.id] || 0) >= s.updated
-    const shown = [...this.sessions.values()].filter((s) => !s.archived)
+    const shown = [...this.sessions.values()].filter((s) => !s.archived && !this.quiet(s))
     const list = shown.filter((s) => !hidden(s)).sort((a, b) => b.updated - a.updated).slice(0, MAX_SESSIONS)
     let read = false
     for (const s of list) read = this.backfill(s) || read
@@ -709,7 +731,7 @@ export class Bridge {
     return {
       rev: this.rev,
       bridge: { name: this.name, version: VERSION, away: this.away() },
-      sessions: list.filter((s) => s.kind !== 'ended' || s.messages.length > 0).map((s) => this.view(s)),
+      sessions: list.filter((s) => s.kind !== 'ended' || talked(s.messages)).map((s) => this.view(s)),
       projects: this.projects(),
       hidden: shown.filter(hidden).length,
     }
@@ -890,6 +912,9 @@ export class Bridge {
       case 'SessionStart':
         s.status = 'idle'
         if (s.messages.length === 0) this.backfill(s)
+        // A new session without a word joins the car's list after a minute.
+        s.startedAt = this.now()
+        if (!talked(s.messages)) this.later(() => this.sessions.get(s.id) === s && s.kind !== 'ended' && !talked(s.messages) && this.touch(), QUIET_START)
         break
       case 'UserPromptSubmit': {
         if (s.pending && !s.pending.waiter) s.pending = null
@@ -957,6 +982,8 @@ export class Bridge {
         this.release(s)
         s.kind = 'ended'
         s.status = 'ended'
+        // Without a word and without a transcript there is nothing to keep.
+        if (!talked(s.messages) && !(s.transcript && fs.existsSync(s.transcript))) this.sessions.delete(s.id)
         break
     }
     this.touch()
