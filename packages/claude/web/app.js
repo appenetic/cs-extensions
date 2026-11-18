@@ -446,6 +446,10 @@
     playing = null;
     try {
       p.audio.pause();
+      // Without its source the page's media session ends, and the car turns
+      // from the browser back to the music before it plays on.
+      p.audio.removeAttribute('src');
+      p.audio.load();
     } catch (e) {}
     p.entry.state = '';
     p.entry.node.textContent = '▶ Vorlesen';

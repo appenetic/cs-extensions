@@ -159,6 +159,13 @@ Nutzer „funktioniert alles“.
   mit `togglePlay` weiter. Mitgeschnitten am 2026-11-18, root darf das laut
   `com.tesla.MusicDbus.conf`. Von Hand geprüft: Pause nach 1 s sichtbar in
   `GUI_mediaPlaybackStatus`, Weiterspielen sofort. Andere Quellen ungeprüft.
+  Während die App vorliest, meldet `GUI_mediaNowPlayingSource` „msBrowser“ und
+  erst nach dem Ende wieder „AppleMusic“; alpha.21 hielt das für einen Wechsel
+  von Hand und spielte nicht weiter. Der Medienserver schläfert Apple Music
+  dabei ein (`sleepPlayback`, `toggleStop`) und stellt nach dem Vorlesen den
+  letzten Zustand wieder her (`restorePlayback(…, "paused")`, etwa 1,5 s).
+  alpha.22 wartet bis zu 5 s auf die Quelle, dann 2 s, spielt weiter und prüft
+  es, sonst noch einmal.
 - **Bestätigt (alpha.20):** Vorlesen spielt im Auto (`web.audio=aac=probably ·
   stimmen=0`, `web.play=ok`). Früher offen: Vorlesen. Die App meldet `web.audio` (spielt das Auto
   AAC, hat Chromium eigene Stimmen, bleibt die Seite im Hintergrund) und nach
