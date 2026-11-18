@@ -592,7 +592,8 @@
     if (p.kind === 'question') {
       questions.forEach(function (q, qi) {
         card.append(h('h3', {}, q.header ? q.header + ': ' + q.question : q.question));
-        var row = h('div', { class: 'options' });
+        // One answer per row, like the card over the map: long labels stay whole.
+        var row = h('div', { class: 'options stack' });
         (q.options || []).forEach(function (o, oi) {
           var key = qi + ':' + oi;
           var chosen = Boolean(picks[key]);

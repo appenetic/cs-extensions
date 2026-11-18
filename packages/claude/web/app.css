@@ -81,6 +81,8 @@ h2 .pulse { width: 12px; height: 12px; }
 .prompt { border-color: var(--orange); margin: 0; }
 .options { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
 .option { display: block; min-width: 140px; min-height: 56px; text-align: left; }
+.options.stack { flex-direction: column; }
+.options.stack .option { width: 100%; }
 .option small { display: block; font-size: 13px; color: var(--text-2); }
 .option.on { background: var(--blue); border-color: var(--blue); color: #fff; }
 .option.on small { color: #e6ecff; }

@@ -73,6 +73,13 @@ test('before the service answers the tile says so and keeps the fields closed', 
   assert.equal(el(h, 'away').disabled, true);
 });
 
+test('answers of a question stand one per row', async () => {
+  const h = await setup({ fetchState: { view: view() }, calls: [] });
+  const rows = el(h, 'prompt').findAll((e) => e.className === 'options stack');
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0].children.map((b) => b.getAttribute('aria-label')), ['Rot', 'Blau']);
+});
+
 test('the tile answers a held question with one tap', async () => {
   const calls = [];
   const state = { view: view() };
