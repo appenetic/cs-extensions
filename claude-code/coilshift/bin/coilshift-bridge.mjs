@@ -383,6 +383,12 @@ export class Bridge {
       away: ['on', 'off', 'auto'].includes(c.away) ? c.away : 'auto',
       permission_mode: ['default', 'acceptEdits', 'plan', 'bypassPermissions'].includes(c.permission_mode) ? c.permission_mode : 'default',
       wait_minutes: Number.isInteger(c.wait_minutes) && c.wait_minutes >= 1 && c.wait_minutes <= 120 ? c.wait_minutes : 20,
+      // Sessions the driver hid in the car, with when: hidden until active again.
+      hidden: Object.fromEntries(
+        Object.entries(c.hidden && typeof c.hidden === 'object' && !Array.isArray(c.hidden) ? c.hidden : {}).filter(
+          ([id, at]) => /^[A-Za-z0-9._:-]{1,128}$/.test(id) && Number.isFinite(at),
+        ),
+      ),
     }
   }
 
@@ -570,7 +576,10 @@ export class Bridge {
   }
 
   snapshot() {
-    const list = [...this.sessions.values()].filter((s) => !s.archived).sort((a, b) => b.updated - a.updated).slice(0, MAX_SESSIONS)
+    // Hidden in the car until something happens there again.
+    const hidden = (s) => (this.config.hidden[s.id] || 0) >= s.updated
+    const shown = [...this.sessions.values()].filter((s) => !s.archived)
+    const list = shown.filter((s) => !hidden(s)).sort((a, b) => b.updated - a.updated).slice(0, MAX_SESSIONS)
     let read = false
     for (const s of list) read = this.backfill(s) || read
     // New history is a new revision, or the car would keep its old copy.
@@ -580,6 +589,7 @@ export class Bridge {
       bridge: { name: this.name, version: VERSION, away: this.away() },
       sessions: list.filter((s) => s.kind !== 'ended' || s.messages.length > 0).map((s) => this.view(s)),
       projects: this.projects(),
+      hidden: shown.filter(hidden).length,
     }
   }
 
@@ -1117,6 +1127,23 @@ export class Bridge {
           const shown = Object.entries(values).filter(([key]) => key !== 'voice.last')
           log(`car ${device.name} ${device.diag.version}: ${shown.map(([k, v]) => `${k}=${v}`).join(' | ')}`)
         }
+        return reply(200, { ok: true })
+      }
+      if (method === 'POST' && url.pathname === '/v1/hide') {
+        const id = typeof body.session === 'string' ? body.session : ''
+        if (!this.sessions.has(id)) return reply(404, { error: 'unknown', message: 'Diese Sitzung kennt der Mac nicht mehr.' })
+        for (const [old, at] of Object.entries(this.config.hidden)) {
+          if (!this.sessions.has(old) && this.now() - at > 7 * 24 * 3600 * 1000) delete this.config.hidden[old]
+        }
+        this.config.hidden[id] = this.now()
+        this.saveConfig()
+        this.touch()
+        return reply(200, { ok: true })
+      }
+      if (method === 'POST' && url.pathname === '/v1/unhide') {
+        this.config.hidden = {}
+        this.saveConfig()
+        this.touch()
         return reply(200, { ok: true })
       }
       if (method === 'POST' && url.pathname === '/v1/unpair') {

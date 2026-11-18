@@ -109,6 +109,31 @@ test('a restarted bridge answers the car at once: its revisions start at the clo
   assert.ok(Date.now() - started < 1000, 'no wait for the long poll to run out')
 })
 
+test('a session hidden in the car stays hidden until it is active again', async () => {
+  const b = bridge()
+  const res = { on() {} }
+  const hook = (id, event, extra = {}) => b.hook({ session_id: id, hook_event_name: event, cwd: '/p', ...extra }, res)
+  await hook('a', 'UserPromptSubmit', { prompt: 'eins' })
+  await hook('b', 'UserPromptSubmit', { prompt: 'zwei' })
+  const device = b.redeem(b.newCode(), 'Tesla')
+  const call = (path, body) => b.handle({ method: 'POST', url: new URL('https://bridge' + path), authorization: 'Bearer ' + device, body })
+  b.advance(1000)
+  assert.equal((await call('/v1/hide', { session: 'a' })).status, 200)
+  assert.equal((await call('/v1/hide', { session: 'nope' })).status, 404)
+  let snap = b.snapshot()
+  assert.deepEqual([snap.sessions.map((s) => s.id), snap.hidden], [['b'], 1])
+  assert.ok(JSON.parse(fs.readFileSync(path.join(b.dir, 'config.json'), 'utf8')).hidden.a, 'kept across restarts')
+  await hook('a', 'PostToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' } })
+  assert.deepEqual(b.snapshot().sessions.map((s) => s.id), ['b'], 'a tool call is not enough to come back')
+  b.advance(1000)
+  await hook('a', 'Stop', { last_assistant_message: 'Fertig.' })
+  snap = b.snapshot()
+  assert.deepEqual([snap.sessions.map((s) => s.id), snap.hidden], [['a', 'b'], 0], 'the end of a turn brings it back')
+  await call('/v1/hide', { session: 'b' })
+  await call('/v1/unhide', {})
+  assert.equal(b.snapshot().sessions.length, 2)
+})
+
 test('a question that was rejected or turned into a clarification does not stay open', async () => {
   const b = bridge()
   const res = { on() {} }

@@ -8,7 +8,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const VERSION = '0.2.6'
+export const VERSION = '0.2.7'
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 // The plugin data directory survives plugin updates and goes with an uninstall.
