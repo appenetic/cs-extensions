@@ -2,15 +2,18 @@
      The data context is "card" (this file's name); the service writes model/card.
      The host sets {card.card} to 0 while that file is missing or older than 30 s.
      Taps on Opt1..Opt4, Allow, Deny and Close reach the package's event stream.
-     Button styles are taken from the firmware's own UIML; not verified on a car. -->
+     It sits at the bottom middle of the map: the top of the map belongs to the
+     firmware's search field and navigation cards, which are drawn over this slot.
+     Layout keys and values as the firmware's own UIML spells them (flexEnd,
+     MaxWidth, Alignment:wordwrap). -->
 <Library>
     <Templates>
         <DisplayView name="ClaudeCard" enableCssLayout="true" touchBehaviors="IgnoreTouches"
-                     verticalLayoutStyle="PositionType:absolute; X:0; Y:0; Right:0; Bottom:0; Padding:80,60,0,0;"
+                     verticalLayoutStyle="PositionType:absolute; X:0; Y:0; Right:0; Bottom:0; Padding:80,0,80,40; JustifyContent:flexEnd; AlignItems:center;"
                      visible="{card.card}">
-            <DisplayView name="Box" visible="{card.shown}" verticalLayoutStyle="Nav/BackgroundStyle; Padding:24,16,24,16;">
-                <LabelView name="Title" style="Text/Caption1; Color:Text/secondary;" text="{card.title}"/>
-                <LabelView name="Question" style="Text/Body1; Color:Text/primary;" text="{card.text}" maxHeight="120"/>
+            <DisplayView name="Box" visible="{card.shown}" verticalLayoutStyle="Nav/BackgroundStyle; Padding:24,16,24,16; MaxWidth:960;">
+                <LabelView name="Title" style="Text/Caption1; Color:Text/secondary; ElideMode:languageaware; MaxWidth:912;" text="{card.title}"/>
+                <LabelView name="Question" style="Text/Body1; Color:Text/primary; Alignment:wordwrap; ElideMode:languageaware; MaxWidth:912; MaxHeight:120;" text="{card.text}"/>
                 <DisplayView name="Options" horizontalLayoutStyle="Padding:0,12,0,4; AlignItems:center;">
                     <ButtonView name="Opt1" visible="{card.o1}" label="{card.l1}" style="ProfilePanel/OutlineButton;"/>
                     <ButtonView name="Opt2" visible="{card.o2}" label="{card.l2}" style="ProfilePanel/OutlineButton;"/>
