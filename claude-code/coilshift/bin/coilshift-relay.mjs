@@ -6,7 +6,7 @@
 // the driver dictated or typed in the car; it posts it and reports back.
 import net from 'node:net'
 import readline from 'node:readline'
-import { dataDir, ensureBridge, relaySocketPath } from '../lib/common.mjs'
+import { VERSION, dataDir, ensureBridge, relaySocketPath } from '../lib/common.mjs'
 
 const SUPPORTED = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
 const inbox = process.env.CLAUDE_CODE_MESSAGING_SOCKET || ''
@@ -35,7 +35,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         result: {
           protocolVersion: SUPPORTED.includes(asked) ? asked : SUPPORTED[0],
           capabilities: { tools: {} },
-          serverInfo: { name: 'coilshift-inbox', version: '0.1.0' },
+          serverInfo: { name: 'coilshift-inbox', version: VERSION },
         },
       })
       break

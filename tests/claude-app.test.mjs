@@ -145,6 +145,46 @@ test('unpaired: the QR code of the pairing page and no session list', async () =
   assert.equal(el(h, 'pairing-qr').getAttribute('src'), 'data:image/png;base64,Qg==');
 });
 
+test('unpaired: the relay code works without a shared network, the QR code stays as the phone way', async () => {
+  const state = { view: view({ link: { state: 'unpaired', since: 1 }, sessions: [], bridge: undefined,
+    pairing: { state: 'open', expires: 1800000600, code: 'K7QM-4ZP2-XR9T-HB3D', message: 'Kopplung mit Mac läuft …', addresses: [
+      { url: 'https://192.168.1.50:41234/#abc', qr: 'data:image/png;base64,Qg==' }] } }) };
+  const h = await setup({ fetchState: state, calls: [] });
+  assert.equal(el(h, 'pairing-code').textContent, '/coilshift:pair K7QM-4ZP2-XR9T-HB3D');
+  assert.match(el(h, 'setup-steps').textContent, /claude plugin install coilshift@appenetic/);
+  assert.match(el(h, 'setup-steps').textContent, /ohne Tailscale/);
+  assert.equal(el(h, 'pairing-message').textContent, 'Kopplung mit Mac läuft …');
+  assert.equal(el(h, 'pairing-qr').getAttribute('src'), 'data:image/png;base64,Qg==');
+  assert.match(root(h).byText('Oder mit dem Handy, im selben WLAN oder Tailnet wie das Auto').textContent, /Handy/);
+});
+
+test('the technical view names the route to the Mac', async () => {
+  const h = await setup({ fetchState: { view: view({ diag: { route: 'relay broker.emqx.io:8883' } }) }, calls: [] });
+  assert.match(el(h, 'diag').textContent, /Internet-Relay · broker\.emqx\.io:8883/);
+});
+
+test('tool calls show as small bubbles of dots that move only while Claude works on them', async () => {
+  const messages = [
+    { id: 'm1', role: 'user', text: 'Teste alles', at: 1799999900000 },
+    { id: 'm2', role: 'tool', text: '', count: 3, at: 1799999910000 },
+    { id: 'm3', role: 'tool', text: 'Bash: rm -rf build', at: 1799999911000 },
+    { id: 'm4', role: 'assistant', text: 'Zwei Tests sind rot.', at: 1799999920000 },
+    { id: 'm5', role: 'tool', text: '', count: 1, at: 1799999930000 }];
+  const working = { id: 's9', title: 'Tests', cwd: '/p', kind: 'interactive', status: 'working', updated: 1799999990000, delivery: 'inbox', messages };
+  const h = await setup({ fetchState: { view: view({ sessions: [working] }) }, calls: [] });
+  const items = [...el(h, 'messages').children];
+  assert.deepEqual(items.map((li) => li.getAttribute('class')), ['message tool', 'message assistant', 'message tool', 'message user']);
+  const typing = (node) => node.find((e) => e.className.startsWith('typing'));
+  const [latest, , earlier] = items.map((li) => typing(li));
+  assert.equal(latest.getAttribute('class'), 'typing live');
+  assert.equal(latest.children.length, 3);
+  assert.equal(earlier.getAttribute('class'), 'typing', 'an earlier run stays still');
+  assert.equal(earlier.getAttribute('aria-label'), '4 Werkzeugaufrufe');
+  assert.doesNotMatch(el(h, 'messages').textContent, /rm -rf|Werkzeug/, 'no tool details in the car');
+  const idle = await setup({ fetchState: { view: view({ sessions: [{ ...working, status: 'idle' }] }) }, calls: [] });
+  assert.equal(typing(el(idle, 'messages')).getAttribute('class'), 'typing', 'still when Claude is done');
+});
+
 test('a new background session starts in a known project', async () => {
   const calls = [];
   const state = { view: view(), answer: { ok: true, id: 'abcdef12' } };

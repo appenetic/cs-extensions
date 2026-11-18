@@ -83,6 +83,10 @@ Abschnitte am Ende halten die Befunde am Auto fest.
 5. Ob die Tesla-Tastatur in Web-Apps ein Diktier-Mikrofon anbietet.
 6. Ob das Auto den Mac über Tailscale oder das WLAN erreicht. Das hängt vom
    Tailnet und der Mac-Firewall ab: Port 47621 muss eingehend erlaubt sein.
+7. Ob das Internet-Relay (alpha.9) ohne Tailscale trägt: Kopplung per Code,
+   dann im Mobilfunk „Weg zum Mac“ unter Technik. Vom Auto aus erreichbar waren
+   am 2026-11-18 `broker.emqx.io:8883` und `broker.hivemq.com:8883`, über WLAN
+   und über das Mobilfunk-Interface `eth0.2`.
 
 ## Am Auto, 2026-11-17 (alpha.1)
 

@@ -4,14 +4,16 @@
 //
 //   coilshift-bridge.mjs serve     the daemon (started by the plugin's hooks)
 //   coilshift-bridge.mjs pair      a one-time pairing link for the car's QR page
+//   coilshift-bridge.mjs pair CODE pairs the car that shows CODE, through the relay
 //   coilshift-bridge.mjs status    what the bridge sees
 //   coilshift-bridge.mjs away on|off|auto
 //   coilshift-bridge.mjs unpair --all
 //   coilshift-bridge.mjs stop
 //
 // The car reaches the daemon over HTTPS (self-signed, pinned by the pairing link)
-// from the LAN or the tailnet only. Hooks, relays and this CLI use Unix sockets in
-// the plugin data directory (mode 0700).
+// from the LAN or the tailnet, or through the encrypted MQTT relay (lib/relay.mjs)
+// when neither connects them. Hooks, session relays and this CLI use Unix sockets
+// in the plugin data directory (mode 0700).
 import { execFile, execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -23,11 +25,13 @@ import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { VERSION, dataDir, ensureBridge, local, relaySocketPath, running, socketPath } from '../lib/common.mjs'
+import { ANSWER_LABEL, OFFER_LABEL, Relay, boxKey, boxKeys, carCode, carCodeFor, channel, rawPublic, relayBrokers, seal } from '../lib/relay.mjs'
 
 const MAX_MESSAGES = 60
 const MAX_TEXT = 4000
 const MAX_SESSIONS = 24
 const PAIR_TTL = 10 * 60 * 1000
+const CAR_OFFER_TTL = 3 * 60 * 1000
 const DRIVING_GRACE = 5 * 60 * 1000
 
 // An error the car shows as is: a status and a German message.
@@ -70,6 +74,20 @@ export function userText(content) {
   }
   s = s.replace(/<(system-reminder|local-command-stdout|local-command-stderr|local-command-caveat)>[\s\S]*?<\/\1>/g, '')
   return clip(s)
+}
+
+// The car shows tool calls only as a bubble of dots: a run of them is one entry
+// that counts them, without names or arguments, and leaves room in the history
+// for the conversation.
+export function countTool(messages, id, at) {
+  const last = messages[messages.length - 1]
+  if (last && last.role === 'tool') {
+    last.count = (last.count || 1) + 1
+    last.at = at
+    return false
+  }
+  messages.push({ id, role: 'tool', text: '', count: 1, at })
+  return true
 }
 
 // The question Claude ended its turn with, if the last paragraph asks one.
@@ -120,7 +138,7 @@ export function parseTranscript(file, maxBytes = 512 * 1024) {
         e.message.content.forEach((b, i) => {
           const bid = id ? `${id}.${i}` : undefined
           if (b.type === 'text' && b.text) result.messages.push({ id: bid, role: 'assistant', text: clip(b.text), at })
-          else if (b.type === 'tool_use') result.messages.push({ id: bid, role: 'tool', text: toolSummary(b.name, b.input), at })
+          else if (b.type === 'tool_use') countTool(result.messages, bid, at)
         })
       }
     }
@@ -231,6 +249,82 @@ export class Bridge {
     this.lastDriving = 0
     this.seq = 0
     this.transcripts = new Map()
+    this.redeemed = new Map()
+    this.mqtt = null
+    this.brokers = []
+  }
+
+  // -------------------------------------------------------------- relay
+
+  // attachRelay listens for every paired car that has a relay key.
+  attachRelay(mqtt, brokers) {
+    this.mqtt = mqtt
+    this.brokers = brokers
+    for (const d of this.config.devices) if (d.relay) mqtt.add('device:' + d.id, channel('device', Buffer.from(d.relay, 'hex')), { device: d.id })
+  }
+
+  relayInfo(device) {
+    if (!this.brokers.length) return undefined
+    if (!device.relay) {
+      device.relay = crypto.randomBytes(32).toString('hex')
+      this.saveConfig()
+    }
+    if (this.mqtt) this.mqtt.add('device:' + device.id, channel('device', Buffer.from(device.relay, 'hex')), { device: device.id })
+    return { key: device.relay, brokers: this.brokers }
+  }
+
+  forget(devices) {
+    for (const d of devices) if (this.mqtt) this.mqtt.remove('device:' + d.id)
+    this.config.devices = this.config.devices.filter((d) => !devices.includes(d))
+    this.saveConfig()
+  }
+
+  // A request that came through the relay runs through the same routes as one
+  // over HTTPS. A pairing channel only redeems its own code; a car's channel
+  // only serves that car.
+  async relayRequest(entry, r) {
+    if (!['GET', 'POST'].includes(r.method) || typeof r.path !== 'string' || !r.path.startsWith('/v1/')) return { status: 400, body: { error: 'invalid' } }
+    const url = new URL(r.path, 'https://bridge')
+    const body = r.body && typeof r.body === 'object' && !Array.isArray(r.body) ? r.body : {}
+    return this.handle({ method: r.method, url, authorization: r.auth, body, via: entry.info })
+  }
+
+  // pairCar answers the code the car shows. The car listens on a channel derived
+  // from the code and, asked with hello, names its key. The code commits to that
+  // key, so the offer sealed to it opens only in that car, not for someone who
+  // read the code off the screen. Hello and offer repeat until the car pairs.
+  pairCar(input, fingerprint) {
+    if (!this.mqtt) throw fail(409, 'Das Internet-Relay ist ausgeschaltet (COILSHIFT_RELAY=off). Bitte über den QR-Code koppeln.')
+    const code = carCode(input)
+    if (!code) throw fail(400, 'Das ist kein Code aus dem Auto. Er hat 16 Zeichen, etwa K7QM-4ZP2-XR9T-HB3D.')
+    const one = this.newCode()
+    const ch = channel('car', code)
+    const started = this.now()
+    const mac = boxKeys()
+    let box = null
+    const send = () => this.mqtt.broadcast(ch, box ? { type: 'pair', mac: rawPublic(mac.publicKey).toString('hex'), box: box.toString('hex') } : { type: 'hello' })
+    const onMessage = (message) => {
+      if (box || !message || message.type !== 'key' || typeof message.pub !== 'string' || !/^[0-9a-f]{64}$/.test(message.pub)) return
+      const pub = Buffer.from(message.pub, 'hex')
+      if (carCodeFor(pub) !== code) return
+      const offer = { type: 'pair', code: one, fingerprint, name: this.name, port: this.config.port, hosts: envHosts() || bridgeHosts(), brokers: this.brokers }
+      try {
+        box = seal(boxKey(mac.privateKey, pub, OFFER_LABEL), OFFER_LABEL, offer)
+      } catch {
+        return
+      }
+      send()
+    }
+    this.mqtt.add('car:' + code, ch, { onMessage })
+    send()
+    const timer = setInterval(() => {
+      if (this.codes.has(one) && this.now() - started <= CAR_OFFER_TTL) return send()
+      clearInterval(timer)
+      if (this.mqtt) this.mqtt.remove('car:' + code)
+    }, 3000)
+    timer.unref?.()
+    log(`pairing offer for car code ${code.slice(0, 4)}…`)
+    return { ok: true, code: one, expires: started + CAR_OFFER_TTL }
   }
 
   // -------------------------------------------------------------- config
@@ -303,6 +397,10 @@ export class Bridge {
     text = clip(text)
     if (!text) return
     s.messages.push({ id: id || `m${++this.seq}`, role, text, at: this.now() })
+    if (s.messages.length > MAX_MESSAGES) s.messages.splice(0, s.messages.length - MAX_MESSAGES)
+  }
+  addTool(s) {
+    if (countTool(s.messages, `m${this.seq + 1}`, this.now())) this.seq++
     if (s.messages.length > MAX_MESSAGES) s.messages.splice(0, s.messages.length - MAX_MESSAGES)
   }
 
@@ -592,7 +690,7 @@ export class Bridge {
       case 'PostToolUse':
         if (input.tool_name === 'AskUserQuestion' && s.pending && s.pending.kind === 'question' && !s.pending.waiter) s.pending = null
         if (s.pending && s.pending.kind === 'permission' && !s.pending.waiter) s.pending = null
-        this.addMessage(s, 'tool', toolSummary(input.tool_name, input.tool_input))
+        this.addTool(s)
         s.status = 'working'
         break
       case 'Notification':
@@ -750,6 +848,10 @@ export class Bridge {
   newCode() {
     const code = crypto.randomBytes(16).toString('hex')
     this.codes.set(code, this.now() + PAIR_TTL)
+    if (this.mqtt) {
+      this.mqtt.add('pair:' + code, channel('pair', code), { code })
+      setTimeout(() => this.mqtt && this.mqtt.remove('pair:' + code), PAIR_TTL).unref?.()
+    }
     return code
   }
 
@@ -761,12 +863,21 @@ export class Bridge {
     const params = new URLSearchParams({ c: code, f: fingerprint })
     if (hosts.length > 1) params.set('h', hosts.slice(1).join(','))
     params.set('n', this.name)
+    if (this.brokers.length) params.set('r', this.brokers.join(','))
     return { link: `https://${hosts[0]}:${this.config.port}/pair#${params.toString()}`, hosts, expires: this.now() + PAIR_TTL }
   }
 
-  redeem(code, device) {
+  // A code works once. The car that redeemed it may ask again for two minutes
+  // with the same key and gets the same token, in case the answer got lost on
+  // the way (the relay drops what a broker cannot deliver). The answer is sealed
+  // to that key, so a retry by anyone else gains nothing.
+  redeem(code, device, pub = '') {
+    const again = this.redeemed.get(code)
+    if (again && pub && again.pub === pub && this.now() - again.at < 2 * 60 * 1000) return again.token
     const expires = this.codes.get(code)
     if (!expires || expires < this.now()) return null
+    // The code's relay channel stays until the code would have expired, for a
+    // retry with the nonce.
     this.codes.delete(code)
     const token = crypto.randomBytes(32).toString('hex')
     this.config.devices.push({
@@ -777,6 +888,8 @@ export class Bridge {
       seen: this.now(),
     })
     this.saveConfig()
+    for (const [c, r] of this.redeemed) if (this.now() - r.at > 2 * 60 * 1000) this.redeemed.delete(c)
+    if (pub) this.redeemed.set(code, { token, pub, at: this.now() })
     return token
   }
 
@@ -804,17 +917,47 @@ export class Bridge {
         return reply(400, { error: 'invalid' })
       }
     }
-    if (req.method === 'POST' && url.pathname === '/v1/pair') {
-      const token = typeof body.code === 'string' && /^[0-9a-f]{32}$/.test(body.code) ? this.redeem(body.code, body.device) : null
+    const answer = await this.handle({ method: req.method, url, authorization: req.headers.authorization, body })
+    reply(answer.status, answer.body)
+  }
+
+  // handle is the car's API, over HTTPS or the relay (via names the channel).
+  async handle({ method, url, authorization, body, via }) {
+    const reply = (status, value) => ({ status, body: value })
+    if (via && via.code !== undefined && (method !== 'POST' || url.pathname !== '/v1/pair' || body.code !== via.code)) return reply(403, { error: 'forbidden' })
+    if (method === 'POST' && url.pathname === '/v1/pair') {
+      if (via && via.device) return reply(403, { error: 'forbidden' })
+      // The car's X25519 key: token and relay key go back sealed to it. Through
+      // the relay it is required, or a holder of the code could read them. It is
+      // checked before the code is spent.
+      let key = null
+      if (typeof body.pub === 'string' && /^[0-9a-f]{64}$/.test(body.pub)) {
+        const mac = boxKeys()
+        try {
+          key = { mac: rawPublic(mac.publicKey).toString('hex'), box: boxKey(mac.privateKey, Buffer.from(body.pub, 'hex'), ANSWER_LABEL) }
+        } catch {
+          return reply(400, { error: 'invalid' })
+        }
+      }
+      if (via && !key) return reply(400, { error: 'invalid' })
+      const token = typeof body.code === 'string' && /^[0-9a-f]{32}$/.test(body.code) ? this.redeem(body.code, body.device, key ? body.pub : '') : null
       if (!token) return reply(403, { error: 'code' })
-      log(`paired ${clip(body.device, 60)}`)
+      log(`paired ${clip(body.device, 60)}${via ? ' through the relay' : ''}`)
       this.touch()
-      return reply(200, { token, name: this.name, version: VERSION })
+      const secret = { token, relay: this.relayInfo(this.device('Bearer ' + token)) }
+      if (!key) return reply(200, { ...secret, name: this.name, version: VERSION })
+      return reply(200, { name: this.name, version: VERSION, mac: key.mac, sealed: seal(key.box, ANSWER_LABEL, secret).toString('hex') })
     }
-    const device = this.device(req.headers.authorization)
-    if (!device) return reply(401, { error: 'token' })
+    const device = this.device(authorization)
+    if (!device || (via && via.device !== device.id)) return reply(401, { error: 'token' })
     try {
-      if (req.method === 'GET' && url.pathname === '/v1/state') {
+      if (method === 'GET' && url.pathname === '/v1/ping') return reply(200, { ok: true, version: VERSION })
+      if (method === 'POST' && url.pathname === '/v1/relay') {
+        // A car paired before the relay existed asks for its key over HTTPS.
+        const info = this.relayInfo(device)
+        return info ? reply(200, info) : reply(410, { error: 'relay_off', message: 'Das Internet-Relay ist auf dem Mac ausgeschaltet.' })
+      }
+      if (method === 'GET' && url.pathname === '/v1/state') {
         const since = Number(url.searchParams.get('since'))
         const wait = Math.min(30, Math.max(0, Number(url.searchParams.get('wait')) || 0))
         const gear = url.searchParams.get('gear') || ''
@@ -829,15 +972,15 @@ export class Bridge {
         await this.waitRev(Number.isFinite(since) ? since : 0, wait * 1000)
         return reply(200, this.snapshot())
       }
-      if (req.method === 'POST' && url.pathname === '/v1/reply') return reply(200, await this.reply(body))
-      if (req.method === 'POST' && url.pathname === '/v1/start') return reply(200, await this.start(body))
-      if (req.method === 'POST' && url.pathname === '/v1/away') {
+      if (method === 'POST' && url.pathname === '/v1/reply') return reply(200, await this.reply(body))
+      if (method === 'POST' && url.pathname === '/v1/start') return reply(200, await this.start(body))
+      if (method === 'POST' && url.pathname === '/v1/away') {
         this.config.away = body.on ? 'on' : 'auto'
         this.saveConfig()
         this.touch()
         return reply(200, { ok: true, away: this.away() })
       }
-      if (req.method === 'POST' && url.pathname === '/v1/diag') {
+      if (method === 'POST' && url.pathname === '/v1/diag') {
         // The car's own diagnostics (web port, card, voice), for /coilshift:status.
         const values = {}
         for (const [key, value] of Object.entries(body.values && typeof body.values === 'object' ? body.values : {}).slice(0, 24)) {
@@ -851,9 +994,8 @@ export class Bridge {
         }
         return reply(200, { ok: true })
       }
-      if (req.method === 'POST' && url.pathname === '/v1/unpair') {
-        this.config.devices = this.config.devices.filter((d) => d !== device)
-        this.saveConfig()
+      if (method === 'POST' && url.pathname === '/v1/unpair') {
+        this.forget([device])
         return reply(200, { ok: true })
       }
     } catch (error) {
@@ -987,6 +1129,8 @@ async function serve(dir) {
   logFile = path.join(dir, 'bridge.log')
   const bridge = new Bridge(dir)
   const tls = ensureCertificate(dir)
+  const brokers = relayBrokers()
+  if (brokers.length) bridge.attachRelay(new Relay({ brokers, log, handle: (entry, request) => bridge.relayRequest(entry, request) }), brokers)
   const send = (res, status, body) => {
     res.writeHead(status, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(body))
@@ -997,12 +1141,14 @@ async function serve(dir) {
       if (req.method === 'GET' && url.pathname === '/ping') return send(res, 200, { ok: true, version: VERSION, pid: process.pid })
       if (req.method === 'POST' && url.pathname === '/hook') return send(res, 200, await bridge.hook(await readJSON(req, 1 << 20), res))
       if (req.method === 'POST' && url.pathname === '/pair/new') return send(res, 200, bridge.pairingLink(tls.fingerprint))
+      if (req.method === 'POST' && url.pathname === '/pair/car') return send(res, 200, bridge.pairCar((await readJSON(req)).code, tls.fingerprint))
       if (req.method === 'GET' && url.pathname === '/status') {
         const snap = bridge.snapshot()
         return send(res, 200, {
           name: bridge.name, version: VERSION, port: bridge.config.port, hosts: envHosts() || bridgeHosts(), fingerprint: tls.fingerprint,
-          away: bridge.config.away, awayNow: bridge.away(), devices: bridge.config.devices.map(({ id, name, created, seen, diag }) => ({ id, name, created, seen, diag })),
-          lastPoll: bridge.lastPoll, relays: bridge.relays.size,
+          away: bridge.config.away, awayNow: bridge.away(),
+          devices: bridge.config.devices.map(({ id, name, created, seen, diag, relay }) => ({ id, name, created, seen, diag, relay: Boolean(relay) })),
+          lastPoll: bridge.lastPoll, relays: bridge.relays.size, mqtt: bridge.mqtt ? bridge.mqtt.status() : [],
           sessions: snap.sessions.map((s) => ({ title: s.title, kind: s.kind, status: s.status, delivery: s.delivery })),
         })
       }
@@ -1015,8 +1161,7 @@ async function serve(dir) {
         return send(res, 200, { ok: true, away: bridge.config.away })
       }
       if (req.method === 'POST' && url.pathname === '/unpair') {
-        bridge.config.devices = []
-        bridge.saveConfig()
+        bridge.forget([...bridge.config.devices])
         return send(res, 200, { ok: true })
       }
       if (req.method === 'POST' && url.pathname === '/stop') {
@@ -1050,6 +1195,7 @@ async function serve(dir) {
   carServer.listen(bridge.config.port, '0.0.0.0')
   log(`bridge ${VERSION} on port ${bridge.config.port}, pid ${process.pid}`)
   const cleanup = () => {
+    if (bridge.mqtt) bridge.mqtt.stop()
     unlock()
     fs.rmSync(socketPath(dir), { force: true })
     fs.rmSync(relaySocketPath(dir), { force: true })
@@ -1074,6 +1220,31 @@ async function serve(dir) {
 
 // ---------------------------------------------------------------- CLI
 
+const RELAY_STATE = { up: 'verbunden', connecting: 'verbindet', down: 'getrennt', idle: 'wartet' }
+
+// pairCar sends the pairing to the car that shows code and waits until it has
+// paired (the car keeps its pairing window open for ten minutes).
+async function pairCar(dir, code) {
+  const before = new Set(((await local(dir, 'GET', '/status')).body.devices || []).map((d) => d.id))
+  const answer = await local(dir, 'POST', '/pair/car', { code })
+  if (answer.status !== 200) return console.log('Keine Kopplung: ' + ((answer.body && answer.body.message) || 'unbekannter Fehler'))
+  console.log('Die Kopplung geht über das Internet-Relay ans Auto, Ende-zu-Ende-verschlüsselt. Warte auf das Auto …')
+  const deadline = Date.now() + 90 * 1000
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    const { body } = await local(dir, 'GET', '/status')
+    const added = (body.devices || []).find((d) => !before.has(d.id))
+    if (added) return console.log(`Gekoppelt mit ${added.name}. Die Claude-App im Auto zeigt jetzt deine Sitzungen.`)
+  }
+  console.log(
+    [
+      'Das Auto hat sich noch nicht gemeldet. Das Angebot gilt noch drei Minuten.',
+      'Bitte prüfen: Ist die Claude-App im Auto mit dem Kopplungscode offen, stimmt der Code, und hat das Auto Internet?',
+      'Danach mit /coilshift:status nachsehen, ob das Auto gekoppelt ist.',
+    ].join('\n'),
+  )
+}
+
 async function cli() {
   const [command, ...args] = process.argv.slice(2).filter((a, i, all) => a !== '--data' && all[i - 1] !== '--data')
   const dir = dataDir()
@@ -1082,6 +1253,7 @@ async function cli() {
       return serve(dir)
     case 'pair': {
       if (!(await ensureBridge(dir))) return console.log('Die Bridge startet nicht. Details: ' + path.join(dir, 'bridge.log'))
+      if (args.join('').trim()) return pairCar(dir, args.join(''))
       const answer = await local(dir, 'POST', '/pair/new', {})
       if (answer.status !== 200) return console.log('Kein Kopplungslink: ' + ((answer.body && answer.body.message) || 'unbekannter Fehler'))
       let copied = false
@@ -1099,7 +1271,8 @@ async function cli() {
           'So geht es weiter:',
           '1. Im Auto die Claude-App öffnen und den QR-Code mit dem Handy scannen.',
           '2. Auf der Handy-Seite den Link einfügen und »Koppeln« tippen.',
-          `Adressen des Macs: ${answer.body.hosts.join(', ')} (Tailscale zuerst).`,
+          `Das Auto versucht zuerst ${answer.body.hosts.join(', ')} (Tailscale vor WLAN)${answer.body.link.includes('&r=') ? ', sonst das Internet-Relay' : ''}.`,
+          'Ohne gemeinsames WLAN: den Code aus der Claude-App im Auto hier angeben, also /coilshift:pair <Code>.',
         ]
           .filter((l) => l !== null)
           .join('\n'),
@@ -1112,8 +1285,9 @@ async function cli() {
       const lines = [
         `CoilShift-Bridge ${body.version} auf ${body.name}, Port ${body.port}`,
         `Adressen: ${body.hosts.join(', ') || 'keine LAN-/Tailscale-Adresse'}`,
+        `Internet-Relay: ${body.mqtt.length ? body.mqtt.map((b) => `${b.broker} ${RELAY_STATE[b.state] || b.state}${b.error && b.state !== 'up' ? ' (' + b.error + ')' : ''}`).join(', ') : 'aus'}`,
         `Unterwegs-Modus: ${body.away}${body.awayNow ? ' (gerade aktiv)' : ''}`,
-        `Gekoppelte Autos: ${body.devices.length ? body.devices.map((d) => `${d.name} (zuletzt ${new Date(d.seen).toLocaleString('de-DE')})`).join(', ') : 'keine'}`,
+        `Gekoppelte Autos: ${body.devices.length ? body.devices.map((d) => `${d.name} (zuletzt ${new Date(d.seen).toLocaleString('de-DE')}${d.relay ? ', mit Internet-Relay' : ''})`).join(', ') : 'keine'}`,
         `Letzte Abfrage des Autos: ${body.lastPoll ? new Date(body.lastPoll).toLocaleString('de-DE') : 'noch keine'}`,
         `Sitzungen mit Relay: ${body.relays}`,
         ...body.devices
@@ -1142,7 +1316,7 @@ async function cli() {
       await local(dir, 'POST', '/stop', {}).catch(() => {})
       return console.log('Bridge gestoppt.')
     default:
-      console.log('Aufruf: coilshift-bridge.mjs serve|pair|status|away on|off|auto|unpair|stop [--data DIR]')
+      console.log('Aufruf: coilshift-bridge.mjs serve|pair [Code]|status|away on|off|auto|unpair|stop [--data DIR]')
   }
 }
 

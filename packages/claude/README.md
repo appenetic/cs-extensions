@@ -4,7 +4,8 @@ Experimentelles SDK-1.0-Paket. Zeigt die Claude-Code-Sitzungen deines Macs auf
 der MCU. Du kannst sie verfolgen und vom Auto aus weiterarbeiten lassen. Fragen
 von Claude erscheinen als Karte über der Navigation. Antworten gibst du per
 Touch, per Diktat über die Tesla-Tastatur oder mit der Sprachtaste („Claude, …“).
-Gekoppelt wird per QR-Code. Am Fahrzeug selbst wird nichts geschrieben.
+Gekoppelt wird mit einem Code aus dem Auto oder per QR-Code. Tailscale ist nicht
+nötig. Am Fahrzeug selbst wird nichts geschrieben.
 
 ## So hängt es zusammen
 
@@ -15,11 +16,31 @@ Gekoppelt wird per QR-Code. Am Fahrzeug selbst wird nichts geschrieben.
 | Kachel „Claude Code“ | App-Launcher | Die App: Sitzungsliste, Verlauf, Fragen, Antwortfeld, neue Sitzung |
 | Karte über der Navi | QtCar über `dev.coilshift.qtcar-host` | Offene Frage mit Antwort-Buttons, auch während der Fahrt |
 
-Das Auto verbindet sich direkt per HTTPS mit dem Mac, über Tailscale oder das
-WLAN. Es gibt keinen Cloud-Dienst dazwischen. Im Auto liegen keine
-Claude-Zugangsdaten. Die Bridge nutzt nur Schnittstellen, die Claude Code selbst
-anbietet: Hooks, `claude agents --json`, `claude --bg` und den Inbox-Socket der
-Sitzung.
+Das Auto verbindet sich direkt per HTTPS mit dem Mac, wenn es ihn erreicht:
+über Tailscale oder dasselbe WLAN. Sonst, etwa unterwegs im Mobilfunk mit dem
+Mac zu Hause hinter dem Router, geht die Verbindung über das
+**Internet-Relay**. Dabei bauen Mac und Auto beide eine ausgehende Verbindung
+zu einem öffentlichen MQTT-Broker auf, standardmäßig `broker.emqx.io` und
+`broker.hivemq.com`.
+
+Die Nachrichten sind Ende-zu-Ende verschlüsselt (AES-256-GCM) mit einem
+Schlüssel, den nur Mac und Auto aus der Kopplung kennen. Der Broker sieht nur
+Chiffretext unter zufälligen Themennamen, dazu Zeitpunkt und Größe der
+Nachrichten. Im Auto liegen keine Claude-Zugangsdaten.
+
+Die Bridge nutzt nur Schnittstellen, die Claude Code selbst anbietet: Hooks,
+`claude agents --json`, `claude --bg` und den Inbox-Socket der Sitzung.
+
+**Broker des Internet-Relays:** Die öffentlichen Broker sind kostenlose
+Testdienste ohne Verfügbarkeitszusage. Antworten brauchen über sie meist 0,2
+bis 1 Sekunde, manchmal ein paar Sekunden. Auf dem Mac lässt sich das
+Internet-Relay über die Variable `COILSHIFT_RELAY` steuern:
+- `COILSHIFT_RELAY=off` schaltet es aus.
+- `COILSHIFT_RELAY=mqtt.example.com:8883` setzt einen eigenen Broker
+  (MQTT über TLS).
+
+Die Variable gehört etwa unter `env` in `~/.claude/settings.json`. Das Auto
+übernimmt die Brokerliste bei der nächsten Verbindung.
 
 ## Einrichtung
 
@@ -46,18 +67,30 @@ Sitzung.
    Die Kachel „Claude Code“ erscheint im App-Launcher. Je nach Firmware geschieht
    das erst nach einem Neustart der Oberfläche im Stand. Einen eigenen Reiter in
    der CoilShift-App hat das Paket nicht.
-3. **Koppeln:** Die App zeigt ohne Kopplung einen QR-Code.
-   - Auf dem Mac `/coilshift:pair` ausführen. Der Kopplungslink landet in der
-     Zwischenablage und per Universal Clipboard auch auf dem iPhone.
-   - Den QR-Code im Auto mit dem Handy scannen und das lokale Zertifikat einmal
-     bestätigen.
-   - Auf der Handy-Seite den Link einfügen und **Koppeln** tippen.
-   - Auto und Handy müssen die MCU erreichen: im selben WLAN oder über Tailscale.
-     Die Tailscale-Adresse steht im QR-Code zuerst.
+3. **Koppeln:** Die App zeigt ohne Kopplung einen Code wie `K7QM-4ZP2-XR9T-HB3D`.
+   - **Mit dem Code, überall:** In Claude Code auf dem Mac
+     `/coilshift:pair K7QM-4ZP2-XR9T-HB3D` eingeben. Der Mac schickt die
+     Kopplung über das Internet-Relay ans Auto. Ein gemeinsames Netz ist nicht
+     nötig, nur Internet auf beiden Seiten.
+   - **Per QR-Code, im selben WLAN oder Tailnet:**
+     - Auf dem Mac `/coilshift:pair` ohne Code ausführen. Der Kopplungslink
+       landet in der Zwischenablage und per Universal Clipboard auch auf dem
+       iPhone.
+     - Den QR-Code im Auto mit dem Handy scannen und das lokale Zertifikat
+       einmal bestätigen.
+     - Auf der Handy-Seite den Link einfügen und **Koppeln** tippen.
+     - Das Handy muss die MCU erreichen: im selben WLAN oder über Tailscale.
 
-Der Link gilt zehn Minuten und genau einmal. Er enthält den Fingerabdruck des
-Mac-Zertifikats, und das Auto vertraut danach nur diesem Zertifikat.
-Neu koppeln geht unter **Technik → Neuen Kopplungs-QR-Code**.
+Der Code des Autos besteht aus 80 Bit des Hashs eines Schlüssels, den das Auto
+für jedes Kopplungsfenster neu erzeugt. Er gilt, solange das Fenster offen ist
+(zehn Minuten). Der Kopplungslink des Macs gilt zehn Minuten und
+genau einmal. Beide Wege übertragen den Fingerabdruck des Mac-Zertifikats. Auf
+dem direkten Weg vertraut das Auto danach nur diesem Zertifikat. Über das
+Internet-Relay gilt der Schlüssel aus der Kopplung.
+
+Neu koppeln geht unter **Technik → Neuen Kopplungs-QR-Code**. Ein Auto, das vor
+dem Internet-Relay gekoppelt wurde, holt sich seinen Schlüssel dafür beim
+nächsten direkten Kontakt selbst.
 
 ## Bedienung
 
@@ -121,7 +154,8 @@ Einstellung `card_enabled`.
 ## Technik und Diagnose
 
 Der Bereich **Technik** in der App zeigt:
-- die Verbindung zum Mac
+- die Verbindung zum Mac und den Weg dorthin: direkt (mit Adresse) oder
+  Internet-Relay (mit Broker)
 - Web-Port und Netzwerk-Namespace-Modus (`inside`, `setns` oder `current`)
 - den Kartenstatus
 - den Status des Sprach-DataValues
@@ -132,9 +166,29 @@ Der Paketstatus in CoilShift folgt der Verbindung.
 ## Sicherheit
 
 - **Bridge auf dem Mac:**
-  - Nimmt nur Verbindungen aus LAN, Tailscale (`100.64.0.0/10`, `fd7a:…`) und
-    Loopback an.
+  - Nimmt direkte Verbindungen nur aus LAN, Tailscale (`100.64.0.0/10`,
+    `fd7a:…`) und Loopback an.
   - Das Gerätetoken hat 256 Bit und liegt auf dem Mac nur als SHA-256-Hash.
+- **Internet-Relay:**
+  - Jedes gekoppelte Auto hat einen eigenen 256-Bit-Schlüssel. Daraus folgen
+    Themennamen und je Richtung ein AES-256-GCM-Schlüssel. Der Mac speichert ihn
+    in `config.json` (Modus 0600), das Auto in der verschlüsselten Kopplung.
+  - Eine Anfrage trägt zusätzlich das Gerätetoken und gilt nur auf dem Kanal
+    ihres Autos.
+  - Der Mac beantwortet jede Anfrage-ID einmal und verwirft Anfragen, die mehr
+    als zehn Minuten von seiner Uhr abweichen. Ein mitgeschnittenes `/v1/reply`
+    oder `/v1/start` wirkt also nicht doppelt.
+  - Kopplung per Code: Der Code legt sich auf einen X25519-Schlüssel des Autos
+    fest. Der Mac verschlüsselt sein Angebot an diesen Schlüssel. Wer den Code
+    nur am Bildschirm abliest, kann es nicht öffnen.
+  - Token und Relay-Schlüssel einer Kopplung verschlüsselt der Mac an einen
+    Schlüssel, den das Auto eigens dafür erzeugt. Wer den Code oder den
+    Kopplungslink kennt, kann sie nicht mitlesen.
+  - Restrisiko: Wer den Code am Bildschirm sieht, kann dem Auto im offenen
+    Kopplungsfenster ein eigenes Angebot unterschieben. Das Auto koppelt sich
+    dann mit seinem Mac, an den Mac des Nutzers kommt er so nicht heran. Zu
+    erkennen ist das an zwei Stellen: `/coilshift:pair` meldet, das Auto habe
+    sich nicht gemeldet, und die App zeigt einen fremden Mac-Namen.
 - **Auto:**
   - Die Kopplung liegt AES-256-GCM-verschlüsselt in `$CSDK_STATE/pairing.enc`.
     Der Schlüssel liegt in `pairing.key`, beide mit Modus 0600.

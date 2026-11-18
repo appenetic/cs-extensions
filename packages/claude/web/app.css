@@ -50,7 +50,15 @@ h2 .pulse { width: 12px; height: 12px; }
 .message .text { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
 .message.user, .message.car { align-self: flex-end; background: var(--fill); }
 .message.car { border-color: var(--blue); }
-.message.tool { background: transparent; border-style: dashed; font-size: 14px; color: var(--text-2); }
+.message.tool { align-self: flex-start; padding: 9px 14px; border-radius: 18px; line-height: 0; }
+.typing { display: inline-flex; gap: 5px; align-items: center; }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-2); opacity: 0.5; }
+.typing.live i { animation: typing 1.2s ease-in-out infinite; }
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) { .typing.live i { animation: none; } }
 
 .prompt { border-color: var(--orange); margin: 0; }
 .options { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
@@ -72,6 +80,8 @@ h2 .pulse { width: 12px; height: 12px; }
 .pairing li .hint { display: block; margin: 4px 0 0; }
 code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.92em; padding: 1px 6px; border-radius: var(--radius); background: var(--fill); }
 code.cmd { display: block; margin: 6px 0 0; padding: 8px 12px; overflow-wrap: anywhere; user-select: all; }
+code.pair-code { font-size: 26px; letter-spacing: 0.04em; padding: 12px 16px; }
+.pairing h3 { margin: 18px 0 4px; font-size: 17px; }
 .qr { display: block; width: 256px; height: 256px; padding: 12px; background: #fff; border-radius: 12px; image-rendering: pixelated; }
 .chip.on { border-color: var(--blue); background: var(--seg-on); }
 

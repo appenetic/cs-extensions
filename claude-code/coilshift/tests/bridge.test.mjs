@@ -35,6 +35,7 @@ test('transcript backfill skips thinking, sidechains and system reminders', () =
     { type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: [{ type: 'thinking', thinking: 'secret' }, { type: 'text', text: 'Mache ich.' }, { type: 'tool_use', name: 'Bash', input: { command: 'go test ./...\nmore' } }] } },
     { type: 'assistant', uuid: 'a2', isSidechain: true, message: { role: 'assistant', content: [{ type: 'text', text: 'subagent' }] } },
     { type: 'user', uuid: 'u3', message: { role: 'user', content: [{ type: 'tool_result', content: 'ok' }] } },
+    { type: 'assistant', uuid: 'a3', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'Read', input: { file_path: '/secret/plan.md' } }] } },
     { type: 'user', uuid: 'u4', message: { role: 'user', content: 'Weiter <system-reminder>intern</system-reminder>' } },
   ]
   fs.writeFileSync(file, 'not json\n' + lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
@@ -46,11 +47,13 @@ test('transcript backfill skips thinking, sidechains and system reminders', () =
     [
       ['user', '/goal baue die App'],
       ['assistant', 'Mache ich.'],
-      ['tool', 'Bash: go test ./...'],
+      ['tool', ''],
       ['user', 'Weiter'],
     ],
   )
+  assert.equal(t.messages[2].count, 2, 'a run of tool calls is one entry')
   assert.equal(JSON.stringify(t).includes('secret'), false)
+  assert.equal(JSON.stringify(t).includes('go test'), false, 'tool calls carry no details')
 })
 
 test('helpers', () => {
@@ -83,6 +86,20 @@ test('a question in the terminal is shown but not held unless away', async () =>
   await assert.rejects(b.reply({ session: 's1', prompt: s.pending.id, answers: { 'Q?': 'A' }, source: 'touch' }), (e) => e.status === 422)
   await b.hook({ session_id: 's1', hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion', tool_input: {} }, res)
   assert.equal(b.snapshot().sessions[0].pending, undefined)
+})
+
+test('tool calls count into one entry per run, without names or arguments', async () => {
+  const b = bridge()
+  const res = { on() {} }
+  const hook = (event, extra = {}) => b.hook({ session_id: 's1', hook_event_name: event, cwd: '/p', ...extra }, res)
+  await hook('UserPromptSubmit', { prompt: 'Teste alles' })
+  for (const command of ['go test ./...', 'npm test', 'cat ~/.ssh/config']) await hook('PostToolUse', { tool_name: 'Bash', tool_input: { command } })
+  await hook('Stop', { last_assistant_message: 'Alle Tests laufen.' })
+  await hook('PostToolUse', { tool_name: 'Edit', tool_input: { file_path: '/p/a.go' } })
+  const messages = b.snapshot().sessions[0].messages
+  assert.deepEqual(messages.map((m) => [m.role, m.count || 0]), [['user', 0], ['tool', 3], ['assistant', 0], ['tool', 1]])
+  assert.equal(JSON.stringify(messages).includes('ssh'), false)
+  assert.equal(new Set(messages.map((m) => m.id)).size, 4)
 })
 
 test('a background session holds a permission until the car decides', async () => {

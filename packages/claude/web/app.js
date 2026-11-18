@@ -169,7 +169,7 @@
   }
   var STATUS = { working: 'arbeitet', waiting: 'wartet auf dich', idle: 'bereit', ended: 'beendet' };
   var KIND = { interactive: 'Terminal', background: 'Hintergrund', ended: 'beendet' };
-  var ROLE = { user: 'Du', assistant: 'Claude', tool: 'Werkzeug', car: 'Aus dem Auto' };
+  var ROLE = { user: 'Du', assistant: 'Claude', car: 'Aus dem Auto' };
   var LINK = { online: 'Verbunden', connecting: 'Verbinde …', offline: 'Mac nicht erreichbar', rejected: 'Kopplung abgelehnt', unpaired: 'Nicht gekoppelt' };
   // A small green dot that pulses while Claude works in a session. Every update
   // redraws the list, so its animation is locked to the clock: a new dot goes
@@ -179,6 +179,20 @@
     var dot = h('span', { class: 'pulse', role: 'img', 'aria-label': 'arbeitet gerade' });
     dot.style.animationDelay = '-' + (Date.now() % 1600) + 'ms';
     return dot;
+  }
+  // Tool calls are not for reading while driving: a run of them is one small
+  // bubble of dots. Its dots move while it is Claude's latest step; like the
+  // pulse, their animation is locked to the clock across redraws.
+  function toolBubble(count, live) {
+    var dots = h('span', { class: 'typing' + (live ? ' live' : ''), role: 'img',
+      'aria-label': count > 1 ? count + ' Werkzeugaufrufe' : 'ein Werkzeugaufruf' });
+    var phase = Date.now() % 1200;
+    for (var i = 0; i < 3; i++) {
+      var dot = h('i', {});
+      if (live) dot.style.animationDelay = (i * 150 - phase) + 'ms';
+      dots.append(dot);
+    }
+    return h('li', { class: 'message tool' }, dots);
   }
   function shortPath(path) {
     var parts = String(path || '').split('/');
@@ -312,20 +326,36 @@
     renderTechnical(link);
   }
 
+  // Two ways to pair: the code through the relay works everywhere; the QR code
+  // needs the phone in the car's WLAN or tailnet.
   function renderPairing(link) {
     var pairing = (view && view.pairing) || {};
     var addresses = pairing.addresses || [];
+    var code = pairing.state === 'open' ? pairing.code : '';
     var parts = [h('h2', {}, 'Mit dem Mac koppeln')];
     if (link.state === 'rejected' && link.error) parts.push(h('p', { class: 'bad' }, link.error));
-    parts.push(h('ol', { class: 'steps', id: 'setup-steps' },
-      h('li', {}, 'Auf dem Mac einmal das Claude-Code-Plugin installieren, im Terminal:',
-        h('code', { class: 'cmd' }, 'claude plugin marketplace add appenetic/cs-extensions'),
-        h('code', { class: 'cmd' }, 'claude plugin install coilshift@appenetic'),
-        h('span', { class: 'hint' }, 'Oder in Claude Code dieselben Befehle mit /plugin statt claude plugin.')),
-      h('li', {}, 'Eine neue Claude-Code-Sitzung starten und ', h('code', {}, '/coilshift:pair'),
-        ' ausführen. Der Kopplungslink landet in der Zwischenablage, per Universal Clipboard auch auf dem iPhone.'),
+    var install = h('li', {}, 'Auf dem Mac einmal das Claude-Code-Plugin installieren, im Terminal:',
+      h('code', { class: 'cmd' }, 'claude plugin marketplace add appenetic/cs-extensions'),
+      h('code', { class: 'cmd' }, 'claude plugin install coilshift@appenetic'),
+      h('span', { class: 'hint' }, 'Oder in Claude Code dieselben Befehle mit /plugin statt claude plugin.'));
+    var phone = [
+      h('li', {}, 'In Claude Code ', h('code', {}, '/coilshift:pair'),
+        ' ohne Code ausführen. Der Kopplungslink landet in der Zwischenablage, per Universal Clipboard auch auf dem iPhone.'),
       h('li', {}, 'Diesen QR-Code mit dem Handy scannen und das lokale Zertifikat einmal bestätigen.'),
-      h('li', {}, 'Auf der Handy-Seite den Link einfügen und „Koppeln“ tippen.')));
+      h('li', {}, 'Auf der Handy-Seite den Link einfügen und „Koppeln“ tippen.')];
+    if (code) {
+      parts.push(h('ol', { class: 'steps', id: 'setup-steps' }, install,
+        h('li', {}, 'In einer neuen Claude-Code-Sitzung eingeben:',
+          h('code', { class: 'cmd pair-code', id: 'pairing-code' }, '/coilshift:pair ' + code),
+          h('span', { class: 'hint' }, 'Das klappt überall, ohne gemeinsames WLAN und ohne Tailscale: Der Mac schickt die Kopplung über ein Ende-zu-Ende-verschlüsseltes Internet-Relay.'))));
+      if (pairing.message) parts.push(h('p', { class: 'hint', id: 'pairing-message' }, pairing.message));
+      if (addresses.length) {
+        parts.push(h('h3', {}, 'Oder mit dem Handy, im selben WLAN oder Tailnet wie das Auto'));
+        parts.push(h.apply(null, ['ol', { class: 'steps' }].concat(phone)));
+      }
+    } else {
+      parts.push(h.apply(null, ['ol', { class: 'steps', id: 'setup-steps' }, install].concat(phone)));
+    }
     if (pairing.state === 'open' && addresses.length) {
       var shown = addresses[0];
       for (var i = 0; i < addresses.length; i++) if (addresses[i].url === picks.address) shown = addresses[i];
@@ -348,7 +378,7 @@
       });
       again.disabled = sending;
       parts.push(again);
-    } else {
+    } else if (!code) {
       parts.push(h('p', { class: 'hint' }, pairing.state === 'failed' ? 'Die Kopplungsseite konnte nicht gestartet werden.' : 'QR-Code wird vorbereitet …'));
     }
     els.pairing.replaceChildren.apply(els.pairing, parts);
@@ -399,9 +429,17 @@
     if (s.pending) els.prompt.append(promptCard(s, s.pending));
     // Newest first: the latest answer sits right under the answer field.
     var rows = [];
-    (s.messages || []).forEach(function (m) {
+    var messages = s.messages || [];
+    for (var i = 0; i < messages.length; i++) {
+      var m = messages[i];
+      if (m.role === 'tool') {
+        var count = m.count || 1;
+        while (i + 1 < messages.length && messages[i + 1].role === 'tool') count += messages[++i].count || 1;
+        rows.unshift(toolBubble(count, i === messages.length - 1 && s.status === 'working' && !s.pending));
+        continue;
+      }
       rows.unshift(h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), h('span', { class: 'text' }, m.text)));
-    });
+    }
     if (!rows.length) rows.push(h('li', { class: 'hint' }, 'Noch kein Verlauf.'));
     els.messages.replaceChildren.apply(els.messages, rows);
     renderComposer(s);
@@ -522,6 +560,7 @@
     var rows = [
       ['Verbindung', (LINK[link.state] || link.state || '–') + (link.error ? ' · ' + link.error : '')],
       ['Bridge', view && view.bridge ? (view.bridge.name || '') + ' · ' + (view.bridge.version || '') : '–'],
+      ['Weg zum Mac', !diag.route ? '–' : diag.route.indexOf('relay') === 0 ? 'Internet-Relay' + (diag.route.length > 6 ? ' · ' + diag.route.slice(6) : '') : 'direkt · ' + diag.route],
       ['Web-Port', diag['web.listen'] ? diag['web.listen'] + (diag['web.port'] ? ' · ' + diag['web.port'] + ' (' + (diag['web.mode'] || '') + ')' : '') : 'noch keine Meldung'],
       ['Web-Dienst', (diag['web.service'] || '–') + (diag['web.bind'] ? ' · Namespace ' + diag['web.bind'] : '')],
       ['Karte über der Navi', diag.card || 'noch keine Meldung'],
