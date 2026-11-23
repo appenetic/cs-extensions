@@ -4,11 +4,11 @@ Experimentelles SDK-1.0-Paket nach dem Vorbild des „Quiet Mode“ von FSD v15.
 Es bringt eine App mit der Kachel **Quiet** in den Launcher. Sie öffnet sich
 direkt maximiert und ohne Titelleiste, auch in D. Zu sehen ist ein dunkler
 Bildschirm mit einem Lichtschein in der Farbe deines Ambientelichts: oben ein
-weicher, atmender Schein, unten zwei Lichtbahnen wie eine Straße bei Nacht, auf
-denen Lichtpulse zu dir hin laufen, im Stand langsam, schneller, je schneller
-du fährst. In einer Linkskurve biegen sich die Bahnen nach links, in einer
-Rechtskurve nach rechts. Blinkst du, pulsiert die Bahn auf dieser Seite im
-Takt.
+weicher, atmender Schein, unten eine Straße bei Nacht, deren zwei Fahrbahnlinien
+feine Lichtfäden sind, die im Dunst verschwinden. Auf ihnen fließen
+Lichtstreifen zu dir hin, im Stand langsam, schneller, je schneller du fährst.
+In einer Linkskurve biegt sich die Straße nach links, in einer Rechtskurve nach
+rechts. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
 
 Ruhig darüber: oben links der Tacho, in der Mitte Ankunftszeit, Restzeit,
 Reststrecke und die nächste Abbiegung („Abbiegen in 200 m“), unten eine Linie
@@ -19,7 +19,7 @@ lange drücken öffnet die Optionen.
 
 Pakete aus einem Repository bekommen in CoilShift keine Einstellungen. Ein
 langer Druck in der App öffnet deshalb ein Menü: Ankunftszeit und Fortschritt,
-Abbiegehinweise, Tacho und Lichtpulse an oder aus, Helligkeit Auto, Hell oder
+Abbiegehinweise, Tacho und Lichtstreifen an oder aus, Helligkeit Auto, Hell oder
 Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 
 ## Sicherheit
@@ -91,14 +91,18 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 | Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
 | Abbiegung | `NAV_milesToNextTurn`, ab 1,5 km als „Abbiegen in …“; `NAV_nextTurnDirection` ist geschwärzt |
 | Kurve | Änderung von `LOC_estimatedHdg` über eine Sekunde, rechts positiv; 0 im Stand, ohne Richtung und bei Sprüngen über 60 °/s |
-| Tempo | Ein Lichtpuls braucht im Stand etwa 5 s bis zu dir, ab 120 km/h 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
+| Tempo | Ein Lichtstreifen braucht im Stand etwa 6 s vom Horizont bis zu dir, ab 120 km/h etwa 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
 
-Die Animation zeichnet ein Canvas: Hintergrund und Schein entstehen einmal pro
-Farbe, Helligkeit und Größe. Die Lichtbahnen zeichnet die Seite bei jeder
-Änderung von Biegung oder Blinker in einen Puffer mit einem Viertel der Größe,
-weichgezeichnet und dann hochskaliert. Jedes Bild fügt das Atmen und die Pulse
-hinzu. Farbe, Helligkeit, Biegung und Tempo gleiten weich in ihre neuen Werte.
+Das Bild zeichnet ein WebGL-Shader in echter Perspektive: eine Kamera 1,25 m
+über der Mitte einer 3,5 m breiten Spur, der Horizont auf 58 % der Höhe. Die
+Linien haben einen fast weißen Kern, der mit der Entfernung feiner wird, und
+einen Bloom in Bildschirmpixeln; die Kurve ist eine Krümmung der Straße. Am Ende
+stehen ein filmisches Tonemapping und feines Rauschen, damit dunkle Verläufe
+keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder länger
+als etwa 26 ms, zeichnet die Seite weniger Pixel. Ohne WebGL steht ein
+schlichteres Canvas-Bild da. Farbe, Helligkeit, Biegung und Tempo gleiten weich
+in ihre neuen Werte.
 
 ## Entwicklung und Validierungsstand
 
