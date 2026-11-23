@@ -5,8 +5,9 @@ Es bringt eine App mit der Kachel **Quiet** in den Launcher. Sie öffnet sich
 direkt maximiert und ohne Titelleiste, auch in D. Zu sehen ist ein dunkler
 Bildschirm mit einem Lichtschein in der Farbe deines Ambientelichts: oben ein
 weicher, atmender Schein, unten zwei Lichtbahnen wie eine Straße bei Nacht, auf
-denen Lichtpulse zu dir hin laufen. In einer Linkskurve biegen sich die Bahnen
-nach links, in einer Rechtskurve nach rechts. Mit aktiver Navigation stehen
+denen Lichtpulse zu dir hin laufen, im Stand langsam, schneller, je schneller
+du fährst. In einer Linkskurve biegen sich die Bahnen nach links, in einer
+Rechtskurve nach rechts. Mit aktiver Navigation stehen
 Ankunftszeit, Restzeit und Reststrecke in der Mitte. Fest nach unten wischen
 schließt die App.
 
@@ -41,7 +42,12 @@ schließt die App.
   Sprüngen über 60 °/s, also einem neuen GPS-Fix, ist sie 0. Die Seite macht
   daraus eine Biegung: Etwa 25 °/s, eine Abzweigung, biegt voll, eine
   Autobahnkurve mit 2 °/s leicht, unter 0,4 °/s bleibt die Straße gerade. Sie
-  gleitet in etwa 0,7 s dorthin. Kommt 3 s lang nichts Neues,
+  gleitet in etwa 0,7 s dorthin.
+- **Tempo:** Ein Lichtpuls braucht im Stand etwa 5 s vom Horizont bis zu dir,
+  ab etwa 75 (`VAPI_vehicleSpeed`) 2 s. Dazwischen steigt das Tempo mit der
+  Wurzel der Geschwindigkeit, so liegen Stadttempi auseinander. Es folgt der
+  Geschwindigkeit über etwa 1,5 s und läuft über eine fortlaufende Phase, damit
+  die Pulse nie springen. Kommt 3 s lang nichts Neues,
   laufen die Bahnen wieder gerade. `VAPI_steeringAngle` und `VAPI_yawRate`
   wären direkter, sind im Stand aber `<invalid>` und ihre Vorzeichen am Auto
   nicht geprüft.
@@ -58,6 +64,7 @@ schließt die App.
 | `min` | `NAV_minutesToArrival`, gerundet |
 | `km` | `NAV_milesToArrival` in Kilometern mit Dezimalkomma |
 | `yaw` | Drehrate in °/s aus `LOC_estimatedHdg`, rechts positiv, „0.0“ im Stand |
+| `speed` | `VAPI_vehicleSpeed` mit einer Stelle („13.7“), „0.0“ ohne Wert |
 
 Die Animation zeichnet ein Canvas: Hintergrund und Schein entstehen einmal pro
 Farbe und Größe. Die Lichtbahnen zeichnet die Seite bei jeder Änderung der

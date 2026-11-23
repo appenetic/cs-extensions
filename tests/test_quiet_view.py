@@ -86,9 +86,9 @@ class QuietView(unittest.TestCase):
         env.update(extra)
         return env
 
-    def bash(self, script):
+    def bash(self, script, **extra):
         result = subprocess.run(['/bin/bash', '-c', 'umask 077\n. "$CSDK_PACKAGE_DIR/lib/quiet.sh"\n' + script],
-                                env=self.env(), capture_output=True, text=True)
+                                env=self.env(**extra), capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout
 
@@ -147,14 +147,15 @@ for k in 5.4 0 "<invalid>"; do printf '[%s]\\n' "$(quiet_km "$k")"; done''')
 
     def test_state_without_a_trip_has_only_the_colour(self):
         self.bash('quiet_state')
-        self.assertEqual(self.state(), {'color': '#ff8300', 'trip': False, 'eta': '', 'min': '', 'km': '', 'yaw': '0.0'})
+        self.assertEqual(self.state(), {'color': '#ff8300', 'trip': False, 'eta': '', 'min': '', 'km': '', 'yaw': '0.0',
+                                        'speed': '0.0'})
 
     def test_state_with_a_trip(self):
         self.dv(GUI_navNextDestinationArrivalInfoValid='true', GUI_navNextDestinationArrivalTime='16:41:00',
                 NAV_minutesToArrival='14.6', NAV_milesToArrival='5.4', GUI_navDestinationLocationName='<redacted>')
         self.bash('quiet_state')
         self.assertEqual(self.state(), {'color': '#ff8300', 'trip': True, 'eta': '16:41', 'min': '15', 'km': '8,7',
-                                        'yaw': '0.0'})
+                                        'yaw': '0.0', 'speed': '0.0'})
         self.assertNotIn('redacted', (self.run_dir / 'state.json').read_text())
 
     def test_numbers_in_thousandths(self):
@@ -199,6 +200,22 @@ for v in 5000 -27000 -200 20 -40 0 123456; do quiet_tenths "$v"; printf '%s\\n' 
                     ('<invalid>', '20.0', 1350, '0.0'),   # no heading
                     ('160.000', '20.0', 1400, '0.0'),
                     ('159.900', '20.0', 1450, '-0.2')])
+
+    def test_motion_writes_speed_and_turn(self):
+        uptime = self.tmp / 'uptime'
+        self.dv(VAPI_vehicleSpeed='13.67', LOC_estimatedHdg='100.000')
+        out = self.bash('''printf '1234.56 99.00\\n' > "$QUIET_UPTIME"
+quiet_state
+cat "$STATE"
+printf '101.000' > "$FAKE_CSDK/dv/LOC_estimatedHdg"
+printf '1235.06 99.00\\n' > "$QUIET_UPTIME"
+quiet_motion; quiet_write
+cat "$STATE"
+printf '<invalid>' > "$FAKE_CSDK/dv/VAPI_vehicleSpeed"
+quiet_motion; quiet_write
+cat "$STATE"''', QUIET_UPTIME=str(uptime))
+        states = [json.loads(line) for line in out.splitlines()]
+        self.assertEqual([(x['speed'], x['yaw']) for x in states], [('13.7', '0.0'), ('13.7', '2.0'), ('0.0', '0.0')])
 
     def test_http_serves_the_app_and_state(self):
         self.bash('quiet_state')
@@ -328,6 +345,7 @@ class QuietViewFiles(unittest.TestCase):
         self.assertIn("'X-Quiet': '1'", js)
         self.assertIn('bendFor(state.yaw)', js)
         self.assertIn('if (c) light = c;', js)
+        self.assertIn('paceFor(state.speed)', js)
 
     @unittest.skipUnless(shutil.which('node'), 'node checks the script syntax')
     def test_script_parses(self):

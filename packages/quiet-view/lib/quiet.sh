@@ -10,6 +10,7 @@ WEB=${CSDK_PACKAGE_DIR:-}/web
 STATE=${CSDK_RUN:-}/state.json
 PORT=${CSDK_WEB_APP_PORT:-}
 LISTEN=${CSDK_RUN:-}/listen
+UPTIME=${QUIET_UPTIME:-/proc/uptime}
 # QtCar knows a web app by its title, the sandbox by the tile ID: the package ID
 # with dashes for dots, a dot and the tile.
 TITLE=Quiet
@@ -109,10 +110,18 @@ quiet_turn() {
     quiet_tenths "$rate"
     YAW=$REPLY
 }
+# The speed for the pulses' pace (VAPI_vehicleSpeed, "13.7"), and the turn.
+SPEED=0.0
 quiet_motion() {
-    local up
-    { read -r up _ < /proc/uptime; } 2>/dev/null || return 0
-    quiet_turn "$(dv LOC_estimatedHdg)" "$(dv VAPI_vehicleSpeed)" "$((10#${up%.*} * 100 + 10#${up#*.}))"
+    local up speed
+    { read -r up _ < "$UPTIME"; } 2>/dev/null || return 0
+    speed=$(dv VAPI_vehicleSpeed)
+    SPEED=0.0
+    if quiet_milli "$speed"; then
+        quiet_tenths "${REPLY#-}"
+        SPEED=$REPLY
+    fi
+    quiet_turn "$(dv LOC_estimatedHdg)" "$speed" "$((10#${up%.*} * 100 + 10#${up#*.}))"
 }
 
 # The colour the ambient lights show now. GUI_rgbMap is what QtCar sends them
@@ -162,8 +171,8 @@ quiet_trip() {
 # /state for the page, as one line; the rename keeps a reader from a half file.
 quiet_write() {
     local tmp=$STATE.$$
-    printf '{"color":"%s","trip":%s,"eta":"%s","min":"%s","km":"%s","yaw":"%s"}\n' \
-        "$COLOR" "$TRIP" "$ETA" "$MIN" "$KM" "$YAW" > "$tmp" && mv -f "$tmp" "$STATE"
+    printf '{"color":"%s","trip":%s,"eta":"%s","min":"%s","km":"%s","yaw":"%s","speed":"%s"}\n' \
+        "$COLOR" "$TRIP" "$ETA" "$MIN" "$KM" "$YAW" "$SPEED" > "$tmp" && mv -f "$tmp" "$STATE"
 }
 quiet_state() {
     quiet_trip

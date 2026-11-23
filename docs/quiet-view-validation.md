@@ -117,3 +117,5 @@ Alle drei liest das Paket über die Schnittstelle. Weitere Modi:
 4. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
    Farben aussieht, auch tagsüber.
 5. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
+6. In welcher Einheit `VAPI_vehicleSpeed` zählt (mph oder km/h). Das Tempo der
+   Pulse erreicht sein Maximum bei 75.

@@ -40,7 +40,8 @@ durchgespielt.
 Nach dem „Quiet Mode“ von FSD v15: eine App mit eigener Kachel im Launcher. Sie
 öffnet sich direkt maximiert, auch in D, und zeigt einen animierten Lichtschein
 in der Farbe des Ambientelichts mit der Ankunftszeit. Die Lichtbahnen biegen
-sich mit der Kurve, die du fährst. Fest nach unten wischen schließt sie.
+sich mit der Kurve, die du fährst, ihre Pulse laufen mit deinem Tempo. Fest
+nach unten wischen schließt sie.
 [Funktionsweise](packages/quiet-view/README.md) ·
 [Validierung](docs/quiet-view-validation.md).
 

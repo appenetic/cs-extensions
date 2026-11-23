@@ -415,7 +415,7 @@
     },
     {
       "id": "com.appenetic.quiet-view",
-      "version": "0.1.0-alpha.4",
+      "version": "0.1.0-alpha.5",
       "sdk": ">=1.0 <2",
       "title": "Quiet-Ansicht (experimental)",
       "published_unix": 1794614400,
@@ -423,7 +423,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.quiet-view",
-        "version": "0.1.0-alpha.4",
+        "version": "0.1.0-alpha.5",
         "sdk": ">=1.0 <2",
         "title": "Quiet-Ansicht (experimental)",
         "summary": "Eine App nach dem Quiet Mode von FSD v15: ein animierter Lichtschein in der Farbe deines Ambientelichts mit der Ankunftszeit, direkt im Vollbild. Nach unten wischen schließt sie.",
@@ -466,10 +466,10 @@
           ]
         }
       },
-      "manifest_sha256": "a2284d3ad6093152c3a9b01890afb48762dc95701d6e8512ac8657fe7a44485b",
+      "manifest_sha256": "f9073af050cf3bec29e15dc1a4dbee90c86cf4fa943c4172039184ae736302c2",
       "archive": {
-        "url": "pool/35001792d4c045c1f26416ecd92105004accc44319433e3202c41ee1bfe2a948",
-        "sha256": "35001792d4c045c1f26416ecd92105004accc44319433e3202c41ee1bfe2a948",
+        "url": "pool/fe3063253639151a6aed5419a841ceac834739cc4d968d7363c2251f541ec5a1",
+        "sha256": "fe3063253639151a6aed5419a841ceac834739cc4d968d7363c2251f541ec5a1",
         "bytes": 71680
       }
     },

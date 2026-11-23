@@ -26,6 +26,11 @@
   let bend = 0;
   let target = 0;
   let trailsBend = null;
+  // pace runs from 0 (standing) to 1 (motorway) and eases slowly towards
+  // paceGoal; phase carries the pulses, so a new pace never makes them jump.
+  let pace = 0;
+  let paceGoal = 0;
+  let phase = 0;
   let lastState = 0;
   let lastFrame = 0;
 
@@ -44,6 +49,14 @@
     if (!Number.isFinite(v)) return 0;
     const a = Math.max(0, Math.abs(v) - 0.4);
     return Math.sign(v) * Math.min(1, Math.sqrt(a / 25));
+  }
+
+  // The speed as a pace: the square root keeps town speeds apart and lets the
+  // motorway (about 75, VAPI_vehicleSpeed) reach the top.
+  function paceFor(speed) {
+    const v = Number.parseFloat(speed);
+    if (!Number.isFinite(v) || v <= 0) return 0;
+    return Math.min(1, Math.sqrt(v / 75));
   }
 
   // A point of a trail, p from 0 at the vanishing point to 1 at the bottom edge.
@@ -159,9 +172,14 @@
     const s = now / 1000;
     const dt = lastFrame ? Math.min(0.1, s - lastFrame) : 0;
     lastFrame = s;
-    // Without fresh state the trails straighten out.
-    const goal = performance.now() - lastState < 3000 ? target : 0;
+    // Without fresh state the trails straighten out and the pulses slow down.
+    const fresh = performance.now() - lastState < 3000;
+    const goal = fresh ? target : 0;
     bend += (goal - bend) * Math.min(1, dt / 0.7);
+    // A pulse takes about 5 s from the horizon to the driver when standing and
+    // 2 s on the motorway; the pace follows the speed over about 1.5 s.
+    pace += ((fresh ? paceGoal : 0) - pace) * Math.min(1, dt / 1.5);
+    phase = (phase + dt * (1 / 5 + (1 / 2 - 1 / 5) * pace)) % 1;
     if (light && light.join() !== rgb.join()) {
       const k = Math.min(1, dt / 0.6);
       rgb = rgb.map((v, i) => (Math.abs(light[i] - v) < 1 ? light[i] : v + (light[i] - v) * k));
@@ -175,7 +193,7 @@
     glowAt(ctx, 1.05, 0.18 * (1 + Math.sin((s * Math.PI * 2) / 5)));
     [-1, 1].forEach((side, k) => {
       for (let n = 0; n < 3; n++) {
-        const t = (s / 2.4 + n / 3 + k / 6) % 1;
+        const t = (phase + n / 3 + k / 6) % 1;
         pulse(side, t ** 1.7);
       }
     });
@@ -191,6 +209,7 @@
     }
     if (c) light = c;
     target = bendFor(state.yaw);
+    paceGoal = paceFor(state.speed);
     lastState = performance.now();
     trip.hidden = !(state.trip && state.eta);
     eta.textContent = state.eta || '';
