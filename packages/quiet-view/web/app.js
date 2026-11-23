@@ -46,16 +46,6 @@
     return m ? [1, 2, 3].map((i) => parseInt(m[i], 16)) : null;
   }
 
-  // Degrees per second the heading turns, right positive, as a bend: gentle
-  // curves already show, a turn at a junction (about 25 °/s) bends fully. Below
-  // 0.4 °/s it is the GPS wandering, and the road stays straight.
-  function bendFor(yaw) {
-    const v = Number.parseFloat(yaw);
-    if (!Number.isFinite(v)) return 0;
-    const a = Math.max(0, Math.abs(v) - 0.4);
-    return Math.sign(v) * Math.min(1, Math.sqrt(a / 25));
-  }
-
   // The steering wheel's angle (right positive) as a bend: up to a few degrees
   // as the road would curve (2° on the motorway bends a little), above that
   // graded on a log scale up to about 240°. Below 0.5° the wheel is straight.
@@ -80,13 +70,10 @@
     return clamp(f * (BRIGHT[options.bright] || 1), 0.3, 1.5);
   }
 
-  // Where the road heads: the steering wheel, or without its angle the turn
-  // the car drives, and a turn the navigation announces within 300 m, as far as
-  // the car does not turn yet.
+  // Where the road heads: the steering wheel alone. Without its angle (in Park
+  // it can be invalid) the road straightens.
   function targetFor(v) {
-    const turning = typeof v.steer === 'number' ? steerBend(v.steer) : bendFor(v.yaw);
-    const t = v.turn && options.turns ? v.turn.side * v.turn.strength * v.turn.near : 0;
-    return clamp(turning + t * (1 - Math.abs(turning)), -1, 1);
+    return typeof v.steer === 'number' ? steerBend(v.steer) : 0;
   }
 
   // ---- The picture ----
@@ -324,8 +311,8 @@ void main() {
     lastFrame = s;
     // Without fresh state the road straightens and the streaks slow down.
     const fresh = (source && source.readyState === 1) || performance.now() - lastState < 3000;
-    // The steering angle comes 20 times a second and is smooth by itself; the
-    // turn rate from the heading needs more easing.
+    // The steering angle comes 20 times a second and is smooth by itself;
+    // without it the road straightens slowly.
     const steering = state && typeof state.steer === 'number';
     bend += ((fresh ? target : 0) - bend) * Math.min(1, dt / (steering ? 0.1 : 0.6));
     // A streak takes about 6 s from the horizon to the driver when standing

@@ -183,7 +183,9 @@ Uhrzeit der Ankunft kommt deshalb aus der letzten Ankunftszeit der Navigation.
 zehnmal pro Sekunde (bei 32 km/h, in 0,1- bis 0,6-Grad-Schritten). Die
 Verzögerung, die der Fahrer sah, lag am Dienst (200-ms-Takt) und an der Seite
 (Glättung über 0,4 s). Seit alpha.11 arbeitet der Dienst im 50-ms-Takt, und die
-Seite glättet den Lenkwinkel nur über 0,1 s.
+Seite glättet den Lenkwinkel nur über 0,1 s. Ab alpha.12 richtet sich die
+Straße auf Wunsch des Fahrers nur nach dem Lenkwinkel, nicht mehr nach
+Abbiegehinweisen oder der Fahrtrichtung.
 
 ## Am Auto offen
 

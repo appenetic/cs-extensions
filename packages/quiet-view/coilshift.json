@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "com.appenetic.quiet-view",
-  "version": "0.1.0-alpha.11",
+  "version": "0.1.0-alpha.12",
   "sdk": ">=1.0 <2",
   "title": "Quiet-Ansicht (experimental)",
   "summary": "Eine App nach dem Quiet Mode von FSD v15: ein ruhiger, animierter Lichtschein in der Farbe deines Ambientelichts mit Tacho, Ankunftszeit und Abbiegehinweisen, direkt im Vollbild. Nach unten wischen schließt sie.",

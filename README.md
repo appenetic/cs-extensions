@@ -39,8 +39,7 @@ durchgespielt.
 
 Nach dem „Quiet Mode“ von FSD v15: eine App mit eigener Kachel im Launcher. Sie
 öffnet sich direkt maximiert, auch in D, und zeigt einen animierten Lichtschein
-in der Farbe des Ambientelichts. Die Lichtbahnen biegen sich mit dem Lenkrad
-und schon vor angesagten Abbiegungen, Lichtstreifen fließen in deinem
+in der Farbe des Ambientelichts. Die Lichtbahnen biegen sich mit dem Lenkrad, Lichtstreifen fließen in deinem
 Tempo darauf, und die Linie leuchtet mit dem Blinker. Darüber ruhig Tacho, Ankunft, nächste Abbiegung und
 Fortschritt, am Ziel ein eigener Ankunftsbildschirm; bei Warnungen schließt sie
 sich selbst. Fest nach unten wischen

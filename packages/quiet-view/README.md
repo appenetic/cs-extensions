@@ -12,8 +12,7 @@ umso stärker, je weiter du lenkst. Blinkst du, leuchtet die Linie auf dieser Se
 
 Ruhig darüber: oben links der Tacho, in der Mitte Ankunftszeit, Restzeit,
 Reststrecke und die nächste Abbiegung („in 200 m rechts“), unten eine Linie für
-den Fortschritt der Route. Ab 300 m vor der Abbiegung biegt sich die Straße
-schon in ihre Richtung. Fest nach unten wischen schließt die App,
+den Fortschritt der Route. Fest nach unten wischen schließt die App,
 lange drücken öffnet die Optionen.
 
 ## Angekommen
@@ -65,10 +64,10 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 - **Ungeprüfte Werte:** Wie die Firmware Blinker und Warnstufen schreibt, war am
   Auto noch nicht zu sehen. Das Paket erkennt sie an Wörtern (`left`, `right`,
   `both`, `visual`, `chime`, `slow`, `struck`, `escalat`).
-- **Lenkwinkel im Stand:** In P ist `VAPI_steeringAngle` `<invalid>`; dann
-  folgt die Straße der Änderung der Fahrtrichtung, die im Stand null ist. Der
-  Dienst schreibt während der Fahrt Drehrate, Gierrate und Lenkwinkel in
-  `CSDK_STATE/turns.log` (höchstens etwa 512 KB).
+- **Lenkwinkel im Stand:** In P kann `VAPI_steeringAngle` `<invalid>` sein;
+  dann bleibt die Straße gerade. Der Dienst schreibt während der Fahrt
+  Drehrate, Gierrate und Lenkwinkel in `CSDK_STATE/turns.log` (höchstens etwa
+  512 KB).
 
 ## So funktioniert es
 
@@ -104,7 +103,7 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 | Ankunft | `GUI_navNextDestinationArrivalTime`, wenn `GUI_navNextDestinationArrivalInfoValid`; `NAV_minutesToArrival`; `NAV_milesToArrival` in den Einheiten des Autos (`GUI_distanceUnits`) |
 | Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
 | Abbiegung | `NAV_milesToNextTurn` ab 1,5 km, die Richtung aus `NAV_nextTurnAngle` im Uhrzeigersinn ab geradeaus (99 war rechts): unter 12° keine Abbiegung, bis 45° leicht, bis 135° normal, bis 165° scharf, darüber wenden. Ohne Winkel nur „Abbiegen in …“ |
-| Kurve | `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt): bis wenige Grad wie die echte Krümmung (2° biegt leicht), darüber logarithmisch bis etwa 240°, unter 0,5° gerade. Der Dienst gibt ihn spätestens nach 50 ms weiter, die Seite glättet nur über 0,1 s. Ohne gültigen Lenkwinkel die Änderung von `LOC_estimatedHdg` über eine Sekunde |
+| Kurve | Nur `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt): bis wenige Grad wie die echte Krümmung (2° biegt leicht), darüber logarithmisch bis etwa 240°, unter 0,5° gerade. Der Dienst gibt ihn spätestens nach 50 ms weiter, die Seite glättet nur über 0,1 s. Ohne gültigen Lenkwinkel bleibt die Straße gerade; Abbiegehinweise biegen sie nicht |
 | Tempo | Ein Lichtstreifen braucht im Stand etwa 6 s vom Horizont bis zu dir, ab 120 km/h etwa 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
 
