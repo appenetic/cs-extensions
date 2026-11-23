@@ -13,6 +13,7 @@ import tarfile
 ROOT = Path(__file__).resolve().parents[1]
 HOME_ASSISTANT = 'com.appenetic.home-assistant'
 CLAUDE = 'com.appenetic.claude'
+WELCOME_ANIMATION = 'com.appenetic.welcome-animation'  # withdrawn
 WELCOME_PERFORMANCE = 'com.appenetic.welcome-performance'
 WELCOME_LAUNCH = 'com.appenetic.welcome-launch'
 # Shell lifecycle adapters are intentionally readable; application logic is ELF,
@@ -46,6 +47,7 @@ RELEASES = {
         'assets': [],
         'binary': 'bin/claude-linux-amd64',
     },
+    WELCOME_ANIMATION: WELCOME,
     WELCOME_PERFORMANCE: WELCOME,
     WELCOME_LAUNCH: WELCOME,
 }

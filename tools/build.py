@@ -143,10 +143,25 @@ def build_package(PACKAGE):
         'archive': {'url': 'pool/' + digest, 'sha256': digest, 'bytes': len(data)}}
 
 
+def withdrawn(built):
+    # A package that leaves the feed stays in the index as published, only
+    # withdrawn: CoilShift refuses an index from which one simply disappears.
+    path = SITE / 'withdrawn.json'
+    entries = json.loads(path.read_text()) if path.exists() else []
+    for e in entries:
+        data = (SITE / e['archive']['url']).read_bytes()
+        if (e['withdrawn'] is not True or e['id'] in built or sha(data) != e['archive']['sha256']
+                or len(data) != e['archive']['bytes']):
+            raise ValueError('Withdrawn entry must keep its published archive: ' + e['id'])
+    return entries
+
+
 def build():
     # Keep the original package first for existing consumers.
     packages = sorted(PACKAGES.iterdir(), key=lambda p: (p.name != 'welcome-light', p.name))
     entries = [build_package(p) for p in packages if (p / 'coilshift.json').is_file()]
+    entries += withdrawn({e['id'] for e in entries})
+    entries.sort(key=lambda e: (e['id'] != 'com.appenetic.welcome-light', e['id']))
     index = {'schema': 1, 'repository': {'name': 'Appenetic CS Extensions',
              'homepage': 'https://github.com/appenetic/cs-extensions'},
              'generated_unix': 1794614400, 'packages': entries}

@@ -23,7 +23,7 @@ class PublicFeed(unittest.TestCase):
         cls.entry = next(e for e in cls.index['packages'] if e['id'] == feed.HOME_ASSISTANT)
         cls.claude = next(e for e in cls.index['packages'] if e['id'] == feed.CLAUDE)
         cls.welcome = [next(e for e in cls.index['packages'] if e['id'] == i)
-                       for i in [feed.WELCOME_PERFORMANCE, feed.WELCOME_LAUNCH]]
+                       for i in [feed.WELCOME_ANIMATION, feed.WELCOME_PERFORMANCE, feed.WELCOME_LAUNCH]]
 
     def test_export_is_only_runtime_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -35,7 +35,9 @@ class PublicFeed(unittest.TestCase):
                              | {'cs-extensions/pool/' + sha for sha in shas})
             index = json.loads((output / 'cs-extensions/index.json').read_text())
             self.assertEqual(sorted(e['id'] for e in index['packages']),
-                             [feed.CLAUDE, feed.HOME_ASSISTANT, feed.WELCOME_LAUNCH, feed.WELCOME_PERFORMANCE])
+                             [feed.CLAUDE, feed.HOME_ASSISTANT, feed.WELCOME_ANIMATION, feed.WELCOME_LAUNCH,
+                              feed.WELCOME_PERFORMANCE])
+            self.assertEqual([e['id'] for e in index['packages'] if e['withdrawn']], [feed.WELCOME_ANIMATION])
             self.assertEqual((output / 'cs-extensions/index.html').read_bytes(),
                              (output / 'cs-extensions/index.json').read_bytes())
             for sha in shas:

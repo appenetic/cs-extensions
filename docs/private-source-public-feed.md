@@ -46,7 +46,9 @@ nur aus Shell-Skripten: zwei Hooks und `lib/intro.sh`. Es gibt keinen privaten
 Quelltext. Der Export nimmt beide mit einer festen Dateiliste auf, ohne README
 und ohne ELF-Prüfung. Er verlangt jetzt genau ein Release je zugelassenem
 Paket: HA, Claude und die beiden Welcome-Pakete. Die erste Fassung
-`com.appenetic.welcome-animation` ist nicht mehr im Feed.
+`com.appenetic.welcome-animation` bleibt als zurückgezogen im Feed: Ein
+Paket, das den Feed verlässt, kommt nach `repository/withdrawn.json` und steht
+weiter im Index, mit seinem veröffentlichten Archiv und `"withdrawn": true`.
 
 ## Build und Export
 

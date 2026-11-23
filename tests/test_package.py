@@ -92,8 +92,12 @@ class Package(unittest.TestCase):
     def test_welcome_archives(self):
         subprocess.run(['python3', 'tools/build.py'], cwd=ROOT, check=True, capture_output=True)
         entries = json.loads((ROOT / 'repository/index.json').read_text())['packages']
-        ids = [e['id'] for e in entries]
-        self.assertNotIn('com.appenetic.welcome-animation', ids, 'its settings were unreachable; retired')
+        # Its settings were unreachable; it stays in the index as published, withdrawn.
+        old = next(e for e in entries if e['id'] == 'com.appenetic.welcome-animation')
+        self.assertIs(old['withdrawn'], True)
+        self.assertEqual((old['version'], old['archive']['sha256'][:12]), ('0.1.0-alpha.1', '802d61188bf3'))
+        self.assertEqual(hashlib.sha256((ROOT / 'repository' / old['archive']['url']).read_bytes()).hexdigest(),
+                         old['archive']['sha256'])
         for kind in ['performance', 'launch']:
             entry = next(e for e in entries if e['id'] == 'com.appenetic.welcome-' + kind)
             manifest = entry['manifest']

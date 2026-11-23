@@ -1,0 +1,82 @@
+[
+  {
+    "id": "com.appenetic.welcome-animation",
+    "version": "0.1.0-alpha.1",
+    "sdk": ">=1.0 <2",
+    "title": "Welcome-Animation (experimental)",
+    "published_unix": 1794614400,
+    "withdrawn": true,
+    "manifest": {
+      "schema": 1,
+      "id": "com.appenetic.welcome-animation",
+      "version": "0.1.0-alpha.1",
+      "sdk": ">=1.0 <2",
+      "title": "Welcome-Animation (experimental)",
+      "summary": "Spielt beim Einsteigen die Performance- oder die Launch-Series-Animation, auf Wunsch mit deren Ambientelicht. Geändert wird nur, welches Video und welche Lichtanimation die Firmware wählt; das Auto sieht weiter seine echte Ausstattung.",
+      "authors": [
+        {
+          "name": "Appenetic",
+          "url": "https://github.com/appenetic/cs-extensions"
+        }
+      ],
+      "capabilities": [
+        "overlay",
+        "restart:ui"
+      ],
+      "settings": [
+        {
+          "id": "animation",
+          "type": "enum",
+          "title": "Welcome-Animation",
+          "summary": "Gilt ab dem nächsten Einsteigen. Ab Werk lässt die Firmware wählen; Standard erzwingt die normale Animation auch bei Performance- und Launch-Series-Autos.",
+          "order": 1,
+          "values": [
+            {
+              "value": "stock",
+              "title": "Ab Werk"
+            },
+            {
+              "value": "standard",
+              "title": "Standard"
+            },
+            {
+              "value": "performance",
+              "title": "Performance"
+            },
+            {
+              "value": "launch",
+              "title": "Launch Series"
+            }
+          ],
+          "default": "stock"
+        },
+        {
+          "id": "lights",
+          "type": "bool",
+          "title": "Ambientelicht passend zur Animation",
+          "summary": "Performance: blaues Pulsieren mit hellen Blitzen, Launch Series: eine rot-weiß-orange Welle. Braucht RGB-Ambientelicht und einen Neustart des Touchscreens; CoilShift wartet damit, bis du aussteigst, oder du tippst „Apply now“.",
+          "order": 2,
+          "default": true
+        }
+      ],
+      "hooks": {
+        "apply": {
+          "run": "hooks/apply.sh",
+          "rerun": "in-place",
+          "phase": "early",
+          "timeout": 30
+        },
+        "remove": {
+          "run": "hooks/remove.sh",
+          "timeout": 30
+        }
+      }
+    },
+    "manifest_sha256": "742556210d19a75aa25f28f36ab22933a25775f086ada674c834d39522da9987",
+    "archive": {
+      "url": "pool/802d61188bf32c2b1865ed499fed60e8a1a71ee217abb2dc91406d8509193ac8",
+      "sha256": "802d61188bf32c2b1865ed499fed60e8a1a71ee217abb2dc91406d8509193ac8",
+      "bytes": 20480
+    }
+  }
+]
