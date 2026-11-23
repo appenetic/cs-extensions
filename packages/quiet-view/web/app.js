@@ -1,19 +1,30 @@
 // The quiet view: a glow in the ambient light's colour over a dark screen and
 // two light trails towards a vanishing point, with pulses running down them
-// towards the driver. The still part is painted once per colour and size; each
-// frame adds only what moves. /state brings the colour and the arrival.
+// towards the driver. The trails bend the way the car turns. The background and
+// the glow are painted once per colour and size; each frame adds the trails,
+// drawn small and blurred and then scaled up, the breathing and the pulses.
+// /state brings the colour, the arrival and the turn rate.
 (() => {
   'use strict';
 
   const canvas = document.getElementById('glow');
   const ctx = canvas.getContext('2d');
   const base = document.createElement('canvas');
+  const trails = document.createElement('canvas');
   const trip = document.getElementById('trip');
   const eta = document.getElementById('eta');
   const rest = document.getElementById('rest');
   const hint = document.getElementById('hint');
+  // The trails' buffer is this much of the screen; blurred, it scales up cleanly.
+  const TRAIL_SCALE = 0.25;
   let rgb = [255, 255, 255];
   let geo = null;
+  // bend runs from -1 (hard left) to 1 (hard right) and eases towards target.
+  let bend = 0;
+  let target = 0;
+  let trailsBend = null;
+  let lastState = 0;
+  let lastFrame = 0;
 
   const rgba = (a, c = rgb) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
@@ -22,10 +33,22 @@
     return m ? [1, 2, 3].map((i) => parseInt(m[i], 16)) : null;
   }
 
-  // The trails run from the bottom corners to the vanishing point.
+  // Degrees per second the heading turns, right positive, as a bend: gentle
+  // curves already show, a turn at a junction (about 25 °/s) bends fully. Below
+  // 0.4 °/s it is the GPS wandering, and the road stays straight.
+  function bendFor(yaw) {
+    const v = Number.parseFloat(yaw);
+    if (!Number.isFinite(v)) return 0;
+    const a = Math.max(0, Math.abs(v) - 0.4);
+    return Math.sign(v) * Math.min(1, Math.sqrt(a / 25));
+  }
+
+  // A point of a trail, p from 0 at the vanishing point to 1 at the bottom edge.
+  // A bend moves the far end sideways, the near end stays, like a road ahead
+  // that curves.
   function trailPoint(side, p) {
     const { w, h, vx, vy } = geo;
-    const x = vx + side * (0.03 * w + 0.45 * w * p);
+    const x = vx + side * (0.03 * w + 0.45 * w * p) + bend * 0.3 * w * (1 - p) ** 2;
     return { x, y: vy + (h - vy) * p, width: 0.012 * w + 0.16 * w * p };
   }
 
@@ -33,6 +56,8 @@
     const dpr = window.devicePixelRatio || 1;
     canvas.width = base.width = Math.round(innerWidth * dpr);
     canvas.height = base.height = Math.round(innerHeight * dpr);
+    trails.width = Math.max(1, Math.round(canvas.width * TRAIL_SCALE));
+    trails.height = Math.max(1, Math.round(canvas.height * TRAIL_SCALE));
     const w = canvas.width;
     const h = canvas.height;
     geo = { w, h, vx: w / 2, vy: h * 0.58, gx: w / 2, gy: h * 0.3, gr: Math.max(w, h) * 0.32 };
@@ -59,38 +84,46 @@
 
   function paintBase() {
     const g = base.getContext('2d');
-    const { w, h, vx, vy } = geo;
+    const { w, h } = geo;
     g.globalCompositeOperation = 'source-over';
     g.fillStyle = rgba(1, rgb.map((c) => Math.round(5 + c * 0.03)));
     g.fillRect(0, 0, w, h);
     g.globalCompositeOperation = 'lighter';
     glowAt(g, 1, 1);
-    // Each trail as a wide soft beam and a brighter core. The base is painted
-    // once per colour and size, so the blur costs nothing per frame.
+    trailsBend = null;
+  }
+
+  // Each trail as a wide soft beam and a brighter core, in the small buffer.
+  function paintTrails() {
+    const g = trails.getContext('2d');
+    g.clearRect(0, 0, trails.width, trails.height);
+    g.globalCompositeOperation = 'lighter';
     for (const side of [-1, 1]) {
-      beam(g, side, 2.4, 0.34, w * 0.02);
-      beam(g, side, 0.45, 0.42, w * 0.005);
+      beam(g, side, 2.4, 0.34, geo.w * 0.02);
+      beam(g, side, 0.45, 0.42, geo.w * 0.005);
     }
+    trailsBend = bend;
   }
 
   function beam(g, side, spread, alpha, blur) {
-    const { h, vx, vy } = geo;
-    const bottom = trailPoint(side, 1);
-    const grad = g.createLinearGradient(vx, vy, bottom.x, h);
+    const s = TRAIL_SCALE;
+    const far = trailPoint(side, 0);
+    const near = trailPoint(side, 1);
+    const grad = g.createLinearGradient(far.x * s, far.y * s, near.x * s, near.y * s);
     grad.addColorStop(0, rgba(0));
     grad.addColorStop(0.3, rgba(alpha * 0.2));
     grad.addColorStop(1, rgba(alpha));
     g.save();
-    g.filter = `blur(${Math.round(blur)}px)`;
+    g.filter = `blur(${Math.max(0.5, blur * s).toFixed(1)}px)`;
     g.fillStyle = grad;
     g.beginPath();
     for (let i = 0; i <= 24; i++) {
       const pt = trailPoint(side, i / 24);
-      g.lineTo(pt.x - (pt.width * spread) / 2, pt.y);
+      g.lineTo((pt.x - (pt.width * spread) / 2) * s, pt.y * s);
     }
     for (let i = 24; i >= 0; i--) {
       const pt = trailPoint(side, i / 24);
-      g.lineTo(pt.x + (pt.width * spread) / 2, pt.y);
+      g.lineTo((pt.x + (pt.width * spread) / 2) * s, pt.y * s);
     }
     g.closePath();
     g.fill();
@@ -121,9 +154,16 @@
 
   function frame(now) {
     const s = now / 1000;
+    const dt = lastFrame ? Math.min(0.1, s - lastFrame) : 0;
+    lastFrame = s;
+    // Without fresh state the trails straighten out.
+    const goal = performance.now() - lastState < 3000 ? target : 0;
+    bend += (goal - bend) * Math.min(1, dt / 0.7);
+    if (trailsBend === null || Math.abs(bend - trailsBend) > 0.002) paintTrails();
     ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(base, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(trails, 0, 0, geo.w, geo.h);
     glowAt(ctx, 1.05, 0.18 * (1 + Math.sin((s * Math.PI * 2) / 5)));
     [-1, 1].forEach((side, k) => {
       for (let n = 0; n < 3; n++) {
@@ -140,6 +180,8 @@
       rgb = c;
       paintBase();
     }
+    target = bendFor(state.yaw);
+    lastState = performance.now();
     trip.hidden = !(state.trip && state.eta);
     eta.textContent = state.eta || '';
     const parts = [];
@@ -191,6 +233,7 @@
   requestAnimationFrame(frame);
   askWindow('max');
   poll();
-  setInterval(poll, 2000);
+  // The turn rate changes quickly; the service samples the heading twice a second.
+  setInterval(poll, 500);
   setTimeout(() => hint.classList.add('gone'), 6000);
 })();

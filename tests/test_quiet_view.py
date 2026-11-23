@@ -125,14 +125,58 @@ for k in 5.4 0 "<invalid>"; do printf '[%s]\\n' "$(quiet_km "$k")"; done''')
 
     def test_state_without_a_trip_has_only_the_colour(self):
         self.bash('quiet_state')
-        self.assertEqual(self.state(), {'color': '#ff8300', 'trip': False, 'eta': '', 'min': '', 'km': ''})
+        self.assertEqual(self.state(), {'color': '#ff8300', 'trip': False, 'eta': '', 'min': '', 'km': '', 'yaw': '0.0'})
 
     def test_state_with_a_trip(self):
         self.dv(GUI_navNextDestinationArrivalInfoValid='true', GUI_navNextDestinationArrivalTime='16:41:00',
                 NAV_minutesToArrival='14.6', NAV_milesToArrival='5.4', GUI_navDestinationLocationName='<redacted>')
         self.bash('quiet_state')
-        self.assertEqual(self.state(), {'color': '#ff8300', 'trip': True, 'eta': '16:41', 'min': '15', 'km': '8,7'})
+        self.assertEqual(self.state(), {'color': '#ff8300', 'trip': True, 'eta': '16:41', 'min': '15', 'km': '8,7',
+                                        'yaw': '0.0'})
         self.assertNotIn('redacted', (self.run_dir / 'state.json').read_text())
+
+    def test_numbers_in_thousandths(self):
+        out = self.bash('''for v in 33.076 -0.5 007.1 12 359.9999 abc 1.2.3 "" . "<invalid>" -; do
+    if quiet_milli "$v"; then printf '%s\\n' "$REPLY"; else echo no; fi
+done
+for v in 5000 -27000 -200 20 -40 0 123456; do quiet_tenths "$v"; printf '%s\\n' "$REPLY"; done''')
+        self.assertEqual(out.splitlines(), ['33076', '-500', '7100', '12000', '359999', 'no', 'no', 'no', 'no', 'no',
+                                            'no', '5.0', '-27.0', '-0.2', '0.0', '0.0', '0.0', '123.5'])
+
+    def turns(self, samples):
+        # Heading, speed, time in hundredths of a second; YAW after each sample.
+        script = ''.join(f'quiet_turn "{h}" "{v}" {t}; printf "%s\\n" "$YAW"\n' for h, v, t, _ in samples)
+        self.assertEqual(self.bash(script).splitlines(), [y for *_, y in samples])
+
+    def test_turn_rate_across_north(self):
+        self.turns([('358.000', '20.0', 1000, '0.0'),     # first sample: no rate yet
+                    ('0.000', '20.0', 1050, '4.0'),       # right across north
+                    ('2.000', '20.0', 1100, '4.0'),       # over the last second
+                    ('4.000', '20.0', 1150, '4.0')])
+        self.turns([('2.000', '20.0', 1000, '0.0'),
+                    ('0.000', '20.0', 1050, '-4.0'),      # left across north
+                    ('358.000', '20.0', 1100, '-4.0'),
+                    ('356.500', '20.0', 1150, '-3.5')])
+
+    def test_turn_rate_is_steady_when_the_heading_updates_once_a_second(self):
+        self.turns([('100.000', '20.0', 1000, '0.0'),
+                    ('100.000', '20.0', 1050, '0.0'),
+                    ('102.000', '20.0', 1100, '2.0'),
+                    ('102.000', '20.0', 1150, '2.0'),
+                    ('104.000', '20.0', 1200, '2.0'),
+                    ('104.000', '20.0', 1250, '2.0')])
+
+    def test_turn_rate_ignores_standing_jumps_and_gaps(self):
+        self.turns([('50.000', '20.0', 1000, '0.0'),
+                    ('50.000', '20.0', 1050, '0.0'),
+                    ('140.000', '20.0', 1100, '0.0'),     # 90 degrees in a second: a new fix
+                    ('141.000', '20.0', 1150, '0.0'),
+                    ('142.000', '20.0', 1200, '2.0'),
+                    ('150.000', '0.4', 1250, '0.0'),      # standing
+                    ('152.000', '20.0', 1300, '0.0'),     # moving again: first sample
+                    ('<invalid>', '20.0', 1350, '0.0'),   # no heading
+                    ('160.000', '20.0', 1400, '0.0'),
+                    ('159.900', '20.0', 1450, '-0.2')])
 
     def test_http_serves_the_app_and_state(self):
         self.bash('quiet_state')
@@ -158,7 +202,8 @@ for k in 5.4 0 "<invalid>"; do printf '[%s]\\n' "$(quiet_km "$k")"; done''')
                  (f'GET /window/max HTTP/1.1\r\nHost: localhost:{PORT}\r\n\r\n', '404 Not Found'),
                  (f'GET /../coilshift.json HTTP/1.1\r\nHost: localhost:{PORT}\r\n\r\n', '404 Not Found'),
                  (f'GET /lib/quiet.sh HTTP/1.1\r\nHost: localhost:{PORT}\r\n\r\n', '404 Not Found'),
-                 (f'GET /state HTTP/1.1\r\nHost: localhost:{PORT}\r\n\r\n', '503 Service Unavailable')]
+                 (f'GET /state HTTP/1.1\r\nHost: localhost:{PORT}\r\n\r\n', '503 Service Unavailable'),
+                 (f'GET / HTTP/1.1\r\nX-Host: localhost:{PORT}\r\n\r\n', '421 Misdirected Request')]
         for request, expected in cases:
             with self.subTest(request.split('\r\n')[0]):
                 status, _, body = self.http(request)
@@ -176,7 +221,7 @@ for k in 5.4 0 "<invalid>"; do printf '[%s]\\n' "$(quiet_km "$k")"; done''')
         prefix = '--system --print-reply=literal --dest=com.tesla.CenterDisplayDbus /CenterDisplayDbus com.tesla.CenterDisplayDbus.'
         status, _, _ = self.http(f'POST /window/max HTTP/1.1\r\nHost: 127.0.0.1:{PORT}\r\nX-Quiet: 1\r\nContent-Length: 0\r\n\r\n')
         self.assertEqual(status, 'HTTP/1.1 204 No Content')
-        status, _, _ = self.http(f'POST /window/close HTTP/1.1\r\nHost: 127.0.0.1:{PORT}\r\nx-quiet: 1\r\n\r\n')
+        status, _, _ = self.http(f'POST /window/close HTTP/1.1\r\nHOST: 127.0.0.1:{PORT}\r\nx-QUIET: 1\r\n\r\n')
         self.assertEqual(status, 'HTTP/1.1 204 No Content')
         self.assertEqual(self.dbus(), [prefix + 'maximizeAppWindow string:Quiet boolean:true',
                                        prefix + 'setWebAppDismissGestureEnabled string:Quiet boolean:true',
@@ -259,6 +304,7 @@ class QuietViewFiles(unittest.TestCase):
         self.assertIn("askWindow('max')", js)
         self.assertIn("askWindow('close')", js)
         self.assertIn("'X-Quiet': '1'", js)
+        self.assertIn('bendFor(state.yaw)', js)
 
     @unittest.skipUnless(shutil.which('node'), 'node checks the script syntax')
     def test_script_parses(self):

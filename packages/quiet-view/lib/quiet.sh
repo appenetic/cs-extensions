@@ -3,7 +3,9 @@
 # definition has QtCar open web/ in a maximized window without a top bar, also
 # in Drive, and a swipe down on the page closes it. The web service serves those
 # files and /state on the package's web port, with socat, in every browser
-# namespace; it writes /state from the car's DataValues.
+# namespace; it writes /state from the car's DataValues, the turn rate twice a
+# second. The page asks for /state twice a second, so the request path starts no
+# process beyond the handler itself.
 WEB=${CSDK_PACKAGE_DIR:-}/web
 STATE=${CSDK_RUN:-}/state.json
 PORT=${CSDK_WEB_APP_PORT:-}
@@ -11,7 +13,8 @@ LISTEN=${CSDK_RUN:-}/listen
 # QtCar knows a web app by its title, the sandbox by the tile ID: the package ID
 # with dashes for dots, a dot and the tile.
 TITLE=Quiet
-TILE=$(printf '%s' "${CSDK_PKG:-com.appenetic.quiet-view}" | tr . -).app
+TILE=${CSDK_PKG:-com.appenetic.quiet-view}
+TILE=${TILE//./-}.app
 
 api() {
     curl --silent --show-error --fail --connect-timeout 2 --max-time 10 \
@@ -60,22 +63,84 @@ quiet_km() {
     awk -v m="$1" 'BEGIN { printf "%.1f", m * 1.609344 }' | tr . ,
 }
 
-# /state for the page: the colour, and the trip while one is planned. The
-# destination is left out: through the car API it reads "<redacted>".
-quiet_state() {
-    local color trip=false eta='' min='' km='' tmp
-    color=$(quiet_color "$(dv GUI_rgbColor)")
+# A decimal the car reports ("33.076", "-0.5") in thousandths, in REPLY; false
+# if it is not a number. No process is started: this runs twice a second.
+quiet_milli() {
+    local v=$1 sign='' int frac=''
+    case "$v" in -*) sign=-; v=${v#-} ;; esac
+    case "$v" in ''|.|*[!0-9.]*|*.*.*) return 1 ;; esac
+    int=${v%%.*}
+    case "$v" in *.*) frac=${v#*.} ;; esac
+    frac=${frac}000
+    REPLY=$sign$((10#${int:-0} * 1000 + 10#${frac:0:3}))
+}
+
+# Thousandths as a decimal with one place ("-3.3"), in REPLY.
+quiet_tenths() {
+    local v=$1 sign=''
+    [ "$v" -ge 0 ] || { sign=-; v=$((-v)); }
+    v=$(((v + 50) / 100))
+    [ "$v" -ne 0 ] || sign=''
+    REPLY=$sign$((v / 10)).$((v % 10))
+}
+
+# How fast the car turns, from its heading: degrees per second, right
+# positive, in YAW ("-3.3"); 0.0 while it stands or has no heading. The
+# arguments are the heading in degrees, the speed and the time in hundredths of
+# a second. The rate spans the last two samples, about a second, so a heading
+# the car updates only once a second still gives a steady rate. A heading that
+# jumps by more than 60 degrees a second is a new fix, not a turn.
+TURN_H='' TURN_T='' TURN_H0='' TURN_T0='' YAW=0.0
+quiet_turn() {
+    local h d rate=0 from at
+    if quiet_milli "$1" && h=$REPLY && quiet_milli "$2" && [ "$REPLY" -ge 1000 ]; then
+        from=${TURN_H0:-$TURN_H} at=${TURN_T0:-$TURN_T}
+        if [ -n "$from" ] && [ "$3" -gt "$at" ]; then
+            d=$(((h - from) % 360000))
+            [ "$d" -le 180000 ] || d=$((d - 360000))
+            [ "$d" -gt -180000 ] || d=$((d + 360000))
+            rate=$((d * 100 / ($3 - at)))
+            [ "$rate" -le 60000 ] && [ "$rate" -ge -60000 ] || rate=0
+        fi
+        TURN_H0=$TURN_H TURN_T0=$TURN_T TURN_H=$h TURN_T=$3
+    else
+        TURN_H='' TURN_T='' TURN_H0='' TURN_T0=''
+    fi
+    quiet_tenths "$rate"
+    YAW=$REPLY
+}
+quiet_motion() {
+    local up
+    { read -r up _ < /proc/uptime; } 2>/dev/null || return 0
+    quiet_turn "$(dv LOC_estimatedHdg)" "$(dv VAPI_vehicleSpeed)" "$((10#${up%.*} * 100 + 10#${up#*.}))"
+}
+
+# The colour, and the trip while one is planned. The destination is left out:
+# through the car API it reads "<redacted>".
+COLOR='#ffffff' TRIP=false ETA='' MIN='' KM=''
+quiet_trip() {
+    COLOR=$(quiet_color "$(dv GUI_rgbColor)")
+    TRIP=false ETA='' MIN='' KM=''
     if [ "$(dv GUI_navNextDestinationArrivalInfoValid)" = true ]; then
-        eta=$(quiet_time "$(dv GUI_navNextDestinationArrivalTime)")
-        if [ -n "$eta" ]; then
-            trip=true
-            min=$(quiet_minutes "$(dv NAV_minutesToArrival)")
-            km=$(quiet_km "$(dv NAV_milesToArrival)")
+        ETA=$(quiet_time "$(dv GUI_navNextDestinationArrivalTime)")
+        if [ -n "$ETA" ]; then
+            TRIP=true
+            MIN=$(quiet_minutes "$(dv NAV_minutesToArrival)")
+            KM=$(quiet_km "$(dv NAV_milesToArrival)")
         fi
     fi
-    tmp=$STATE.$$
-    printf '{"color":"%s","trip":%s,"eta":"%s","min":"%s","km":"%s"}\n' "$color" "$trip" "$eta" "$min" "$km" > "$tmp" &&
-        mv -f "$tmp" "$STATE"
+}
+
+# /state for the page, as one line; the rename keeps a reader from a half file.
+quiet_write() {
+    local tmp=$STATE.$$
+    printf '{"color":"%s","trip":%s,"eta":"%s","min":"%s","km":"%s","yaw":"%s"}\n' \
+        "$COLOR" "$TRIP" "$ETA" "$MIN" "$KM" "$YAW" > "$tmp" && mv -f "$tmp" "$STATE"
+}
+quiet_state() {
+    quiet_trip
+    quiet_motion
+    quiet_write
 }
 
 # The tile as the daemon builds one for a manifest tile (the browser config and
@@ -140,7 +205,7 @@ qtcar() {
 # a page elsewhere cannot rebind to it, and POST only with the X-Quiet header,
 # which another origin cannot send without a preflight this server refuses.
 quiet_http() {
-    local line method path version name host='' quiet='' file type
+    local line method path version host='' quiet='' file type body
     IFS= read -r -t 5 line || return 0
     line=${line%$'\r'}
     read -r method path version <<EOF
@@ -149,50 +214,62 @@ EOF
     while IFS= read -r -t 5 line; do
         line=${line%$'\r'}
         [ -n "$line" ] || break
-        name=$(printf '%s' "${line%%:*}" | tr 'A-Z' 'a-z')
-        case "$name" in
-        host) host=${line#*:}; host=${host# } ;;
-        x-quiet) quiet=${line#*:}; quiet=${quiet# } ;;
+        # Header names in any case, without a process for tr.
+        case "$line" in
+        [Hh][Oo][Ss][Tt]:*) host=${line#*:}; host=${host# } ;;
+        [Xx]-[Qq][Uu][Ii][Ee][Tt]:*) quiet=${line#*:}; quiet=${quiet# } ;;
         esac
     done
     case "$host" in
     "127.0.0.1:$PORT"|"localhost:$PORT") ;;
-    *) quiet_reply '421 Misdirected Request' text/plain /dev/null; return 0 ;;
+    *) quiet_send '421 Misdirected Request'; return 0 ;;
     esac
     case "$method $path" in
     'POST /window/max'|'POST /window/close')
         if [ "$quiet" != 1 ]; then
-            quiet_reply '403 Forbidden' text/plain /dev/null
+            quiet_send '403 Forbidden'
         elif quiet_window "${path#/window/}"; then
-            quiet_reply '204 No Content' text/plain /dev/null
+            quiet_send '204 No Content'
         else
-            quiet_reply '502 Bad Gateway' text/plain /dev/null
+            quiet_send '502 Bad Gateway'
         fi
         return 0 ;;
     GET\ *|HEAD\ *) ;;
-    *) quiet_reply '405 Method Not Allowed' text/plain /dev/null; return 0 ;;
+    *) quiet_send '405 Method Not Allowed'; return 0 ;;
     esac
     case "${path%%\?*}" in
     /) file=$WEB/index.html type='text/html; charset=utf-8' ;;
     /app.js) file=$WEB/app.js type='text/javascript; charset=utf-8' ;;
     /app.css) file=$WEB/app.css type='text/css; charset=utf-8' ;;
     /icon.png) file=$WEB/icon.png type=image/png ;;
-    /state) file=$STATE type='application/json' ;;
-    *) quiet_reply '404 Not Found' text/plain /dev/null; return 0 ;;
+    /state)
+        # One line, read by the shell itself.
+        if { IFS= read -r body < "$STATE"; } 2>/dev/null; then
+            quiet_send '200 OK' application/json "$body"
+        else
+            quiet_send '503 Service Unavailable'
+        fi
+        return 0 ;;
+    *) quiet_send '404 Not Found'; return 0 ;;
     esac
     if [ ! -f "$file" ]; then
-        quiet_reply '503 Service Unavailable' text/plain /dev/null
+        quiet_send '503 Service Unavailable'
         return 0
     fi
-    quiet_reply '200 OK' "$type" "$file"
+    quiet_head '200 OK' "$type" "$(wc -c < "$file" | tr -d ' ')"
+    [ "$method" = HEAD ] || cat "$file"
 }
-quiet_reply() {
-    local size
-    size=$(wc -c < "$3" | tr -d ' ')
-    printf 'HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %s\r\nCache-Control: no-store\r\n' "$1" "$2" "$size"
+# A reply with a body of one line, or none.
+quiet_send() {
+    local LC_ALL=C length=0
+    [ -z "${3:-}" ] || length=$((${#3} + 1))
+    quiet_head "$1" "${2:-text/plain}" "$length"
+    [ "$method" = HEAD ] || [ -z "${3:-}" ] || printf '%s\n' "$3"
+}
+quiet_head() {
+    printf 'HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %s\r\nCache-Control: no-store\r\n' "$1" "$2" "$3"
     printf "X-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'; img-src 'self' data:\r\n"
     printf 'Connection: close\r\n\r\n'
-    [ "$method" = HEAD ] || cat "$3"
 }
 
 # The port in every namespace a browser of the car may open the tile in: the
@@ -201,16 +278,21 @@ quiet_reply() {
 # Claude package's web service does it). One socat per namespace, by inode; one
 # that died is started again on the next scan.
 quiet_scan() {
-    local ns id pid
+    local ns id pid comm
     mkdir -p "$LISTEN"
     for ns in self /var/run/netns/chromium* /proc/[0-9]*/ns/net; do
         case "$ns" in
         self) ns=/proc/self/ns/net ;;
-        /proc/*) case "$(cat "${ns%/ns/net}/comm" 2>/dev/null)" in *chromium*) ;; *) continue ;; esac ;;
+        /proc/*)
+            # Every process of the car passes here: read, not cat.
+            comm=''
+            { read -r comm < "${ns%/ns/net}/comm"; } 2>/dev/null
+            case "$comm" in *chromium*) ;; *) continue ;; esac ;;
         esac
         id=$(stat -L -c %i "$ns" 2>/dev/null) || continue
         [ -n "$id" ] || continue
-        pid=$(cat "$LISTEN/$id" 2>/dev/null)
+        pid=''
+        { read -r pid < "$LISTEN/$id"; } 2>/dev/null
         [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && continue
         # nsenter execs socat, so $! is the listener in both cases.
         if [ "$ns" = /proc/self/ns/net ]; then

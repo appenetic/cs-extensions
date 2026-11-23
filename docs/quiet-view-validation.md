@@ -77,9 +77,29 @@ Kachel, so wie Netflix. Am Auto geprüft (Firmware 2026.32.7, simulierte Fahrt):
 - **Bildschirmfoto:** Eine X-Aufnahme (`ximagesrc`) bleibt schwarz, weil QtCar
   per GPU zeichnet. QtCars `screenshot` zeigt die eigene Oberfläche.
 
+## Kurve und Feed (alpha.3)
+
+- **Fahrtrichtung:** Über die Schnittstelle liest das Paket `LOC_estimatedHdg`
+  (33.076) und `LOC_geoHdg`. `NAVGUI_carHeading` und `LOC_adasHdg` kennt sie
+  nicht (404). `VAPI_steeringAngle`, `VAPI_yawRate` und `VAPI_lateralAccel`
+  standen in P auf `<invalid>`. `sleep 0.5` geht mit BusyBox, `read -t` in
+  Bash 3.2 nur ganze Sekunden.
+- **Feed am Auto:** Der CoilShift-Server holt ein Repository höchstens etwa
+  alle 15 Minuten neu (`checked_unix`). Frühere Anfragen an
+  `api/repositories/<id>/refresh` antworten mit dem alten Stand. Ein
+  installiertes Paket aktualisiert sich danach von selbst, der Dienst startet
+  etwa eine Minute später.
+- **Kachel:** Auf diesem Auto fehlt der `qtcar_tiles`-Binder. Eine neue Kachel
+  erscheint erst nach dem Neustart von QtCar, den CoilShift bis P zurückhält.
+  Bleibt die Definition gleich, braucht ein Update keinen Neustart.
+- **Nachfrage-Last:** Vorher startete der Namespace-Scan alle 2 s für jeden
+  Prozess ein `cat`, der Handler pro Header ein `tr`. Beides liest jetzt die
+  Shell selbst.
+
 ## Am Auto offen
 
-1. Ob QtCar die Kachel ohne Neustart zeigt.
+1. Ob sich die Bahnen in echten Kurven richtig herum und ruhig biegen. Ob die
+   simulierte Fahrt `LOC_estimatedHdg` mitdreht.
 2. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
 3. Ob das Wischen nach unten die App über `dismissApp` schließt.
