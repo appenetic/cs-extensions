@@ -7,73 +7,104 @@ Bildschirm mit einem Lichtschein in der Farbe deines Ambientelichts: oben ein
 weicher, atmender Schein, unten zwei Lichtbahnen wie eine Straße bei Nacht, auf
 denen Lichtpulse zu dir hin laufen, im Stand langsam, schneller, je schneller
 du fährst. In einer Linkskurve biegen sich die Bahnen nach links, in einer
-Rechtskurve nach rechts. Mit aktiver Navigation stehen
-Ankunftszeit, Restzeit und Reststrecke in der Mitte. Fest nach unten wischen
-schließt die App.
+Rechtskurve nach rechts. Blinkst du, pulsiert die Bahn auf dieser Seite im
+Takt.
+
+Ruhig darüber: oben links der Tacho, in der Mitte Ankunftszeit, Restzeit,
+Reststrecke und die nächste Abbiegung („Abbiegen in 200 m“), unten eine Linie
+für den Fortschritt der Route. Fest nach unten wischen schließt die App,
+lange drücken öffnet die Optionen.
+
+## Optionen
+
+Pakete aus einem Repository bekommen in CoilShift keine Einstellungen. Ein
+langer Druck in der App öffnet deshalb ein Menü: Ankunftszeit und Fortschritt,
+Abbiegehinweise, Tacho und Lichtpulse an oder aus, Helligkeit Auto, Hell oder
+Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
+
+## Sicherheit
+
+- **Tacho:** Auf dem Model Y gibt es nur diesen Bildschirm, das maximierte
+  Fenster verdeckt die Geschwindigkeitsanzeige. Die App zeigt deshalb
+  `VAPI_displaySpeed`, die Zahl des Tachos, in seiner Einheit.
+- **Warnungen:** Beginnt bei offener App eine Warnung, schließt der Dienst sie
+  über QtCars `dismissApp`. Das gilt für eine Übernahme-Aufforderung
+  (`GUI_centerDisplayTakeOverNow`), eine Hände-am-Lenkrad-Mahnung, die der
+  Bildschirm zeigt oder mit Ton meldet (`DAS_autopilotHandsOnState`), eine
+  Kollisionswarnung (`DAS_sideCollisionWarning`, `DAS_longCollisionWarning`)
+  und den Rückwärtsgang. Was ein Wert beim Öffnen schon zeigt, gilt als
+  Ausgangslage. So kann ein unerwarteter Normalwert die App nicht immer wieder
+  schließen. Jeder Auslöser steht mit seinem Wert im Paketlog.
 
 ## Grenzen
 
 - **Start per Kachel:** QtCar startet eine App von außen nur, wenn eine App auf
   dem Bildschirm das anfordert. Die Quiet-Ansicht öffnest du deshalb über ihre
   Kachel.
-- **Kein Zielname:** Über die Schnittstelle des Autos kommt das Ziel nur als
-  `<redacted>`. Die App zeigt deshalb Ankunftszeit, Minuten und Kilometer.
-- **Farbe:** Sie folgt dem Ambientelicht, auch wenn es die Farbe des
-  Albumcovers übernimmt. Ohne RGB-Ambientelicht ist der Schein weiß.
-- **Tacho:** Auf dem Model Y gibt es nur diesen Bildschirm. Ein maximiertes
-  Fenster überdeckt auch die Geschwindigkeitsanzeige.
+- **Kein Zielname, keine Abbiegerichtung:** Über die Schnittstelle des Autos
+  kommen das Ziel, die Richtung der nächsten Abbiegung und ihr Straßenname nur
+  als `<redacted>`. Die App zeigt deshalb nur die Entfernung zur Abbiegung, und
+  die Bahnen biegen sich erst in der Kurve selbst. Gäbe CoilShift die Richtung
+  frei, erkennt der Dienst sie an Wörtern (`slight`, `sharp`, `uturn`, `left`,
+  `right` …), zeigt „in 200 m leicht links“ und biegt die Bahnen ab 300 m vorab.
+- **Ungeprüfte Werte:** Wie die Firmware Blinker und Warnstufen schreibt, war am
+  Auto noch nicht zu sehen. Das Paket erkennt sie an Wörtern (`left`, `right`,
+  `both`, `visual`, `chime`, `slow`, `struck`, `escalat`).
+- **Kurve aus der Fahrtrichtung:** Die Bahnen folgen der Änderung von
+  `LOC_estimatedHdg`, mit etwa einer Sekunde Verzögerung. Gierrate und
+  Lenkwinkel wären direkter, ihr Vorzeichen und ihre Einheit sind aber noch
+  offen. Der Dienst schreibt sie deshalb während der Fahrt neben die Drehrate
+  in `CSDK_STATE/turns.log` (höchstens etwa 512 KB).
 
 ## So funktioniert es
 
-- **Kachel:** Der `apply`-Hook schreibt die Kachel-Definition selbst
-  (`config`, `webapp.json`, Symbol) und installiert sie über `PUT /v1/tiles`.
-  Gegenüber der Kachel, die CoilShift aus dem Manifest baut, setzt sie
-  `appWindowDefaultOpensToMaximized`, `appWindowIsMaximizedOnly`,
+- **Kachel:** Der `apply`-Hook (`lib/quiet.sh`) schreibt die Kachel-Definition
+  selbst (`config`, `webapp.json`, Symbol) und installiert sie über
+  `PUT /v1/tiles/app`. Gegenüber der Kachel, die CoilShift aus dem Manifest
+  baut, setzt sie `appWindowDefaultOpensToMaximized`, `appWindowIsMaximizedOnly`,
   `canMaximizeAppWindow` und `allowInDrive` und blendet die Titelleiste aus.
-  Der Ledger nimmt die Kachel beim Deinstallieren zurück.
-- **Dienst `web`** (`hooks/web.sh`, `lib/quiet.sh`, `lib/http.sh`): Zwei Mal
-  pro Sekunde schreibt er `/state` mit der Drehrate, alle 2 s auch Farbe und
-  Fahrt. Ebenso oft öffnet er den Web-Port mit `socat` in jedem Netz-Namespace
-  eines Browsers. Dazu gehören auch die Namespaces, die ein App-Fenster erst
-  beim Start bekommt. Der Handler beantwortet nur Anfragen an `127.0.0.1` oder
-  `localhost` auf diesem Port und startet für `/state` keinen weiteren Prozess.
-- **Kurve:** Die Drehrate ist die Änderung von `LOC_estimatedHdg` über die
-  letzte Sekunde, rechts positiv. Im Stand (`VAPI_vehicleSpeed` unter 1) und bei
-  Sprüngen über 60 °/s, also einem neuen GPS-Fix, ist sie 0. Die Seite macht
-  daraus eine Biegung: Etwa 25 °/s, eine Abzweigung, biegt voll, eine
-  Autobahnkurve mit 2 °/s leicht, unter 0,4 °/s bleibt die Straße gerade. Sie
-  gleitet in etwa 0,7 s dorthin.
-- **Tempo:** Ein Lichtpuls braucht im Stand etwa 5 s vom Horizont bis zu dir,
-  ab etwa 75 (`VAPI_vehicleSpeed`) 2 s. Dazwischen steigt das Tempo mit der
-  Wurzel der Geschwindigkeit, so liegen Stadttempi auseinander. Es folgt der
-  Geschwindigkeit über etwa 1,5 s und läuft über eine fortlaufende Phase, damit
-  die Pulse nie springen. Kommt 3 s lang nichts Neues,
-  laufen die Bahnen wieder gerade. `VAPI_steeringAngle` und `VAPI_yawRate`
-  wären direkter, sind im Stand aber `<invalid>` und ihre Vorzeichen am Auto
-  nicht geprüft.
+  Der Ledger nimmt sie beim Deinstallieren zurück.
+- **Dienst `web`:** ein Go-Programm (`bin/quiet-linux-amd64`), das `web.sh`
+  ins ausführbare `CSDK_RUN` kopiert und startet. Es öffnet den Web-Port in
+  jedem Netz-Namespace eines Browsers, auch in denen, die ein App-Fenster erst
+  beim Start bekommt, und antwortet nur `127.0.0.1` oder `localhost` auf
+  diesem Port. Die Seite bekommt die Daten als Server-Sent Events
+  (`/events`), `/state` springt ein, solange der Strom fehlt.
+- **Sparsam lesen:** Der Daemon protokolliert jeden Aufruf und erlaubt einem
+  Paket 8 gleichzeitige Aufrufe und 4 Streams. Der Dienst liest das Auto deshalb
+  nur, solange die Seite offen ist: Fahrtrichtung, Tacho, Übernahme und
+  Hände-Mahnung als Streams, der Rest ein- bis zweimal pro Sekunde nacheinander.
+  Geschlossen liest er alle 15 s nur die Reststrecke, damit die
+  Fortschrittslinie weiß, wo die Route begann.
 - **Fenster:** Die Seite meldet sich beim Öffnen mit `POST /window/max` und
   beim Wischen mit `POST /window/close`. Der Dienst ruft dann QtCars
   `maximizeAppWindow`/`setWebAppDismissGestureEnabled` oder `dismissApp` über
-  D-Bus auf, mit dem Titel der App. Ohne den Header `X-Quiet` lehnt er ab, so
-  kann keine fremde Seite das Fenster steuern.
+  D-Bus auf, mit dem Titel der App. Fenster und Optionen ändern nur Anfragen mit
+  dem Header `X-Quiet`.
 
-| `/state` | Quelle |
+| Anzeige | Quelle |
 | --- | --- |
-| `color` | Was die Ambientelichter zeigen: `red`, `green`, `blue` aus `GUI_rgbMap` („{blue:36,…,green:73,…,red:255,…}“) als `#ff4924`. Ohne sie `GUI_rgbAlbumColor`, wenn `GUI_rgbSyncAlbumArtColor` an ist, sonst `GUI_rgbColor` („255,131,0“). Die Seite blendet in etwa 0,6 s über |
-| `trip`, `eta` | `GUI_navNextDestinationArrivalTime` („16:41:00“) als „16:41“, wenn `GUI_navNextDestinationArrivalInfoValid` |
-| `min` | `NAV_minutesToArrival`, gerundet |
-| `km` | `NAV_milesToArrival` in Kilometern mit Dezimalkomma |
-| `yaw` | Drehrate in °/s aus `LOC_estimatedHdg`, rechts positiv, „0.0“ im Stand |
-| `speed` | `VAPI_vehicleSpeed` mit einer Stelle („13.7“), „0.0“ ohne Wert |
+| Farbe | `red`, `green`, `blue` aus `GUI_rgbMap`, was QtCar an die Ambientelichter schickt. Ohne sie `GUI_rgbAlbumColor`, wenn `GUI_rgbSyncAlbumArtColor` an ist, sonst `GUI_rgbColor` |
+| Helligkeit | `brightness` aus `GUI_rgbMap` (0 bis 100), heller bei Tag (`GUI_dayMode`), dazu die Wahl im Menü |
+| Tacho | `VAPI_displaySpeed` in `VAPI_speedUnits` (KPH, MPH) |
+| Ankunft | `GUI_navNextDestinationArrivalTime`, wenn `GUI_navNextDestinationArrivalInfoValid`; `NAV_minutesToArrival`; `NAV_milesToArrival` in den Einheiten des Autos (`GUI_distanceUnits`) |
+| Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
+| Abbiegung | `NAV_milesToNextTurn`, ab 1,5 km als „Abbiegen in …“; `NAV_nextTurnDirection` ist geschwärzt |
+| Kurve | Änderung von `LOC_estimatedHdg` über eine Sekunde, rechts positiv; 0 im Stand, ohne Richtung und bei Sprüngen über 60 °/s |
+| Tempo | Ein Lichtpuls braucht im Stand etwa 5 s bis zu dir, ab 120 km/h 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
+| Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
 
 Die Animation zeichnet ein Canvas: Hintergrund und Schein entstehen einmal pro
-Farbe und Größe. Die Lichtbahnen zeichnet die Seite bei jeder Änderung der
-Biegung in einen Puffer mit einem Viertel der Größe, weichgezeichnet und dann
-hochskaliert. Jedes Bild fügt das Atmen und die Pulse hinzu.
+Farbe, Helligkeit und Größe. Die Lichtbahnen zeichnet die Seite bei jeder
+Änderung von Biegung oder Blinker in einen Puffer mit einem Viertel der Größe,
+weichgezeichnet und dann hochskaliert. Jedes Bild fügt das Atmen und die Pulse
+hinzu. Farbe, Helligkeit, Biegung und Tempo gleiten weich in ihre neuen Werte.
 
 ## Entwicklung und Validierungsstand
 
-`python3 -m unittest tests.test_quiet_view` testet Bibliothek, HTTP-Handler,
-Fensteranfragen und Hooks mit Bash 3.2 unter `umask 077` gegen einen
-nachgebauten Daemon und ein nachgebautes `dbus-send`. Was am Auto geprüft ist,
-steht in der [Validierung](../../docs/quiet-view-validation.md).
+Der Go-Quelltext des Dienstes liegt wie der des Claude-Pakets privat unter
+`services/quiet-view/` mit seinen Tests; veröffentlicht wird nur das Binary.
+`tools/build-quiet-view.sh` baut es. `python3 -m unittest tests.test_quiet_view`
+testet Kachel und Hooks mit Bash 3.2 unter `umask 077` gegen einen nachgebauten
+Daemon. Was am Auto geprüft ist, steht in der
+[Validierung](../../docs/quiet-view-validation.md).

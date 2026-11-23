@@ -1,40 +1,51 @@
-// The quiet view: a glow in the ambient light's colour over a dark screen and
+// The quiet view: a glow in the ambient lights' colour over a dark screen and
 // two light trails towards a vanishing point, with pulses running down them
-// towards the driver. The trails bend the way the car turns. The background and
-// the glow are painted once per colour and size; each frame adds the trails,
-// drawn small and blurred and then scaled up, the breathing and the pulses.
-// /state brings the colour, the arrival and the turn rate.
+// towards the driver at the pace of the car. The trails bend the way the car
+// turns, and already before a turn the navigation announces; the side the car
+// signals to pulses with the indicator. The speedometer, the arrival, the next
+// turn and the route's progress sit quietly on top; a long press offers what to
+// show. The background and the glow are painted once per colour, brightness and
+// size; each frame adds the trails, drawn small and blurred and then scaled up,
+// the breathing and the pulses. The service streams what the car shows
+// (events), and answers /state while the stream is down.
 (() => {
   'use strict';
 
-  const canvas = document.getElementById('glow');
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('glow');
   const ctx = canvas.getContext('2d');
   const base = document.createElement('canvas');
   const trails = document.createElement('canvas');
-  const trip = document.getElementById('trip');
-  const eta = document.getElementById('eta');
-  const rest = document.getElementById('rest');
-  const hint = document.getElementById('hint');
+  const menu = $('menu');
   // The trails' buffer is this much of the screen; blurred, it scales up cleanly.
   const TRAIL_SCALE = 0.25;
-  // The colour shown, and the one the ambient lights have now; it fades over
-  // like the lights do.
+  const BRIGHT = { auto: 1, high: 1.3, low: 0.6 };
+
+  let geo = null;
+  // What is shown eases towards what the car shows: colour, brightness, bend
+  // (-1 hard left to 1 hard right) and pace (0 standing to 1 motorway). phase
+  // carries the pulses, so a new pace never makes them jump.
   let rgb = [255, 255, 255];
   let light = null;
-  let geo = null;
-  // bend runs from -1 (hard left) to 1 (hard right) and eases towards target.
+  let glow = 1;
+  let glowGoal = 1;
   let bend = 0;
   let target = 0;
-  let trailsBend = null;
-  // pace runs from 0 (standing) to 1 (motorway) and eases slowly towards
-  // paceGoal; phase carries the pulses, so a new pace never makes them jump.
   let pace = 0;
   let paceGoal = 0;
   let phase = 0;
+  let painted = null;
+  let trailsKey = null;
+  let state = null;
   let lastState = 0;
   let lastFrame = 0;
+  let options = { eta: true, speed: true, turns: true, pulses: true, bright: 'auto' };
+  let source = null;
+  let polling = null;
 
-  const rgba = (a, c = rgb) => `rgba(${c.map(Math.round).join(',')},${a})`;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const rgba = (a, c = rgb) => `rgba(${c.map(Math.round).join(',')},${clamp(a * glow, 0, 1)})`;
+  const whiter = (c, k) => c.map((v) => v + (255 - v) * k);
 
   function parseColor(hex) {
     const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
@@ -51,12 +62,28 @@
     return Math.sign(v) * Math.min(1, Math.sqrt(a / 25));
   }
 
-  // The speed as a pace: the square root keeps town speeds apart and lets the
-  // motorway (about 75, VAPI_vehicleSpeed) reach the top.
-  function paceFor(speed) {
-    const v = Number.parseFloat(speed);
-    if (!Number.isFinite(v) || v <= 0) return 0;
-    return Math.min(1, Math.sqrt(v / 75));
+  // The speed as a pace: the square root keeps town speeds apart, the
+  // motorway (120 km/h) reaches the top.
+  function paceFor(kmh) {
+    const v = Number.parseFloat(kmh);
+    return Number.isFinite(v) && v > 0 ? Math.min(1, Math.sqrt(v / 120)) : 0;
+  }
+
+  // The brightness of the glow: the ambient lights' (0 to 100), more by day,
+  // and the choice in the menu.
+  function glowFor(v) {
+    const level = typeof v.level === 'number' && v.level >= 0 ? v.level : 60;
+    let f = 0.55 + 0.45 * (level / 100);
+    if (v.day) f = Math.max(f, 0.95) * 1.15;
+    return clamp(f * (BRIGHT[options.bright] || 1), 0.3, 1.5);
+  }
+
+  // Where the trails head: the turn the car drives, and a turn the navigation
+  // announces within 300 m, as far as the car does not turn already.
+  function targetFor(v) {
+    const turning = bendFor(v.yaw);
+    const t = v.turn && options.turns ? v.turn.side * v.turn.strength * v.turn.near : 0;
+    return clamp(turning + t * (1 - Math.abs(turning)), -1, 1);
   }
 
   // A point of a trail, p from 0 at the vanishing point to 1 at the bottom edge.
@@ -77,7 +104,7 @@
     const w = canvas.width;
     const h = canvas.height;
     geo = { w, h, vx: w / 2, vy: h * 0.58, gx: w / 2, gy: h * 0.3, gr: Math.max(w, h) * 0.32 };
-    paintBase();
+    painted = trailsKey = null;
   }
 
   function glowAt(g, scale, alpha) {
@@ -98,37 +125,41 @@
     g.restore();
   }
 
-  function paintBase() {
+  function paintBase(key) {
     const g = base.getContext('2d');
     const { w, h } = geo;
     g.globalCompositeOperation = 'source-over';
-    g.fillStyle = rgba(1, rgb.map((c) => Math.round(5 + c * 0.03)));
+    g.fillStyle = `rgb(${rgb.map((c) => Math.round(5 + c * 0.03 * Math.min(1, glow))).join(',')})`;
     g.fillRect(0, 0, w, h);
     g.globalCompositeOperation = 'lighter';
     glowAt(g, 1, 1);
-    trailsBend = null;
+    document.documentElement.style.setProperty('--light', `rgb(${rgb.map(Math.round).join(',')})`);
+    painted = key;
   }
 
-  // Each trail as a wide soft beam and a brighter core, in the small buffer.
-  function paintTrails() {
+  // Each trail as a wide soft beam and a brighter core, in the small buffer;
+  // the side the car signals to gets a whiter beam in the indicator's rhythm.
+  function paintTrails(left, right, key) {
     const g = trails.getContext('2d');
     g.clearRect(0, 0, trails.width, trails.height);
     g.globalCompositeOperation = 'lighter';
     for (const side of [-1, 1]) {
       beam(g, side, 2.4, 0.34, geo.w * 0.02);
       beam(g, side, 0.45, 0.42, geo.w * 0.005);
+      const blink = side < 0 ? left : right;
+      if (blink > 0.01) beam(g, side, 1.1, 0.55 * blink, geo.w * 0.01, whiter(rgb, 0.45));
     }
-    trailsBend = bend;
+    trailsKey = key;
   }
 
-  function beam(g, side, spread, alpha, blur) {
+  function beam(g, side, spread, alpha, blur, color = rgb) {
     const s = TRAIL_SCALE;
     const far = trailPoint(side, 0);
     const near = trailPoint(side, 1);
     const grad = g.createLinearGradient(far.x * s, far.y * s, near.x * s, near.y * s);
-    grad.addColorStop(0, rgba(0));
-    grad.addColorStop(0.3, rgba(alpha * 0.2));
-    grad.addColorStop(1, rgba(alpha));
+    grad.addColorStop(0, rgba(0, color));
+    grad.addColorStop(0.3, rgba(alpha * 0.2, color));
+    grad.addColorStop(1, rgba(alpha, color));
     g.save();
     g.filter = `blur(${Math.max(0.5, blur * s).toFixed(1)}px)`;
     g.fillStyle = grad;
@@ -173,50 +204,117 @@
     const dt = lastFrame ? Math.min(0.1, s - lastFrame) : 0;
     lastFrame = s;
     // Without fresh state the trails straighten out and the pulses slow down.
-    const fresh = performance.now() - lastState < 3000;
-    const goal = fresh ? target : 0;
-    bend += (goal - bend) * Math.min(1, dt / 0.7);
+    const fresh = (source && source.readyState === 1) || performance.now() - lastState < 3000;
+    bend += ((fresh ? target : 0) - bend) * Math.min(1, dt / 0.7);
     // A pulse takes about 5 s from the horizon to the driver when standing and
     // 2 s on the motorway; the pace follows the speed over about 1.5 s.
     pace += ((fresh ? paceGoal : 0) - pace) * Math.min(1, dt / 1.5);
     phase = (phase + dt * (1 / 5 + (1 / 2 - 1 / 5) * pace)) % 1;
+    // Colour and brightness fade over like the lights do.
     if (light && light.join() !== rgb.join()) {
       const k = Math.min(1, dt / 0.6);
       rgb = rgb.map((v, i) => (Math.abs(light[i] - v) < 1 ? light[i] : v + (light[i] - v) * k));
-      paintBase();
     }
-    if (trailsBend === null || Math.abs(bend - trailsBend) > 0.002) paintTrails();
+    glow = Math.abs(glowGoal - glow) < 0.004 ? glowGoal : glow + (glowGoal - glow) * Math.min(1, dt / 0.8);
+    const key = `${rgb.map(Math.round).join()}|${glow.toFixed(3)}`;
+    if (key !== painted) paintBase(key);
+    let left = 0;
+    let right = 0;
+    if (state && state.signal) {
+      const period = state.blink || 700;
+      const b = 0.5 - 0.5 * Math.cos((2 * Math.PI * (now % period)) / period);
+      if (state.signal !== 'right') left = b;
+      if (state.signal !== 'left') right = b;
+    }
+    const tkey = `${key}|${bend.toFixed(3)}|${left.toFixed(2)}|${right.toFixed(2)}`;
+    if (tkey !== trailsKey) paintTrails(left, right, tkey);
     ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(base, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
     ctx.drawImage(trails, 0, 0, geo.w, geo.h);
     glowAt(ctx, 1.05, 0.18 * (1 + Math.sin((s * Math.PI * 2) / 5)));
-    [-1, 1].forEach((side, k) => {
-      for (let n = 0; n < 3; n++) {
-        const t = (phase + n / 3 + k / 6) % 1;
-        pulse(side, t ** 1.7);
-      }
-    });
+    if (options.pulses) {
+      [-1, 1].forEach((side, k) => {
+        for (let n = 0; n < 3; n++) pulse(side, ((phase + n / 3 + k / 6) % 1) ** 1.7);
+      });
+    }
     requestAnimationFrame(frame);
   }
 
-  function show(state) {
-    const c = parseColor(state.color);
-    if (c && !light) {
-      // The first colour shows at once, not as a fade from white.
-      rgb = c;
-      paintBase();
-    }
-    if (c) light = c;
-    target = bendFor(state.yaw);
-    paceGoal = paceFor(state.speed);
-    lastState = performance.now();
-    trip.hidden = !(state.trip && state.eta);
-    eta.textContent = state.eta || '';
+  function render(v) {
+    const arrival = options.eta && v.trip && v.eta;
+    $('arrival').hidden = !arrival;
+    $('eta').textContent = v.eta || '';
     const parts = [];
-    if (state.min) parts.push(`noch ${state.min} min`);
-    if (state.km) parts.push(`${state.km} km`);
-    rest.textContent = parts.join(' · ');
+    if (v.min) parts.push(`noch ${v.min} min`);
+    if (v.dist) parts.push(v.dist);
+    $('rest').textContent = parts.join(' · ');
+    const turnText = options.turns && v.turn ? v.turn.text : '';
+    $('turn').hidden = !turnText;
+    $('turn').textContent = turnText;
+    $('center').hidden = !arrival && !turnText;
+    const speed = options.speed && v.speed ? v.speed : '';
+    $('speed').hidden = !speed;
+    $('speedValue').textContent = speed;
+    $('speedUnit').textContent = v.unit || '';
+    const progress = options.eta && v.trip && typeof v.progress === 'number' && v.progress >= 0;
+    $('progress').hidden = !progress;
+    $('progressFill').style.width = `${Math.round((progress ? v.progress : 0) * 1000) / 10}%`;
+  }
+
+  function applyOptions(o) {
+    options = { eta: !!o.eta, speed: !!o.speed, turns: !!o.turns, pulses: !!o.pulses, bright: o.bright in BRIGHT ? o.bright : 'auto' };
+    if (state) {
+      glowGoal = glowFor(state);
+      target = targetFor(state);
+      render(state);
+    }
+    if (!menu.hidden) renderMenu();
+  }
+
+  function show(v) {
+    if (!v || typeof v !== 'object') return;
+    state = v;
+    lastState = performance.now();
+    const c = parseColor(v.color);
+    const first = c && !light;
+    if (c) light = c;
+    paceGoal = paceFor(v.kmh);
+    // A choice still on its way to the service is not undone by an older view.
+    applyOptions(v.options && !pending ? v.options : options);
+    if (first) {
+      // The first colour and brightness show at once, not as a fade.
+      rgb = c;
+      glow = glowGoal;
+    }
+  }
+
+  // The data: a stream of views, and /state once a second while it is down.
+  function connect() {
+    if (typeof EventSource !== 'function') {
+      startPolling();
+      return;
+    }
+    source = new EventSource('events');
+    source.onmessage = (e) => {
+      try {
+        show(JSON.parse(e.data));
+      } catch {
+        // A broken event waits for the next one.
+      }
+    };
+    source.onopen = stopPolling;
+    // EventSource reconnects by itself; until then /state fills in.
+    source.onerror = startPolling;
+  }
+
+  function startPolling() {
+    if (!polling) polling = setInterval(poll, 1000);
+  }
+
+  function stopPolling() {
+    clearInterval(polling);
+    polling = null;
   }
 
   async function poll() {
@@ -234,35 +332,101 @@
     return fetch(`window/${action}`, { method: 'POST', headers: { 'X-Quiet': '1' } }).catch(() => {});
   }
 
-  // A tap also asks Chromium for full screen, in case QtCar gives a full-screen
-  // page more of the display than the maximized window.
-  let start = null;
-  addEventListener('pointerdown', (e) => {
-    start = { x: e.clientX, y: e.clientY };
-    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {});
+  // The menu a long press opens. A choice takes effect at once and is kept by
+  // the service; one it does not take goes back.
+  let pending = 0;
+  let swallowClick = false;
+
+  function renderMenu() {
+    for (const b of menu.querySelectorAll('[data-option]')) b.setAttribute('aria-pressed', String(!!options[b.dataset.option]));
+    for (const b of menu.querySelectorAll('[data-bright]')) b.setAttribute('aria-pressed', String(options.bright === b.dataset.bright));
+  }
+
+  function openMenu() {
+    swallowClick = true;
+    menu.hidden = false;
+    renderMenu();
+  }
+
+  async function choose(next) {
+    const before = options;
+    applyOptions(next);
+    pending++;
+    try {
+      const res = await fetch('options', {
+        method: 'POST',
+        headers: { 'X-Quiet': '1', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eta: options.eta, speed: options.speed, turns: options.turns, pulses: options.pulses, bright: options.bright }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+    } catch {
+      applyOptions(before);
+    } finally {
+      pending--;
     }
+  }
+
+  menu.addEventListener('pointerdown', () => {
+    swallowClick = false;
+  });
+  menu.addEventListener('click', (e) => {
+    // The release of the long press that opened the menu is no choice.
+    if (swallowClick) {
+      swallowClick = false;
+      return;
+    }
+    const option = e.target.closest('[data-option]');
+    const bright = e.target.closest('[data-bright]');
+    if (option) choose({ ...options, [option.dataset.option]: !options[option.dataset.option] });
+    else if (bright) choose({ ...options, bright: bright.dataset.bright });
+    else if (e.target.closest('#done') || e.target === menu) menu.hidden = true;
+  });
+
+  // On the view itself: a firm swipe down closes the app, a long press opens
+  // the menu, a short tap asks Chromium for full screen, in case QtCar gives a
+  // full-screen page more of the display than the maximized window.
+  let press = null;
+  addEventListener('pointerdown', (e) => {
+    if (!menu.hidden) return;
+    const p = { x: e.clientX, y: e.clientY, at: performance.now(), long: false, moved: false };
+    p.timer = setTimeout(() => {
+      if (!p.moved) {
+        p.long = true;
+        openMenu();
+      }
+    }, 650);
+    press = p;
+  });
+  addEventListener('pointermove', (e) => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 15) press.moved = true;
   });
   addEventListener('pointerup', (e) => {
-    if (!start) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    start = null;
+    const p = press;
+    press = null;
+    if (!p) return;
+    clearTimeout(p.timer);
+    if (p.long) return;
+    const dx = e.clientX - p.x;
+    const dy = e.clientY - p.y;
     if (dy > innerHeight * 0.22 && Math.abs(dx) < dy / 2) {
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       askWindow('close');
+      return;
+    }
+    if (!p.moved && performance.now() - p.at < 400 && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
     }
   });
   addEventListener('pointercancel', () => {
-    start = null;
+    if (press) clearTimeout(press.timer);
+    press = null;
   });
 
   addEventListener('resize', layout);
   layout();
   requestAnimationFrame(frame);
   askWindow('max');
+  connect();
   poll();
-  // The turn rate changes quickly; the service samples the heading twice a second.
-  setInterval(poll, 500);
-  setTimeout(() => hint.classList.add('gone'), 6000);
+  setTimeout(() => $('hint').classList.add('gone'), 6000);
 })();

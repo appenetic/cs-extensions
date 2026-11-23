@@ -50,6 +50,16 @@ Paket: HA, Claude und die beiden Welcome-Pakete. Die erste Fassung
 Paket, das den Feed verlässt, kommt nach `repository/withdrawn.json` und steht
 weiter im Index, mit seinem veröffentlichten Archiv und `"withdrawn": true`.
 
+## Quiet-Ansicht (ab 2026-11-23)
+
+`com.appenetic.quiet-view` hat ab alpha.6 einen Go-Dienst. Sein Quelltext liegt
+wie der des Claude-Pakets privat unter `services/quiet-view/` und ist von
+`.gitignore` ausgeschlossen. Veröffentlicht werden das Linux-Binary
+`bin/quiet-linux-amd64` (gebaut von `tools/build-quiet-view.sh`), die NOTICE mit
+der Go-Lizenz, die Seite unter `web/` und die lesbaren Shell-Hooks. Der Export
+prüft das Binary als x86-64-ELF. Eine Sicherung des Go-Quelltexts liegt unter
+`../CS_Plugins-backup/quiet-view-src-alpha.6-2026-11-23.tgz`.
+
 ## Build und Export
 
 Auf dem Entwicklungsrechner mit lokalem/private ausgechecktem Quellcode:

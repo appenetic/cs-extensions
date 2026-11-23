@@ -146,11 +146,15 @@ class Package(unittest.TestCase):
         self.assertNotIn('settings', manifest)
         with tarfile.open(fileobj=io.BytesIO(data)) as archive:
             self.assertEqual(sorted(archive.getnames()),
-                             ['coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/web.sh', 'lib',
-                              'lib/http.sh', 'lib/quiet.sh', 'web', 'web/app.css', 'web/app.js', 'web/icon.png',
-                              'web/index.html'])
+                             ['NOTICE', 'bin', 'bin/quiet-linux-amd64', 'coilshift.json', 'hooks', 'hooks/apply.sh',
+                              'hooks/remove.sh', 'hooks/web.sh', 'lib', 'lib/quiet.sh', 'web', 'web/app.css',
+                              'web/app.js', 'web/icon.png', 'web/index.html'])
             for hook in ['hooks/apply.sh', 'hooks/remove.sh', 'hooks/web.sh']:
                 self.assertEqual(archive.getmember(hook).mode, 0o755)
+            # A static x86-64 Linux binary; the Go source stays private.
+            binary = archive.extractfile('bin/quiet-linux-amd64').read()
+            self.assertEqual((binary[:6], binary[18:20]), (b'\x7fELF\x02\x01', b'\x3e\x00'))
+            self.assertIn(b'Go license', archive.extractfile('NOTICE').read())
             self.assertEqual(json.load(archive.extractfile('coilshift.json')), manifest)
 
     def test_summaries_fit_the_coilshift_index(self):

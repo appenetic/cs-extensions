@@ -69,11 +69,11 @@ RELEASES = {
     },
     'com.appenetic.welcome-performance': {'allowed': WELCOME_FILES},
     'com.appenetic.welcome-launch': {'allowed': WELCOME_FILES},
-    # Shell hooks and service, the app's page; no README.
+    # Shell hooks, the Go service, the app's page; no README.
     'com.appenetic.quiet-view': {
         'allowed': {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/web.sh', 'lib',
-                    'lib/quiet.sh', 'lib/http.sh', 'web', 'web/index.html', 'web/app.js', 'web/app.css',
-                    'web/icon.png'},
+                    'lib/quiet.sh', 'bin', 'bin/quiet-linux-amd64', 'NOTICE', 'web', 'web/index.html',
+                    'web/app.js', 'web/app.css', 'web/icon.png'},
     },
 }
 

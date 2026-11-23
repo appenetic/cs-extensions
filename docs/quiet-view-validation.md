@@ -107,15 +107,50 @@ Alle drei liest das Paket über die Schnittstelle. Weitere Modi:
 `GUI_rgbAudioSyncEnabled`, `GUI_rgbRainbowRave`, `GUI_rgbRainbowRoadRequest`
 (alle false).
 
+## Go-Dienst und Datenquellen (alpha.6)
+
+- **Grenzen des Daemons:** Höchstens 8 Aufrufe gleichzeitig und 4 offene Streams
+  pro Paket (SDK: 429 `too_many_requests`, `too_many_streams`). Von zwölf
+  gleichzeitigen `?watch=1`-Streams liefen vier, die anderen bekamen 429.
+  Hintereinander gingen 80 Abfragen in 1,8 s durch. Jeder Aufruf landet mit pid
+  und Status im Log des Daemons, jeder Treffer einer Grenze einmal pro Boot als
+  `limited:429` im Paketstatus.
+- **Watch:** `GET /v1/dv/{name}?watch=1` liefert
+  `{"type":"dv","data":{"name":…,"value":…}}` bei jeder Änderung, zuerst den
+  aktuellen Wert.
+- **Gelesen über die Schnittstelle (in P):** `VAPI_displaySpeed` 0,
+  `VAPI_speedUnits` KPH, `GUI_distanceUnits` Kilometers,
+  `VAPI_turnSignalActive` Off, `GUI_dayMode` false,
+  `GUI_centerDisplayTakeOverNow` false, `DAS_autopilotHandsOnState`
+  NotDetected, `DAS_sideCollisionWarning` None, `DAS_longCollisionWarning`
+  `<invalid>`. `NAV_nextTurnDirection`, `NAV_milesToNextTurn` und
+  `NAV_nextTurnStreetName` waren ohne Route `<invalid>`. `GUI_displaySpeed`
+  gibt es nicht (404).
+- **Navigation mit Route:** `NAV_nextTurnDirection` und
+  `NAV_nextTurnStreetName` kommen über die Schnittstelle nur als `<redacted>`.
+  Lesbar sind `NAV_milesToNextTurn` (0.038), `NAV_minutesToNextTurn` (0.143),
+  `NAV_nextTurnId` (3589978) und `GUI_navNextDestinationArrivalTime`
+  („19:01:00.000“). Die Manöver der Routing-Bibliothek in QtCar heißen
+  `kSlightLeft`, `kSharpRight`, `kUturnLeft` und so weiter.
+- **Probelauf des Go-Dienstes am Auto:** Auf einem Testport (29912) mit dem
+  Token des Pakets lieferte er über `/events` und `/state` Farbe `#ff4924`,
+  Helligkeit 24, Ankunft, Restzeit und Reststrecke, Tacho „0 km/h“ und die
+  Blinkerperiode 680 ms. Ein fremder Host bekam 421, ein Fensterbefehl ohne
+  Header 403.
+
 ## Am Auto offen
 
 1. Ob sich die Bahnen in echten Kurven richtig herum und ruhig biegen. Ob die
    simulierte Fahrt `LOC_estimatedHdg` mitdreht.
 2. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
-3. Ob das Wischen nach unten die App über `dismissApp` schließt.
-4. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
+3. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
    Farben aussieht, auch tagsüber.
-5. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
-6. In welcher Einheit `VAPI_vehicleSpeed` zählt (mph oder km/h). Das Tempo der
-   Pulse erreicht sein Maximum bei 75.
+4. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
+5. Ob das Wischen die App über `dismissApp` schließt; davon hängt auch das
+   Schließen bei Warnungen ab.
+6. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
+   Auslöser stehen mit ihrem Wert im Paketlog.
+7. Vorzeichen und Einheit von `VAPI_yawRate` und `VAPI_steeringAngle`, aus
+   `turns.log` einer echten Fahrt. Danach können sie die Fahrtrichtung als
+   Quelle der Kurve ablösen.

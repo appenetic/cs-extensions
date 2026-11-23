@@ -53,9 +53,11 @@ RELEASES = {
     WELCOME_LAUNCH: WELCOME,
     QUIET_VIEW: {
         'runtime': {'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/web.sh', 'lib/quiet.sh',
-                    'lib/http.sh', 'web/index.html', 'web/app.js', 'web/app.css', 'web/icon.png'},
-        'directories': {'hooks', 'lib', 'web'},
+                    'bin/quiet-linux-amd64', 'NOTICE', 'web/index.html', 'web/app.js', 'web/app.css',
+                    'web/icon.png'},
+        'directories': {'hooks', 'lib', 'bin', 'web'},
         'assets': [],
+        'binary': 'bin/quiet-linux-amd64',
     },
 }
 PUBLIC_README = '''# Appenetic CS package feed
@@ -64,8 +66,8 @@ This export contains generated package artifacts only: the Home Assistant
 Bridge, Claude Code for the MCU, the two welcome animations and the quiet view.
 The application source belongs in a separate private repository and is not
 included here. The first two contain a compiled Linux executable, their panel
-files and small, readable lifecycle scripts; the others are shell scripts and,
-for the quiet view, a small web page only.
+files and small, readable lifecycle scripts, as does the quiet view with its
+web page; the welcome animations are shell scripts only.
 Compiled executables can still be reverse engineered.
 
 Feed path: `cs-extensions/index.json`

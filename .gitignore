@@ -15,3 +15,6 @@ __pycache__/
 # The Claude service source stays local/private like the HA source.
 /services/claude/
 
+
+# The quiet view service source stays local/private like the Claude source.
+/services/quiet-view/

@@ -8,12 +8,34 @@
 </head>
 <body>
 <canvas id="glow"></canvas>
-<main id="trip" hidden>
-  <p class="label">Ankunft</p>
-  <p id="eta" class="eta"></p>
-  <p id="rest" class="rest"></p>
+<div id="speed" class="speed" hidden><span id="speedValue"></span><span id="speedUnit" class="unit"></span></div>
+<main id="center" hidden>
+  <div id="arrival" hidden>
+    <p class="label">Ankunft</p>
+    <p id="eta" class="eta"></p>
+    <p id="rest" class="rest"></p>
+  </div>
+  <p id="turn" class="turn" hidden></p>
 </main>
-<p id="hint" class="hint">Nach unten wischen zum Schließen</p>
+<div id="progress" class="progress" hidden><div id="progressFill" class="fill"></div></div>
+<p id="hint" class="hint">Nach unten wischen zum Schließen · lange drücken für Optionen</p>
+<div id="menu" class="menu" hidden>
+  <div class="panel" role="dialog" aria-label="Optionen">
+    <h2>Quiet</h2>
+    <button class="row" data-option="eta" type="button"><span>Ankunftszeit und Fortschritt</span><i></i></button>
+    <button class="row" data-option="turns" type="button"><span>Abbiegehinweise</span><i></i></button>
+    <button class="row" data-option="speed" type="button"><span>Tacho</span><i></i></button>
+    <button class="row" data-option="pulses" type="button"><span>Lichtpulse</span><i></i></button>
+    <div class="row bright"><span>Helligkeit</span>
+      <div class="choices">
+        <button type="button" data-bright="auto">Auto</button>
+        <button type="button" data-bright="high">Hell</button>
+        <button type="button" data-bright="low">Gedämpft</button>
+      </div>
+    </div>
+    <button id="done" class="done" type="button">Fertig</button>
+  </div>
+</div>
 <script src="app.js"></script>
 </body>
 </html>
