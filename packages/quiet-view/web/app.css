@@ -57,6 +57,20 @@ main {
   opacity: 0.9;
 }
 
+.arrived {
+  font-size: 76px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: 0.005em;
+}
+
+.rise { animation: rise 1.8s ease both; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
 .speed {
   position: fixed;
   top: 28px;

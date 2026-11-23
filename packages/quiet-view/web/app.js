@@ -3,7 +3,8 @@
 // haze, with streaks of light flowing down them towards the driver at the pace
 // of the car. The road curves with the steering wheel; the line on the signalled
 // side brightens with the indicator. The speedometer, the arrival, the next
-// turn and the route's progress sit quietly on top; a long press offers what to
+// turn and the route's progress sit quietly on top; on arriving, the road ends
+// in a ring of light with the drive's summary. A long press offers what to
 // show. A WebGL shader draws the picture in true perspective, with a filmic
 // roll-off and a little grain so the dark gradients do not band; on a slow GPU
 // it draws fewer pixels, and without WebGL a plainer canvas picture stands in.
@@ -28,6 +29,9 @@
   let pace = 0;
   let paceGoal = 0;
   let travel = 0;
+  // 0 on the road, 1 arrived; it eases in over a few seconds.
+  let arrive = 0;
+  let arriveGoal = 0;
   let state = null;
   let lastState = 0;
   let lastFrame = 0;
@@ -102,6 +106,8 @@ uniform float uStreaks;
 uniform vec2 uBlink;
 uniform float uBreath;
 uniform float uSeed;
+uniform float uArrive;
+uniform float uTime;
 
 float grain(vec2 p) {
   p = fract(p * vec2(443.897, 441.423));
@@ -115,10 +121,11 @@ void main() {
   float h = uRes.y;
   vec3 col = uColor * 0.012;
   vec2 g = (px - vec2(0.5 * w, 0.30 * h)) / vec2(0.62 * w, 0.30 * h);
-  col += uColor * exp(-dot(g, g) * 1.8) * (0.40 + 0.07 * uBreath);
+  col += uColor * exp(-dot(g, g) * 1.8) * (0.40 + 0.07 * uBreath + 0.10 * uArrive);
   float yH = 0.58 * h;
-  float band = exp(-pow((px.y - yH) / (0.010 * h), 2.0)) * exp(-pow((px.x - 0.5 * w) / (0.32 * w), 2.0));
-  col += uColor * band * 0.12;
+  float by = (px.y - yH) / (0.010 * h);
+  float bx = (px.x - 0.5 * w) / (0.32 * w);
+  col += uColor * exp(-by * by) * exp(-bx * bx) * 0.12;
   float dy = px.y - yH;
   if (dy > 0.0) {
     float f = 0.78 * w;
@@ -129,20 +136,44 @@ void main() {
     float fog = exp(-z / 70.0);
     float wpx = 0.04 / mpp;
     float coreW = max(1.1, wpx);
+    // On arrival the road ends 26 m ahead, in a ring of light.
+    float zEnd = mix(600.0, 26.0, uArrive);
+    float ends = 1.0 - uArrive * smoothstep(zEnd - 8.0, zEnd + 1.0, z);
     for (int i = 0; i < 2; i++) {
       float side = i == 0 ? -1.0 : 1.0;
       float d = abs(x - centre - side * 1.75) / mpp;
       float core = exp(-d * d / (coreW * coreW)) * min(1.0, wpx / 1.1 + 0.2);
       float s = fract((z + uTravel) / 24.0);
-      float streak = uStreaks * smoothstep(0.0, 0.03, s) * pow(1.0 - smoothstep(0.03, 0.42, s), 1.5);
+      float streak = uStreaks * (1.0 - uArrive) * smoothstep(0.0, 0.03, s) * pow(1.0 - smoothstep(0.03, 0.42, s), 1.5);
       float blink = i == 0 ? uBlink.x : uBlink.y;
-      float gain = (1.0 + 1.5 * blink) * fog;
+      float gain = (1.0 + 1.5 * blink) * fog * ends;
       vec3 hot = mix(uColor, vec3(1.0), 0.55 + 0.25 * blink);
       // The streak lights the line and its near halo; the wide halo stays
       // even, or the streak's edge would draw a line across the screen.
       col += hot * core * (0.34 + 1.3 * streak) * gain;
       col += uColor * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * streak) * gain;
       col += uColor * exp(-d / (0.045 * w)) * 0.034 * gain;
+    }
+    if (uArrive > 0.0) {
+      // The ring lies on the road around the lane's centre, breathing slowly; a
+      // wave of light leaves it every 3.2 s, and a pool of light fills it.
+      vec2 pos = vec2(x - 0.5 * (uBend / 75.0) * zEnd * zEnd, z - zEnd);
+      float len = length(pos);
+      float fw = max(mpp, 0.6 * z * z / (f * 1.25));
+      float r = 2.8 + 0.12 * sin(uTime * 1.4);
+      float e = abs(len - r);
+      float ew = e / max(0.07, fw);
+      float ring = exp(-ew * ew) * min(1.0, 0.07 / fw + 0.35);
+      float halo = exp(-e / (fw * 14.0)) * 0.22;
+      float phase = fract(uTime / 3.2);
+      float wv = (len - r - phase * 7.0) / max(0.12, 1.5 * fw);
+      float wave = exp(-wv * wv) * (1.0 - phase) * (1.0 - phase) * 0.5;
+      float pr = len / r;
+      float pool = exp(-pr * pr * 1.4) * 0.10;
+      vec3 hot = mix(uColor, vec3(1.0), 0.6);
+      // The haze at the pixel's own distance, and nothing far beyond the ring.
+      float near = fog * (1.0 - smoothstep(zEnd + 6.0, zEnd + 30.0, z));
+      col += (hot * ring + uColor * (halo + wave + pool)) * uArrive * near;
     }
   }
   vec2 q = px / uRes - 0.5;
@@ -177,7 +208,7 @@ void main() {
     gl.enableVertexAttribArray(at);
     gl.vertexAttribPointer(at, 2, gl.FLOAT, false, 0, 0);
     const u = {};
-    for (const name of ['uRes', 'uColor', 'uGlow', 'uBend', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed']) {
+    for (const name of ['uRes', 'uColor', 'uGlow', 'uBend', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed', 'uArrive', 'uTime']) {
       u[name] = gl.getUniformLocation(program, name);
     }
     const info = gl.getExtension('WEBGL_debug_renderer_info');
@@ -198,6 +229,8 @@ void main() {
         gl.uniform2f(u.uBlink, p.left, p.right);
         gl.uniform1f(u.uBreath, p.breath);
         gl.uniform1f(u.uSeed, (p.time * 37) % 101);
+        gl.uniform1f(u.uArrive, p.arrive);
+        gl.uniform1f(u.uTime, p.time % 3600);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
       },
     };
@@ -248,6 +281,13 @@ void main() {
           }
           ctx.fill();
         }
+        if (p.arrive > 0.01) {
+          ctx.strokeStyle = rgba(p, 0.7 * p.arrive, p.rgb.map((c) => c + (255 - c) * 0.6));
+          ctx.lineWidth = Math.max(1, w * 0.002);
+          ctx.beginPath();
+          ctx.ellipse(w / 2, h * 0.66, w * 0.09, h * 0.022, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       },
     };
   }
@@ -289,6 +329,7 @@ void main() {
     // and 2 s on the motorway; the pace follows the speed over about 1.5 s.
     pace += ((fresh ? paceGoal : 0) - pace) * Math.min(1, dt / 1.5);
     travel += dt * (4 + 9 * pace);
+    arrive += (arriveGoal - arrive) * Math.min(1, dt / 2.2);
     // Colour and brightness fade over like the lights do.
     if (light && light.join() !== rgb.join()) {
       const k = Math.min(1, dt / 0.6);
@@ -304,7 +345,7 @@ void main() {
       if (state.signal !== 'right') left = b;
       if (state.signal !== 'left') right = b;
     }
-    picture.draw({ rgb, glow, bend, travel, streaks: options.pulses, left, right,
+    picture.draw({ rgb, glow, bend, travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s });
     if (++measured === 90) {
       if ((now - measureStart) / measured > 26 && quality > 0.35) {
@@ -318,22 +359,36 @@ void main() {
   }
 
   function render(v) {
-    const arrival = options.eta && v.trip && v.eta;
+    // Arrived: the drive's summary instead of arrival, turn and progress.
+    const done = v.arrived && typeof v.arrived === 'object' ? v.arrived : null;
+    const block = $('arrivedBlock');
+    if (done && block.hidden) {
+      // The summary rises in each time it appears.
+      block.classList.remove('rise');
+      void block.offsetWidth;
+      block.classList.add('rise');
+    }
+    block.hidden = !done;
+    if (done) {
+      const what = done.dist && done.min ? `${done.dist} in ${done.min} min` : done.min ? `${done.min} min` : '';
+      $('arrivedSum').textContent = [what, done.time].filter(Boolean).join(' · ');
+    }
+    const arrival = !done && options.eta && v.trip && v.eta;
     $('arrival').hidden = !arrival;
     $('eta').textContent = v.eta || '';
     const parts = [];
     if (v.min) parts.push(`noch ${v.min} min`);
     if (v.dist) parts.push(v.dist);
     $('rest').textContent = parts.join(' · ');
-    const turnText = options.turns && v.turn ? v.turn.text : '';
+    const turnText = !done && options.turns && v.turn ? v.turn.text : '';
     $('turn').hidden = !turnText;
     $('turn').textContent = turnText;
-    $('center').hidden = !arrival && !turnText;
+    $('center').hidden = !done && !arrival && !turnText;
     const speed = options.speed && v.speed ? v.speed : '';
     $('speed').hidden = !speed;
     $('speedValue').textContent = speed;
     $('speedUnit').textContent = v.unit || '';
-    const progress = options.eta && v.trip && typeof v.progress === 'number' && v.progress >= 0;
+    const progress = !done && options.eta && v.trip && typeof v.progress === 'number' && v.progress >= 0;
     $('progress').hidden = !progress;
     $('progressFill').style.width = `${Math.round((progress ? v.progress : 0) * 1000) / 10}%`;
   }
@@ -356,6 +411,7 @@ void main() {
     const first = c && !light;
     if (c) light = c;
     paceGoal = paceFor(v.kmh);
+    arriveGoal = v.arrived ? 1 : 0;
     // A choice still on its way to the service is not undone by an older view.
     applyOptions(v.options && !pending ? v.options : options);
     if (first) {

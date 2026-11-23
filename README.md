@@ -42,7 +42,8 @@ Nach dem „Quiet Mode“ von FSD v15: eine App mit eigener Kachel im Launcher. 
 in der Farbe des Ambientelichts. Die Lichtbahnen biegen sich mit dem Lenkrad
 und schon vor angesagten Abbiegungen, Lichtstreifen fließen in deinem
 Tempo darauf, und die Linie leuchtet mit dem Blinker. Darüber ruhig Tacho, Ankunft, nächste Abbiegung und
-Fortschritt; bei Warnungen schließt sie sich selbst. Fest nach unten wischen
+Fortschritt, am Ziel ein eigener Ankunftsbildschirm; bei Warnungen schließt sie
+sich selbst. Fest nach unten wischen
 schließt sie, lange drücken öffnet die Optionen.
 [Funktionsweise](packages/quiet-view/README.md) ·
 [Validierung](docs/quiet-view-validation.md).

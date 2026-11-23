@@ -158,6 +158,15 @@ Verhältnis der Beträge lag im Median bei 172, die Einheit ist offen.
 `VAPI_vehicleSpeed` zählt in mph: 17,4 bei 28 km/h auf dem Tacho
 (`VAPI_displaySpeed`). Seit alpha.9 folgt die Kurve dem Lenkwinkel.
 
+## Ankunft (alpha.10)
+
+Eine Ankunftsmeldung liest ein Paket nicht: `NAV_arrivalInfoSnapshot` und
+`NAV_accurateMilesToArrival` waren `<invalid>`, `ARRIVAL_ENERGY` gibt es nicht
+(404). Nach dem Ende der Route stand `GUI_navNextDestinationArrivalInfoValid`
+auf false und `NAV_milesToArrival` auf `<invalid>`. Die Systemuhr der MCU läuft
+auf US-Pazifikzeit (`date` zeigte PST, als das Auto 17:19 anzeigte); die
+Uhrzeit der Ankunft kommt deshalb aus der letzten Ankunftszeit der Navigation.
+
 ## Am Auto offen
 
 1. Wie sich die Straße mit dem Lenkwinkel anfühlt, auch auf der Autobahn.
@@ -171,3 +180,5 @@ Verhältnis der Beträge lag im Median bei 172, die Einheit ist offen.
 6. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
    Auslöser stehen mit ihrem Wert im Paketlog.
 7. Die Einheit von `VAPI_yawRate`.
+8. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation die
+   Route beendet.

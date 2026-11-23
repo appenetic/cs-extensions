@@ -16,6 +16,22 @@ den Fortschritt der Route. Ab 300 m vor der Abbiegung biegt sich die Straße
 schon in ihre Richtung. Fest nach unten wischen schließt die App,
 lange drücken öffnet die Optionen.
 
+## Angekommen
+
+Am Ziel endet die Straße in einem Ring aus Licht, der langsam atmet; ab und zu
+geht eine Lichtwelle von ihm aus, und die Lichtstreifen kommen zur Ruhe. Darüber
+steht „Angekommen“ mit der Fahrt: „12,4 km in 18 min · 18:42“. Der Bildschirm
+bleibt bis zu 10 Minuten, eine neue Route oder Weiterfahren über 20 km/h
+beenden ihn.
+
+QtCar meldet die Ankunft Paketen nicht (`NAV_arrivalInfoSnapshot` ist
+`<invalid>`). Der Dienst erkennt sie selbst: Die Reststrecke fällt unter etwa
+50 m, oder die Route endet, als zuletzt weniger als 400 m übrig waren. Eine
+Route, die weit vor dem Ziel abbricht, ist keine Ankunft. Strecke und Dauer
+zählt er ab Beginn der Route, auch bei geschlossener App. Die Uhrzeit ist die
+letzte Ankunftszeit der Navigation, denn die Uhr der MCU läuft in einer anderen
+Zeitzone als die Anzeige im Auto.
+
 ## Optionen
 
 Pakete aus einem Repository bekommen in CoilShift keine Einstellungen. Ein
