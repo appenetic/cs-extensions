@@ -7,8 +7,8 @@ Bildschirm mit einem Lichtschein in der Farbe deines Ambientelichts: oben ein
 weicher, atmender Schein, unten eine Straße bei Nacht, deren zwei Fahrbahnlinien
 feine Lichtfäden sind, die im Dunst verschwinden. Auf ihnen fließen
 Lichtstreifen zu dir hin, im Stand langsam, schneller, je schneller du fährst.
-In einer Linkskurve biegt sich die Straße nach links, in einer Rechtskurve nach
-rechts. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
+Die Straße biegt sich mit dem Lenkrad: lenkst du nach links, nach links, und
+umso stärker, je weiter du lenkst. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
 
 Ruhig darüber: oben links der Tacho, in der Mitte Ankunftszeit, Restzeit,
 Reststrecke und die nächste Abbiegung („in 200 m rechts“), unten eine Linie für
@@ -49,11 +49,10 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 - **Ungeprüfte Werte:** Wie die Firmware Blinker und Warnstufen schreibt, war am
   Auto noch nicht zu sehen. Das Paket erkennt sie an Wörtern (`left`, `right`,
   `both`, `visual`, `chime`, `slow`, `struck`, `escalat`).
-- **Kurve aus der Fahrtrichtung:** Die Bahnen folgen der Änderung von
-  `LOC_estimatedHdg`, mit etwa einer Sekunde Verzögerung. Gierrate und
-  Lenkwinkel wären direkter, ihr Vorzeichen und ihre Einheit sind aber noch
-  offen. Der Dienst schreibt sie deshalb während der Fahrt neben die Drehrate
-  in `CSDK_STATE/turns.log` (höchstens etwa 512 KB).
+- **Lenkwinkel im Stand:** In P ist `VAPI_steeringAngle` `<invalid>`; dann
+  folgt die Straße der Änderung der Fahrtrichtung, die im Stand null ist. Der
+  Dienst schreibt während der Fahrt Drehrate, Gierrate und Lenkwinkel in
+  `CSDK_STATE/turns.log` (höchstens etwa 512 KB).
 
 ## So funktioniert es
 
@@ -71,7 +70,7 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
   (`/events`), `/state` springt ein, solange der Strom fehlt.
 - **Sparsam lesen:** Der Daemon protokolliert jeden Aufruf und erlaubt einem
   Paket 8 gleichzeitige Aufrufe und 4 Streams. Der Dienst liest das Auto deshalb
-  nur, solange die Seite offen ist: Fahrtrichtung, Tacho, Übernahme und
+  nur, solange die Seite offen ist: Lenkwinkel, Tacho, Übernahme und
   Hände-Mahnung als Streams, der Rest ein- bis zweimal pro Sekunde nacheinander.
   Geschlossen liest er alle 15 s nur die Reststrecke, damit die
   Fortschrittslinie weiß, wo die Route begann.
@@ -89,7 +88,7 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 | Ankunft | `GUI_navNextDestinationArrivalTime`, wenn `GUI_navNextDestinationArrivalInfoValid`; `NAV_minutesToArrival`; `NAV_milesToArrival` in den Einheiten des Autos (`GUI_distanceUnits`) |
 | Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
 | Abbiegung | `NAV_milesToNextTurn` ab 1,5 km, die Richtung aus `NAV_nextTurnAngle` im Uhrzeigersinn ab geradeaus (99 war rechts): unter 12° keine Abbiegung, bis 45° leicht, bis 135° normal, bis 165° scharf, darüber wenden. Ohne Winkel nur „Abbiegen in …“ |
-| Kurve | Änderung von `LOC_estimatedHdg` über eine Sekunde, rechts positiv; 0 im Stand, ohne Richtung und bei Sprüngen über 60 °/s |
+| Kurve | `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt): bis wenige Grad wie die echte Krümmung (2° biegt leicht), darüber logarithmisch bis etwa 240°, unter 0,5° gerade; die Seite gleitet in etwa 0,4 s dorthin. Ohne gültigen Lenkwinkel die Änderung von `LOC_estimatedHdg` über eine Sekunde |
 | Tempo | Ein Lichtstreifen braucht im Stand etwa 6 s vom Horizont bis zu dir, ab 120 km/h etwa 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
 

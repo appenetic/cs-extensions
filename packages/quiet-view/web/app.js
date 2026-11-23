@@ -1,7 +1,7 @@
 // The quiet view: a glow in the ambient lights' colour over a dark screen and a
 // road at night, its two lane lines fine filaments of light that run into the
 // haze, with streaks of light flowing down them towards the driver at the pace
-// of the car. The road curves the way the car turns; the line on the signalled
+// of the car. The road curves with the steering wheel; the line on the signalled
 // side brightens with the indicator. The speedometer, the arrival, the next
 // turn and the route's progress sit quietly on top; a long press offers what to
 // show. A WebGL shader draws the picture in true perspective, with a filmic
@@ -52,6 +52,14 @@
     return Math.sign(v) * Math.min(1, Math.sqrt(a / 25));
   }
 
+  // The steering wheel's angle (right positive) as a bend: up to a few degrees
+  // as the road would curve (2° on the motorway bends a little), above that
+  // graded on a log scale up to about 240°. Below 0.5° the wheel is straight.
+  function steerBend(angle) {
+    const a = Math.max(0, Math.abs(angle) - 0.5);
+    return Math.sign(angle) * Math.min(1, Math.log1p(a / 3) / Math.log1p(240 / 3));
+  }
+
   // The speed as a pace: the square root keeps town speeds apart, the
   // motorway (120 km/h) reaches the top.
   function paceFor(kmh) {
@@ -68,10 +76,11 @@
     return clamp(f * (BRIGHT[options.bright] || 1), 0.3, 1.5);
   }
 
-  // Where the road heads: the turn the car drives, and a turn the navigation
-  // announces with its side within 300 m, as far as the car does not turn yet.
+  // Where the road heads: the steering wheel, or without its angle the turn
+  // the car drives, and a turn the navigation announces within 300 m, as far as
+  // the car does not turn yet.
   function targetFor(v) {
-    const turning = bendFor(v.yaw);
+    const turning = typeof v.steer === 'number' ? steerBend(v.steer) : bendFor(v.yaw);
     const t = v.turn && options.turns ? v.turn.side * v.turn.strength * v.turn.near : 0;
     return clamp(turning + t * (1 - Math.abs(turning)), -1, 1);
   }
@@ -275,7 +284,7 @@ void main() {
     lastFrame = s;
     // Without fresh state the road straightens and the streaks slow down.
     const fresh = (source && source.readyState === 1) || performance.now() - lastState < 3000;
-    bend += ((fresh ? target : 0) - bend) * Math.min(1, dt / 0.7);
+    bend += ((fresh ? target : 0) - bend) * Math.min(1, dt / 0.4);
     // A streak takes about 6 s from the horizon to the driver when standing
     // and 2 s on the motorway; the pace follows the speed over about 1.5 s.
     pace += ((fresh ? paceGoal : 0) - pace) * Math.min(1, dt / 1.5);

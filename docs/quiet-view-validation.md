@@ -147,10 +147,20 @@ Alle drei liest das Paket über die Schnittstelle. Weitere Modi:
   Blinkerperiode 680 ms. Ein fremder Host bekam 421, ein Fensterbefehl ohne
   Header 403.
 
+## Echte Fahrt (alpha.8)
+
+Bei offener App schrieb der Dienst `turns.log` (90 Sekunden, 10 bis 32 km/h).
+In 13 von 15 Sekunden mit mindestens 3 °/s Drehrate hatte `VAPI_steeringAngle`
+deren Vorzeichen, etwa +107,5° bei +16,2 °/s und −192° bei −6,3 °/s: positiv
+heißt rechts. Die zwei Ausreißer waren −5° und −3,5° am Ende einer Kurve.
+`VAPI_yawRate` zählt andersherum (positiv links, 3 von 15 gleich), das
+Verhältnis der Beträge lag im Median bei 172, die Einheit ist offen.
+`VAPI_vehicleSpeed` zählt in mph: 17,4 bei 28 km/h auf dem Tacho
+(`VAPI_displaySpeed`). Seit alpha.9 folgt die Kurve dem Lenkwinkel.
+
 ## Am Auto offen
 
-1. Ob sich die Bahnen in echten Kurven richtig herum und ruhig biegen. Ob die
-   simulierte Fahrt `LOC_estimatedHdg` mitdreht.
+1. Wie sich die Straße mit dem Lenkwinkel anfühlt, auch auf der Autobahn.
 2. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
 3. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
@@ -160,6 +170,4 @@ Alle drei liest das Paket über die Schnittstelle. Weitere Modi:
    Schließen bei Warnungen ab.
 6. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
    Auslöser stehen mit ihrem Wert im Paketlog.
-7. Vorzeichen und Einheit von `VAPI_yawRate` und `VAPI_steeringAngle`, aus
-   `turns.log` einer echten Fahrt. Danach können sie die Fahrtrichtung als
-   Quelle der Kurve ablösen.
+7. Die Einheit von `VAPI_yawRate`.
