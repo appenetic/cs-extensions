@@ -6,7 +6,8 @@ direkt maximiert und ohne Titelleiste, auch in D. Zu sehen ist ein dunkler
 Bildschirm mit einem Lichtschein in der Farbe deines Ambientelichts: oben ein
 weicher, atmender Schein, unten eine Straße bei Nacht, deren zwei Fahrbahnlinien
 feine Lichtfäden sind, die im Dunst verschwinden. Auf ihnen fließen
-Lichtstreifen zu dir hin, im Stand langsam, schneller, je schneller du fährst.
+Lichtstreifen zu dir hin, so schnell wie die Straße, bei hohem Tempo gebremst;
+im Stand stehen sie.
 Die beiden Linien zeigen die Bahn, die das Auto beim gerade eingeschlagenen
 Lenkwinkel fahren würde, wie die Hilfslinien einer Rückfahrkamera: leicht
 gelenkt eine sanfte Kurve, voll eingeschlagen ein enger Bogen zur Seite. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
@@ -109,18 +110,19 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 | Ankunft | `GUI_navNextDestinationArrivalTime`, wenn `GUI_navNextDestinationArrivalInfoValid`; `NAV_minutesToArrival`; `NAV_milesToArrival` in den Einheiten des Autos (`GUI_distanceUnits`) |
 | Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
 | Abbiegung | `NAV_milesToNextTurn` ab 1,5 km, die Richtung aus `NAV_nextTurnAngle` im Uhrzeigersinn ab geradeaus (99 war rechts): unter 12° keine Abbiegung, bis 45° leicht, bis 135° normal, bis 165° scharf, darüber wenden. Ohne Winkel nur „Abbiegen in …“ |
-| Bahn | Nur `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt). Die Krümmung ist tan(Lenkwinkel / 10) / 2,89 m, also Lenkübersetzung etwa 10:1 und Radstand 2,89 m: 2° biegen die Bahn auf 60 m ein wenig, 180° auf einen Radius von etwa 9 m. Die Linien sind Kreisbögen 1,75 m innen und außen; sichtbar sind etwa 60 m, nie über die Umkehr hinaus. Unter 0,3° bleibt sie gerade. Der Dienst liest den Winkel 30-mal pro Sekunde direkt bei QtCar und gibt jeden neuen Wert sofort weiter; die Seite glättet nur über 0,03 s. Ohne gültigen Lenkwinkel läuft die Bahn gerade; Abbiegehinweise biegen sie nicht |
-| Tempo | Ein Lichtstreifen braucht im Stand etwa 6 s vom Horizont bis zu dir, ab 120 km/h etwa 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
+| Bahn | Nur `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt). Die Krümmung ist tan(Lenkwinkel / 10) / 2,89 m, also Lenkübersetzung etwa 10:1 und Radstand 2,89 m: 2° biegen die Bahn auf 60 m ein wenig, 180° auf einen Radius von etwa 9 m. Die Linien sind Kreisbögen 1,75 m innen und außen; sichtbar sind etwa 60 m, nie über die Umkehr hinaus. Unter 0,3° bleibt sie gerade. Der Dienst liest den Winkel 30-mal pro Sekunde direkt bei QtCar und gibt jeden neuen Wert sofort weiter; eine kritisch gedämpfte Feder auf der Seite trägt die Bahn ohne Stufen von Wert zu Wert, etwa 0,08 s hinter einem drehenden Lenkrad. Ohne gültigen Lenkwinkel läuft die Bahn gerade; Abbiegehinweise biegen sie nicht |
+| Tempo | Die Lichtstreifen laufen langsam so schnell wie die Straße (1,3 m/s bei 5 km/h), darüber gebremst gegen 13 m/s (8,5 m/s bei 50 km/h, 12 m/s bei 120 km/h). Sie folgen dem Tempo über etwa 1,5 s und kommen im Stand ganz zum Stehen |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
 
 Das Bild zeichnet ein WebGL-Shader in echter Perspektive: eine Kamera 1,25 m
 über der Mitte einer 3,5 m breiten Spur, der Horizont auf 58 % der Höhe. Die
 Linien haben einen fast weißen Kern, der mit der Entfernung feiner wird, und
-einen Bloom in Bildschirmpixeln; die Kurve ist eine Krümmung der Straße. Am Ende
+einen Bloom in Bildschirmpixeln, der auch am Boden nur wenige Meter um seine
+Linie reicht; die Bahn ist ein Kreisbogen, nahe der Geraden eine Parabel. Am Ende
 stehen ein filmisches Tonemapping und feines Rauschen, damit dunkle Verläufe
 keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder länger
 als etwa 26 ms, zeichnet die Seite weniger Pixel. Ohne WebGL steht ein
-schlichteres Canvas-Bild da. Farbe, Helligkeit, Biegung und Tempo gleiten weich
+schlichteres Canvas-Bild da. Farbe, Helligkeit, Bahn und Tempo gleiten weich
 in ihre neuen Werte.
 
 ## Entwicklung und Validierungsstand

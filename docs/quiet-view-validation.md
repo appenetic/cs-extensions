@@ -203,12 +203,32 @@ Korrekturen, zu schwach bei viel Lenken, falsche Form (gebogen hatte sich vor
 allem das ferne Ende), noch verzögert. Seitdem zeichnen die Linien die Bahn
 des Lenkwinkels als Kreisbögen (Lenkübersetzung 10:1 angenommen, Radstand
 2,89 m), etwa 60 m weit; der Dienst liest den Winkel 30-mal pro Sekunde und
-gibt jeden neuen Wert sofort weiter, die Seite glättet über 0,03 s. Die
-Lenkübersetzung des Model Y ist nicht nachgemessen.
+gibt jeden neuen Wert sofort weiter. Die Lenkübersetzung des Model Y ist
+nicht nachgemessen.
+
+## Glatt, ohne Kanten, im Stand still (alpha.15)
+
+Alle drei Befunde stammen aus der Demo. Die Kurve sprang: Die Demo-Ansicht
+kam nur fünfmal pro Sekunde, und 0,03 s Glättung zeigten jeden Wert als
+Stufe. Seitdem trägt eine kritisch gedämpfte Feder die Bahn von Wert zu Wert,
+etwa 0,08 s hinter einem drehenden Lenkrad; die Demo rechnet den Lenkwinkel
+in jedem Bild neu. In Kurven zogen die Lichtstreifen scharfe, fast waagrechte
+Kanten über den Bildschirm: Der Schein der Linien zählt Pixel so, wie der
+Boden am Pixel verläuft, und weit weg von der Linie, wo der Boden zum
+Horizont hin schnell schrumpft, kam das viel zu kurz heraus. Ganze Zeilen
+leuchteten schwach, und jeder Streifen schnitt seine Kante hinein. Der Schein
+bleibt jetzt auch am Boden in wenigen Metern um seine Linie, und der Kopf
+eines Streifens wird nie schärfer als anderthalb Pixel. Nahe der Geraden ist
+die Bahn eine Parabel statt eines sehr großen Kreises; vorher sprang ihr
+fernes Ende um einige Pixel, wenn das Lenkrad etwa 0,5° kreuzte. Im Stand
+liefen die Lichtstreifen mit 4 m/s weiter. Jetzt laufen sie langsam so schnell
+wie die Straße, darüber gebremst gegen 13 m/s, und beim Anhalten kommen sie
+ganz zum Stehen.
 
 ## Am Auto offen
 
-1. Wie sich die Straße mit dem Lenkwinkel anfühlt, auch auf der Autobahn.
+1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
+   (alpha.14 und 15 bisher nur in der Demo und im Rendering gesehen).
 2. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
 3. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen

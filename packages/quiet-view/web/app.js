@@ -18,14 +18,15 @@
   const BRIGHT = { auto: 1, high: 1.3, low: 0.6 };
 
   // What is shown eases towards what the car shows: colour, brightness, the
-  // path's curvature (1/m, right positive) and pace (0 standing to 1
-  // motorway). travel is the distance the streaks have run, so a new pace
-  // never makes them jump.
+  // path's curvature (1/m, right positive) and the streaks' pace (m/s).
+  // travel is the distance the streaks have run, so a new pace never makes
+  // them jump.
   let rgb = [255, 255, 255];
   let light = null;
   let glow = 1;
   let glowGoal = 1;
   let curv = 0;
+  let curvRate = 0;
   let target = 0;
   let pace = 0;
   let paceGoal = 0;
@@ -57,11 +58,12 @@
     return (Math.sign(angle) * Math.tan((a / 10) * Math.PI / 180)) / 2.89;
   }
 
-  // The speed as a pace: the square root keeps town speeds apart, the
-  // motorway (120 km/h) reaches the top.
+  // The streaks' pace in m/s: as fast as the road when slow (1.3 m/s at
+  // 5 km/h), held back towards 13 m/s above, so the motorway stays calm
+  // (8.5 m/s at 50 km/h, 12 m/s at 120 km/h). Standing, they stand.
   function paceFor(kmh) {
     const v = Number.parseFloat(kmh);
-    return Number.isFinite(v) && v > 0 ? Math.min(1, Math.sqrt(v / 120)) : 0;
+    return Number.isFinite(v) && v > 0 ? 13 * (1 - Math.exp(-v / 3.6 / 13)) : 0;
   }
 
   // The brightness of the picture: the ambient lights' (0 to 100), more by
@@ -71,6 +73,19 @@
     let f = 0.55 + 0.45 * (level / 100);
     if (v.day) f = Math.max(f, 0.95) * 1.15;
     return clamp(f * (BRIGHT[options.bright] || 1), 0.3, 1.5);
+  }
+
+  // A critically damped spring towards a target (as game engines smooth a
+  // camera): the value moves with a steady speed, without steps or overshoot,
+  // and trails a moving target by about the smoothing time. Stable for any
+  // frame time. Returns the new value and its rate.
+  function spring(value, rate, goal, smoothing, dt) {
+    const omega = 2 / smoothing;
+    const x = omega * dt;
+    const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const change = value - goal;
+    const pull = (rate + omega * change) * dt;
+    return [goal + (change + pull) * decay, (rate - omega * pull) * decay];
   }
 
   // Where the path heads: the steering wheel alone. Without its angle (in Park
@@ -137,11 +152,14 @@ void main() {
   float z = f * 1.25 / max(dy, 0.25);
   float mpp = z / f;
   float x = (px.x - 0.5 * w) * mpp;
-  // Where the pixel lies against the path: metres to its right, metres along it.
-  float lateral = x;
+  // Where the pixel lies against the path: metres to its right, metres along
+  // it. A gentle path is a parabola, within a centimetre of the circle over
+  // 75 m and precise on the straight, so nothing snaps as the wheel passes
+  // the middle.
+  float lateral = x - 0.5 * uCurv * z * z;
   float along = z;
   float turn = 1.0;
-  if (abs(uCurv) > 1e-4) {
+  if (abs(uCurv) > 1e-3) {
     float r = 1.0 / abs(uCurv);
     float xs = x * sign(uCurv);
     float th = atan(z, r - xs);
@@ -159,20 +177,29 @@ void main() {
     // On arrival the path ends 26 m ahead, in a ring of light.
     float aEnd = mix(600.0, 26.0, uArrive);
     float ends = 1.0 - uArrive * smoothstep(aEnd - 8.0, aEnd + 1.0, along);
+    // A streak's head is sharp, but never sharper than a pixel and a half.
+    float head = clamp(1.5 * ma / 24.0, 0.03, 0.2);
+    float s = fract((along + uTravel) / 24.0);
+    float streak = uStreaks * (1.0 - uArrive) * smoothstep(0.0, head, s) * pow(1.0 - smoothstep(0.03, 0.42, s), 1.5);
     for (int i = 0; i < 2; i++) {
       float side = i == 0 ? -1.0 : 1.0;
-      float d = abs(lateral - side * 1.75) / m;
+      float dl = abs(lateral - side * 1.75);
+      float d = dl / m;
+      // d counts pixels as the ground runs at this pixel; far from the line,
+      // where the ground shrinks towards the horizon, it comes out far too
+      // short. So the light also keeps within a few metres of its line on the
+      // ground, or it would light whole rows, and the streaks cut edges in.
+      float close = exp(-dl * dl / 2.0);
+      float wide = exp(-dl * dl / 18.0);
       float core = exp(-d * d / (coreW * coreW)) * min(1.0, wpx / 1.1 + 0.2);
-      float s = fract((along + uTravel) / 24.0);
-      float streak = uStreaks * (1.0 - uArrive) * smoothstep(0.0, 0.03, s) * pow(1.0 - smoothstep(0.03, 0.42, s), 1.5);
       float blink = i == 0 ? uBlink.x : uBlink.y;
       float gain = (1.0 + 1.5 * blink) * fog * ends * path;
       vec3 hot = mix(uColor, vec3(1.0), 0.55 + 0.25 * blink);
       // The streak lights the line and its near halo; the wide halo stays
       // even, or the streak's edge would draw a line across the screen.
-      col += hot * core * (0.34 + 1.3 * streak) * gain;
-      col += uColor * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * streak) * gain;
-      col += uColor * exp(-d / (0.045 * w)) * 0.034 * gain;
+      col += hot * core * (0.34 + 1.3 * streak) * gain * close;
+      col += uColor * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * streak) * gain * close;
+      col += uColor * exp(-d / (0.045 * w)) * 0.034 * gain * wide;
     }
     if (uArrive > 0.0) {
       // The ring lies on the path, breathing slowly; a wave of light leaves it
@@ -184,10 +211,12 @@ void main() {
       float e = abs(len - r);
       float ew = e / max(0.07, fw);
       float ring = exp(-ew * ew) * min(1.0, 0.07 / fw + 0.35);
-      float halo = exp(-e / (fw * 14.0)) * 0.22;
+      // Halo and wave keep to a few metres on the ground, like the lines' light.
+      float halo = exp(-e / (fw * 14.0)) * exp(-e * e / 18.0) * 0.22;
       float phase = fract(uTime / 3.2);
-      float wv = (len - r - phase * 7.0) / max(0.12, 1.5 * fw);
-      float wave = exp(-wv * wv) * (1.0 - phase) * (1.0 - phase) * 0.5;
+      float front = len - r - phase * 7.0;
+      float wv = front / max(0.12, 1.5 * fw);
+      float wave = exp(-wv * wv) * exp(-front * front / 2.0) * (1.0 - phase) * (1.0 - phase) * 0.5;
       float pr = len / r;
       float pool = exp(-pr * pr * 1.4) * 0.10;
       vec3 hot = mix(uColor, vec3(1.0), 0.6);
@@ -347,15 +376,17 @@ void main() {
     lastFrame = s;
     // Without fresh state the road straightens and the streaks slow down.
     const fresh = (source && source.readyState === 1) || performance.now() - lastState < 3000;
-    // The steering angle comes 30 times a second, and the path follows it
-    // exactly; the easing only bridges the frames between two readings. Without
-    // the angle the path straightens slowly.
+    // The steering angle comes about 30 times a second, unevenly; a spring
+    // carries the path smoothly from reading to reading, about 0.08 s behind a
+    // turning wheel. Without the angle the path straightens slowly.
     const steering = state && typeof state.steer === 'number';
-    curv += ((fresh ? target : 0) - curv) * Math.min(1, dt / (steering ? 0.03 : 0.6));
-    // A streak takes about 6 s from the horizon to the driver when standing
-    // and 2 s on the motorway; the pace follows the speed over about 1.5 s.
-    pace += ((fresh ? paceGoal : 0) - pace) * Math.min(1, dt / 1.5);
-    travel += dt * (4 + 9 * pace);
+    [curv, curvRate] = spring(curv, curvRate, fresh ? target : 0, steering ? 0.08 : 0.6, dt);
+    // The pace follows the speed over about 1.5 s and comes to a full stop,
+    // the last of it at 0.4 m/s², rather than creeping on.
+    const paceTo = fresh ? paceGoal : 0;
+    const paceStep = Math.max(Math.abs(paceTo - pace) * Math.min(1, dt / 1.5), 0.4 * dt);
+    pace = Math.abs(paceTo - pace) <= paceStep ? paceTo : pace + Math.sign(paceTo - pace) * paceStep;
+    travel += dt * pace;
     arrive += (arriveGoal - arrive) * Math.min(1, dt / 2.2);
     // Colour and brightness fade over like the lights do.
     if (light && light.join() !== rgb.join()) {
