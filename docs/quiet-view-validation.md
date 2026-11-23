@@ -128,6 +128,15 @@ Alle drei liest das Paket über die Schnittstelle. Weitere Modi:
   gibt es nicht (404).
 - **Navigation mit Route:** `NAV_nextTurnDirection` und
   `NAV_nextTurnStreetName` kommen über die Schnittstelle nur als `<redacted>`.
+  Das schwärzt QtCar selbst, nicht CoilShift: `lv` (`com.tesla.Debug.get_data_value`),
+  `com.tesla.LocalDataValue.DataGetValueRequest` und der Sammelabruf
+  `get_data_values` („@redacted“) liefern dasselbe, ebenso `GUI_turnByTurnJson`.
+  Nicht geschwärzt ist `NAV_nextTurnAngle`: 99 bei einer Abbiegung, die die
+  Navigation als rechts anzeigte (vom Fahrer bestätigt). Der Winkel zählt also
+  im Uhrzeigersinn ab geradeaus, wie Valhallas `turn_degree`. `NAV_nextTurnAdvice`
+  war `<invalid>`.
+- **Screenshot:** QtCars `screenshot` erfasst auch offene App-Fenster (die
+  CoilShift-App war darauf zu sehen).
   Lesbar sind `NAV_milesToNextTurn` (0.038), `NAV_minutesToNextTurn` (0.143),
   `NAV_nextTurnId` (3589978) und `GUI_navNextDestinationArrivalTime`
   („19:01:00.000“). Die Manöver der Routing-Bibliothek in QtCar heißen

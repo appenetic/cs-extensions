@@ -11,8 +11,9 @@ In einer Linkskurve biegt sich die Straße nach links, in einer Rechtskurve nach
 rechts. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
 
 Ruhig darüber: oben links der Tacho, in der Mitte Ankunftszeit, Restzeit,
-Reststrecke und die nächste Abbiegung („Abbiegen in 200 m“), unten eine Linie
-für den Fortschritt der Route. Fest nach unten wischen schließt die App,
+Reststrecke und die nächste Abbiegung („in 200 m rechts“), unten eine Linie für
+den Fortschritt der Route. Ab 300 m vor der Abbiegung biegt sich die Straße
+schon in ihre Richtung. Fest nach unten wischen schließt die App,
 lange drücken öffnet die Optionen.
 
 ## Optionen
@@ -41,12 +42,10 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 - **Start per Kachel:** QtCar startet eine App von außen nur, wenn eine App auf
   dem Bildschirm das anfordert. Die Quiet-Ansicht öffnest du deshalb über ihre
   Kachel.
-- **Kein Zielname, keine Abbiegerichtung:** Über die Schnittstelle des Autos
-  kommen das Ziel, die Richtung der nächsten Abbiegung und ihr Straßenname nur
-  als `<redacted>`. Die App zeigt deshalb nur die Entfernung zur Abbiegung, und
-  die Bahnen biegen sich erst in der Kurve selbst. Gäbe CoilShift die Richtung
-  frei, erkennt der Dienst sie an Wörtern (`slight`, `sharp`, `uturn`, `left`,
-  `right` …), zeigt „in 200 m leicht links“ und biegt die Bahnen ab 300 m vorab.
+- **Kein Zielname:** QtCar schwärzt das Ziel, die Richtung der nächsten
+  Abbiegung (`NAV_nextTurnDirection`) und ihren Straßennamen auf jedem Weg, den
+  ein Paket lesen kann, auch direkt über D-Bus. Den Winkel der Abbiegung
+  (`NAV_nextTurnAngle`) schwärzt es nicht; daraus kommt die Richtung.
 - **Ungeprüfte Werte:** Wie die Firmware Blinker und Warnstufen schreibt, war am
   Auto noch nicht zu sehen. Das Paket erkennt sie an Wörtern (`left`, `right`,
   `both`, `visual`, `chime`, `slow`, `struck`, `escalat`).
@@ -89,7 +88,7 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 | Tacho | `VAPI_displaySpeed` in `VAPI_speedUnits` (KPH, MPH) |
 | Ankunft | `GUI_navNextDestinationArrivalTime`, wenn `GUI_navNextDestinationArrivalInfoValid`; `NAV_minutesToArrival`; `NAV_milesToArrival` in den Einheiten des Autos (`GUI_distanceUnits`) |
 | Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
-| Abbiegung | `NAV_milesToNextTurn`, ab 1,5 km als „Abbiegen in …“; `NAV_nextTurnDirection` ist geschwärzt |
+| Abbiegung | `NAV_milesToNextTurn` ab 1,5 km, die Richtung aus `NAV_nextTurnAngle` im Uhrzeigersinn ab geradeaus (99 war rechts): unter 12° keine Abbiegung, bis 45° leicht, bis 135° normal, bis 165° scharf, darüber wenden. Ohne Winkel nur „Abbiegen in …“ |
 | Kurve | Änderung von `LOC_estimatedHdg` über eine Sekunde, rechts positiv; 0 im Stand, ohne Richtung und bei Sprüngen über 60 °/s |
 | Tempo | Ein Lichtstreifen braucht im Stand etwa 6 s vom Horizont bis zu dir, ab 120 km/h etwa 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
