@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "id": "com.appenetic.welcome-performance",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "sdk": ">=1.0 <2",
   "title": "Welcome-Animation Performance (experimental)",
-  "summary": "Spielt beim Einsteigen die Welcome-Animation eines Performance-Autos, mit dessen Ambientelicht: blaues Pulsieren mit hellen Blitzen. Geändert wird nur, was die Firmware für das Intro wählt; das Auto sieht weiter seine echte Ausstattung. Deinstallieren stellt den Werkszustand her.",
+  "summary": "Spielt beim Einsteigen die Performance-Animation mit ihrem Ambientelicht. Ändert nur, was die Firmware fürs Intro wählt; Deinstallieren stellt den Werkszustand her.",
   "authors": [
     {
       "name": "Appenetic",

@@ -127,6 +127,16 @@ class Package(unittest.TestCase):
             builder.validate_settings({'settings': [{'id': 'speed_unit', 'type': 'enum',
                 'values': [{'value': 'km/h'}, {'value': 'm/s'}], 'default': 'km/h'}]})
 
+    def test_summaries_fit_the_coilshift_index(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('builder', ROOT / 'tools/build.py')
+        builder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(builder)
+        for path in (ROOT / 'packages').glob('*/coilshift.json'):
+            builder.validate_text(json.loads(path.read_text()))
+        with self.assertRaisesRegex(ValueError, 'Summary'):
+            builder.validate_text({'id': 'x', 'summary': 'ä' * 140})
+
     def test_shell_syntax(self):
         for path in (ROOT / 'packages').rglob('*.sh'):
             subprocess.run(['/bin/bash', '-n', str(path)], check=True)

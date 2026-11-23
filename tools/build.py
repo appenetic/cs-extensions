@@ -39,6 +39,13 @@ def validate_settings(manifest):
             raise ValueError('Invalid SDK enum setting: ' + setting['id'])
 
 
+def validate_text(manifest):
+    # One long summary makes the CoilShift server refuse the whole index
+    # (bad_index): it did so for 283 bytes; the longest it takes are 279.
+    if len(manifest.get('summary', '').encode()) > 279:
+        raise ValueError('Summary longer than 279 bytes: ' + manifest['id'])
+
+
 # Shell only: hooks and the library the welcome packages share, no README.
 WELCOME_FILES = {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'lib', 'lib/intro.sh'}
 # Packages with a panel get a versioned HTML entry and content-addressed assets,
@@ -68,6 +75,7 @@ RELEASES = {
 def build_package(PACKAGE):
     manifest = json.loads((PACKAGE / 'coilshift.json').read_text())
     validate_settings(manifest)
+    validate_text(manifest)
     release_files = set()
     release = RELEASES.get(manifest['id'])
     if manifest['id'] == 'com.appenetic.home-assistant':

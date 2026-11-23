@@ -99,6 +99,13 @@ Paket-ID wählt die Animation.
   `$CSDK_STATE/overlays/<name>/pristine`. So zu sehen in den Ledgern von
   `dev.coilshift.no-tesla-wifi` und `dev.coilshift.fix-sentry-drive`.
   `dev.coilshift.no-elon` legt auf dieselbe Art Kopien über `/etc/sv/*/run`.
+- **Feed:** Mit alpha.1 galt der Feed im Auto als kaputt. Syntax, Hashes und
+  Archive stimmten. Die Beschreibung von `welcome-performance` hatte aber 283
+  Byte, und CoilShift lehnt einen Index ab, in dem ein Paket eine Regel bricht
+  (`bad_index`). Die längsten Beschreibungen, die CoilShift annimmt, haben 279
+  Byte (`vnc`, `tailscale-native`). alpha.2 hat 167 bzw. 169 Byte, und
+  `tools/build.py` lehnt mehr als 279 Byte ab. Titel sind bis 52 Zeichen belegt
+  (`no-elon-rcg`).
 - **Werkzeuge am Auto:** BusyBox 1.37 (`awk`, `cmp`, `pidof`), `jq` 1.8.1,
   Bash 3.2.57.
 - **Automatische Tests:** `tests/test_welcome_animation.py`, 14 Tests mit
