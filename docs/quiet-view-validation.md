@@ -177,6 +177,14 @@ Uhrzeit der Ankunft kommt deshalb aus der letzten Ankunftszeit der Navigation.
 - **Update ohne Neustart:** Nach einem Update startete der Daemon den Dienst
   etwa eine Minute später neu; bis dahin lief der alte Prozess weiter.
 
+## Lenkwinkel in der Fahrt (alpha.11)
+
+`VAPI_steeringAngle` änderte sich bei jeder Abfrage über `lv`, also mindestens
+zehnmal pro Sekunde (bei 32 km/h, in 0,1- bis 0,6-Grad-Schritten). Die
+Verzögerung, die der Fahrer sah, lag am Dienst (200-ms-Takt) und an der Seite
+(Glättung über 0,4 s). Seit alpha.11 arbeitet der Dienst im 50-ms-Takt, und die
+Seite glättet den Lenkwinkel nur über 0,1 s.
+
 ## Am Auto offen
 
 1. Wie sich die Straße mit dem Lenkwinkel anfühlt, auch auf der Autobahn.

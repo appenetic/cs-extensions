@@ -104,7 +104,7 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 | Ankunft | `GUI_navNextDestinationArrivalTime`, wenn `GUI_navNextDestinationArrivalInfoValid`; `NAV_minutesToArrival`; `NAV_milesToArrival` in den Einheiten des Autos (`GUI_distanceUnits`) |
 | Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
 | Abbiegung | `NAV_milesToNextTurn` ab 1,5 km, die Richtung aus `NAV_nextTurnAngle` im Uhrzeigersinn ab geradeaus (99 war rechts): unter 12° keine Abbiegung, bis 45° leicht, bis 135° normal, bis 165° scharf, darüber wenden. Ohne Winkel nur „Abbiegen in …“ |
-| Kurve | `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt): bis wenige Grad wie die echte Krümmung (2° biegt leicht), darüber logarithmisch bis etwa 240°, unter 0,5° gerade; die Seite gleitet in etwa 0,4 s dorthin. Ohne gültigen Lenkwinkel die Änderung von `LOC_estimatedHdg` über eine Sekunde |
+| Kurve | `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt): bis wenige Grad wie die echte Krümmung (2° biegt leicht), darüber logarithmisch bis etwa 240°, unter 0,5° gerade. Der Dienst gibt ihn spätestens nach 50 ms weiter, die Seite glättet nur über 0,1 s. Ohne gültigen Lenkwinkel die Änderung von `LOC_estimatedHdg` über eine Sekunde |
 | Tempo | Ein Lichtstreifen braucht im Stand etwa 6 s vom Horizont bis zu dir, ab 120 km/h etwa 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
 

@@ -415,7 +415,7 @@
     },
     {
       "id": "com.appenetic.quiet-view",
-      "version": "0.1.0-alpha.10",
+      "version": "0.1.0-alpha.11",
       "sdk": ">=1.0 <2",
       "title": "Quiet-Ansicht (experimental)",
       "published_unix": 1794614400,
@@ -423,7 +423,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.quiet-view",
-        "version": "0.1.0-alpha.10",
+        "version": "0.1.0-alpha.11",
         "sdk": ">=1.0 <2",
         "title": "Quiet-Ansicht (experimental)",
         "summary": "Eine App nach dem Quiet Mode von FSD v15: ein ruhiger, animierter Lichtschein in der Farbe deines Ambientelichts mit Tacho, Ankunftszeit und Abbiegehinweisen, direkt im Vollbild. Nach unten wischen schließt sie.",
@@ -466,10 +466,10 @@
           ]
         }
       },
-      "manifest_sha256": "379143020c80ba02d316ec5356abb69aff191cf9c1a04d3ac7e44fa6819ae748",
+      "manifest_sha256": "9f42d5e31f3fb48456a4856ad172a2e7a189d06c4cafd899308d26fc47a2bc2a",
       "archive": {
-        "url": "pool/73ecb78a3813265e9944895ef109c6a803208d499e7f8e4140f9dfdf4e5f25d2",
-        "sha256": "73ecb78a3813265e9944895ef109c6a803208d499e7f8e4140f9dfdf4e5f25d2",
+        "url": "pool/f4b2329fe5be6eaa9880dc9d01bae13f7fb31ca896babd878ff7cd7303965ccc",
+        "sha256": "f4b2329fe5be6eaa9880dc9d01bae13f7fb31ca896babd878ff7cd7303965ccc",
         "bytes": 7372800
       }
     },

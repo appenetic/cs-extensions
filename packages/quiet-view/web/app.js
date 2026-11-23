@@ -324,7 +324,10 @@ void main() {
     lastFrame = s;
     // Without fresh state the road straightens and the streaks slow down.
     const fresh = (source && source.readyState === 1) || performance.now() - lastState < 3000;
-    bend += ((fresh ? target : 0) - bend) * Math.min(1, dt / 0.4);
+    // The steering angle comes 20 times a second and is smooth by itself; the
+    // turn rate from the heading needs more easing.
+    const steering = state && typeof state.steer === 'number';
+    bend += ((fresh ? target : 0) - bend) * Math.min(1, dt / (steering ? 0.1 : 0.6));
     // A streak takes about 6 s from the horizon to the driver when standing
     // and 2 s on the motorway; the pace follows the speed over about 1.5 s.
     pace += ((fresh ? paceGoal : 0) - pace) * Math.min(1, dt / 1.5);
