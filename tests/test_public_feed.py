@@ -22,17 +22,19 @@ class PublicFeed(unittest.TestCase):
         cls.index = json.loads((ROOT / 'repository/index.json').read_text())
         cls.entry = next(e for e in cls.index['packages'] if e['id'] == feed.HOME_ASSISTANT)
         cls.claude = next(e for e in cls.index['packages'] if e['id'] == feed.CLAUDE)
+        cls.welcome = next(e for e in cls.index['packages'] if e['id'] == feed.WELCOME_ANIMATION)
 
     def test_export_is_only_runtime_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = feed.export(ROOT / 'repository', Path(tmp) / 'public')
-            shas = [self.entry['archive']['sha256'], self.claude['archive']['sha256']]
+            shas = [e['archive']['sha256'] for e in [self.entry, self.claude, self.welcome]]
             files = {p.relative_to(output).as_posix() for p in output.rglob('*') if p.is_file()}
             self.assertEqual(files, {'.nojekyll', 'README.md', 'cs-extensions/.nojekyll',
                                     'cs-extensions/index.json', 'cs-extensions/index.html'}
                              | {'cs-extensions/pool/' + sha for sha in shas})
             index = json.loads((output / 'cs-extensions/index.json').read_text())
-            self.assertEqual(sorted(e['id'] for e in index['packages']), [feed.CLAUDE, feed.HOME_ASSISTANT])
+            self.assertEqual(sorted(e['id'] for e in index['packages']),
+                             [feed.CLAUDE, feed.HOME_ASSISTANT, feed.WELCOME_ANIMATION])
             self.assertEqual((output / 'cs-extensions/index.html').read_bytes(),
                              (output / 'cs-extensions/index.json').read_bytes())
             for sha in shas:
@@ -63,7 +65,7 @@ class PublicFeed(unittest.TestCase):
             feed.validate_package(entry, ROOT / 'repository')
 
     def test_source_in_archive_rejected_even_with_correct_hash(self):
-        for entry in [copy.deepcopy(self.entry), copy.deepcopy(self.claude)]:
+        for entry in [copy.deepcopy(self.entry), copy.deepcopy(self.claude), copy.deepcopy(self.welcome)]:
             with self.subTest(entry['id']):
                 self.assert_source_rejected(entry)
 

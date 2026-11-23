@@ -39,6 +39,14 @@ beide Pakete im Pages-Feed. Das Mac-Plugin in `claude-code/` ist Node-Quelltext
 und ist absichtlich öffentlich, weil es von dort installiert wird. Eine Sicherung
 des Go-Quelltexts liegt unter `../CS_Plugins-backup/claude-src-alpha.1-2026-11-17.tgz`.
 
+## Welcome-Animation (ab 2026-11-23)
+
+`com.appenetic.welcome-animation` besteht nur aus Shell-Skripten: zwei Hooks
+und `lib/intro.sh`. Es gibt keinen privaten Quelltext. Der Export nimmt das
+Paket mit einer festen Dateiliste auf, ohne README und ohne ELF-Prüfung. Er
+verlangt jetzt genau ein Release je zugelassenem Paket: HA, Claude und
+Welcome-Animation.
+
 ## Build und Export
 
 Auf dem Entwicklungsrechner mit lokalem/private ausgechecktem Quellcode:

@@ -13,7 +13,9 @@ import tarfile
 ROOT = Path(__file__).resolve().parents[1]
 HOME_ASSISTANT = 'com.appenetic.home-assistant'
 CLAUDE = 'com.appenetic.claude'
-# Shell lifecycle adapters are intentionally readable; application logic is ELF.
+WELCOME_ANIMATION = 'com.appenetic.welcome-animation'
+# Shell lifecycle adapters are intentionally readable; application logic is ELF,
+# except in the Welcome Animation, whose hooks are the whole package.
 RELEASES = {
     HOME_ASSISTANT: {
         'runtime': {
@@ -38,13 +40,19 @@ RELEASES = {
         'assets': [],
         'binary': 'bin/claude-linux-amd64',
     },
+    WELCOME_ANIMATION: {
+        'runtime': {'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'lib/intro.sh'},
+        'directories': {'hooks', 'lib'},
+        'assets': [],
+    },
 }
 PUBLIC_README = '''# Appenetic CS package feed
 
 This export contains generated package artifacts only: the Home Assistant
-Bridge and Claude Code for the MCU. The application source belongs in a separate
-private repository and is not included here. Each package contains a compiled
-Linux executable, its panel files and small, readable lifecycle scripts.
+Bridge, Claude Code for the MCU and the Welcome Animation. The application
+source belongs in a separate private repository and is not included here. The
+first two contain a compiled Linux executable, their panel files and small,
+readable lifecycle scripts; the Welcome Animation is shell scripts only.
 Compiled executables can still be reverse engineered.
 
 Feed path: `cs-extensions/index.json`
@@ -62,7 +70,7 @@ def digest(data):
 def validate_package(entry, repository):
     release = RELEASES.get(entry['id'])
     if not release:
-        raise ValueError('Only the compiled Home Assistant and Claude packages are approved for this feed')
+        raise ValueError('Only the Home Assistant, Claude and Welcome Animation packages are approved for this feed')
     archive = entry['archive']
     sha = archive['sha256']
     if not re.fullmatch(r'[0-9a-f]{64}', sha) or archive['url'] != 'pool/' + sha:
@@ -117,9 +125,10 @@ def validate_package(entry, repository):
                 raise ValueError('Versioned asset checksum mismatch: ' + source)
         if json.load(tar.extractfile('coilshift.json')) != manifest:
             raise ValueError('Embedded manifest mismatch')
-        binary = tar.extractfile(release['binary']).read()
-        if binary[:6] != b'\x7fELF\x02\x01' or binary[18:20] != b'\x3e\x00':
-            raise ValueError('Expected compiled Linux AMD64 executable')
+        if 'binary' in release:
+            binary = tar.extractfile(release['binary']).read()
+            if binary[:6] != b'\x7fELF\x02\x01' or binary[18:20] != b'\x3e\x00':
+                raise ValueError('Expected compiled Linux AMD64 executable')
     return sha, data
 
 
@@ -131,7 +140,7 @@ def export(repository, output):
     index = json.loads((repository / 'index.json').read_text())
     entries = [e for e in index['packages'] if e['id'] in RELEASES]
     if sorted(e['id'] for e in entries) != sorted(RELEASES):
-        raise ValueError('Expected exactly one Home Assistant and one Claude release')
+        raise ValueError('Expected exactly one release of each approved package')
     blobs = [validate_package(e, repository) for e in entries]
     public_index = {'schema': index['schema'], 'repository': {
         'name': 'Appenetic CS Extensions',

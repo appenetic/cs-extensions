@@ -23,6 +23,17 @@ dem Mac. Es ist öffentlich, auch für Kollegen:
 [Validierung](docs/claude-validation.md). Läuft seit alpha.8 am Auto
 (Model Y, Firmware 2026.32.7).
 
+## Welcome-Animation (neu, experimentell)
+
+Spielt beim Einsteigen die Performance- oder die Launch-Series-Animation, auf
+Wunsch mit deren Ambientelicht. Das Paket legt per CoilShift-`overlay` Kopien
+über die Startskripte des Intro-Dienstes und über die Lichtanimationen der
+Oberfläche. Am Fahrzeug wird kein Wert geschrieben. Installiert ändert es
+nichts; gewählt wird in den Einstellungen.
+[Funktionsweise](packages/welcome-animation/README.md) ·
+[Validierung](docs/welcome-animation-validation.md). Am Auto bisher nur lesend
+durchgespielt.
+
 ## Home Assistant Bridge
 
 New experimental package: [setup and limitations](packages/home-assistant/README.md).

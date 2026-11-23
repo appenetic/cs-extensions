@@ -58,6 +58,10 @@ RELEASES = {
                     'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'web', 'web/app.html', 'web/app.js',
                     'web/app.css', 'web/csdk-panel.css', 'web/icon.png'},
     },
+    # Shell only: hooks and the library they share, no README.
+    'com.appenetic.welcome-animation': {
+        'allowed': {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'lib', 'lib/intro.sh'},
+    },
 }
 
 
@@ -95,7 +99,7 @@ def build_package(PACKAGE):
         raise ValueError('Missing tile icon: ' + tile['icon'])
     # Match JSON Compact without reordering keys or HTML escaping.
     compact = json.dumps(manifest, separators=(',', ':'), ensure_ascii=False).encode()
-    for hook in [manifest['hooks']['apply'], manifest['hooks']['remove']] + manifest['hooks']['service']:
+    for hook in [manifest['hooks']['apply'], manifest['hooks']['remove']] + manifest['hooks'].get('service', []):
         p = PACKAGE / hook['run']
         if not p.is_file() or not p.stat().st_mode & 0o111:
             raise ValueError('Missing executable hook: ' + str(p))
