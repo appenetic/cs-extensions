@@ -17,8 +17,8 @@ schließt die App.
   Kachel.
 - **Kein Zielname:** Über die Schnittstelle des Autos kommt das Ziel nur als
   `<redacted>`. Die App zeigt deshalb Ankunftszeit, Minuten und Kilometer.
-- **Farbe:** Sie kommt aus `GUI_rgbColor`. Ohne RGB-Ambientelicht ist der
-  Schein weiß.
+- **Farbe:** Sie folgt dem Ambientelicht, auch wenn es die Farbe des
+  Albumcovers übernimmt. Ohne RGB-Ambientelicht ist der Schein weiß.
 - **Tacho:** Auf dem Model Y gibt es nur diesen Bildschirm. Ein maximiertes
   Fenster überdeckt auch die Geschwindigkeitsanzeige.
 
@@ -53,7 +53,7 @@ schließt die App.
 
 | `/state` | Quelle |
 | --- | --- |
-| `color` | `GUI_rgbColor` („255,131,0“) als `#ff8300` |
+| `color` | Was die Ambientelichter zeigen: `red`, `green`, `blue` aus `GUI_rgbMap` („{blue:36,…,green:73,…,red:255,…}“) als `#ff4924`. Ohne sie `GUI_rgbAlbumColor`, wenn `GUI_rgbSyncAlbumArtColor` an ist, sonst `GUI_rgbColor` („255,131,0“). Die Seite blendet in etwa 0,6 s über |
 | `trip`, `eta` | `GUI_navNextDestinationArrivalTime` („16:41:00“) als „16:41“, wenn `GUI_navNextDestinationArrivalInfoValid` |
 | `min` | `NAV_minutesToArrival`, gerundet |
 | `km` | `NAV_milesToArrival` in Kilometern mit Dezimalkomma |

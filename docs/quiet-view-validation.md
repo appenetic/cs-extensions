@@ -96,6 +96,17 @@ Kachel, so wie Netflix. Am Auto geprüft (Firmware 2026.32.7, simulierte Fahrt):
   Prozess ein `cat`, der Handler pro Header ein `tr`. Beides liest jetzt die
   Shell selbst.
 
+## Farbe (alpha.4)
+
+`GUI_rgbColor` ist die im Colorizer eingestellte Farbe (QtCar: „AmbientLightsColorizer:
+GUI_rgbColor …“). Mit `GUI_rgbSyncAlbumArtColor` = true leuchtete der Innenraum
+aber in der Farbe des Albumcovers: `GUI_rgbAlbumColor` „#ff4924“, während
+`GUI_rgbColor` bei „255,131,0“ blieb. `GUI_rgbMap` zeigte genau diese Farbe:
+„{blue:36,brightness:24,effect:250ms,green:73,lightSync:false,powerOverride:true,red:255,target:.*,usercolor:true}“.
+Alle drei liest das Paket über die Schnittstelle. Weitere Modi:
+`GUI_rgbAudioSyncEnabled`, `GUI_rgbRainbowRave`, `GUI_rgbRainbowRoadRequest`
+(alle false).
+
 ## Am Auto offen
 
 1. Ob sich die Bahnen in echten Kurven richtig herum und ruhig biegen. Ob die
@@ -105,3 +116,4 @@ Kachel, so wie Netflix. Am Auto geprüft (Firmware 2026.32.7, simulierte Fahrt):
 3. Ob das Wischen nach unten die App über `dismissApp` schließt.
 4. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
    Farben aussieht, auch tagsüber.
+5. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.

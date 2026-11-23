@@ -17,7 +17,10 @@
   const hint = document.getElementById('hint');
   // The trails' buffer is this much of the screen; blurred, it scales up cleanly.
   const TRAIL_SCALE = 0.25;
+  // The colour shown, and the one the ambient lights have now; it fades over
+  // like the lights do.
   let rgb = [255, 255, 255];
+  let light = null;
   let geo = null;
   // bend runs from -1 (hard left) to 1 (hard right) and eases towards target.
   let bend = 0;
@@ -26,7 +29,7 @@
   let lastState = 0;
   let lastFrame = 0;
 
-  const rgba = (a, c = rgb) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  const rgba = (a, c = rgb) => `rgba(${c.map(Math.round).join(',')},${a})`;
 
   function parseColor(hex) {
     const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
@@ -159,6 +162,11 @@
     // Without fresh state the trails straighten out.
     const goal = performance.now() - lastState < 3000 ? target : 0;
     bend += (goal - bend) * Math.min(1, dt / 0.7);
+    if (light && light.join() !== rgb.join()) {
+      const k = Math.min(1, dt / 0.6);
+      rgb = rgb.map((v, i) => (Math.abs(light[i] - v) < 1 ? light[i] : v + (light[i] - v) * k));
+      paintBase();
+    }
     if (trailsBend === null || Math.abs(bend - trailsBend) > 0.002) paintTrails();
     ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(base, 0, 0);
@@ -176,10 +184,12 @@
 
   function show(state) {
     const c = parseColor(state.color);
-    if (c && c.join() !== rgb.join()) {
+    if (c && !light) {
+      // The first colour shows at once, not as a fade from white.
       rgb = c;
       paintBase();
     }
+    if (c) light = c;
     target = bendFor(state.yaw);
     lastState = performance.now();
     trip.hidden = !(state.trip && state.eta);

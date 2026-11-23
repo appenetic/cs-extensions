@@ -115,11 +115,39 @@ quiet_motion() {
     quiet_turn "$(dv LOC_estimatedHdg)" "$(dv VAPI_vehicleSpeed)" "$((10#${up%.*} * 100 + 10#${up#*.}))"
 }
 
+# The colour the ambient lights show now. GUI_rgbMap is what QtCar sends them
+# ("{blue:36,…,green:73,…,red:255,…}"), also while they take the album art's
+# colour; without it the album colour when that sync is on, else the colour set
+# in the colorizer (GUI_rgbColor).
+quiet_light() {
+    local map r g b c album
+    map=$(dv GUI_rgbMap)
+    r=${map#*[{,]red:} g=${map#*[{,]green:} b=${map#*[{,]blue:}
+    if [ "$r" != "$map" ] && [ "$g" != "$map" ] && [ "$b" != "$map" ]; then
+        r=${r%%[,\}]*} g=${g%%[,\}]*} b=${b%%[,\}]*}
+        # quiet_color answers white also for what is no colour.
+        c=$(quiet_color "$r,$g,$b")
+        if [ "$c" != '#ffffff' ] || [ "$r,$g,$b" = 255,255,255 ]; then
+            echo "$c"
+            return
+        fi
+    fi
+    if [ "$(dv GUI_rgbSyncAlbumArtColor)" = true ]; then
+        album=$(dv GUI_rgbAlbumColor)
+        case "$album" in
+        \#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])
+            printf '%s\n' "$album" | tr 'A-F' 'a-f'
+            return ;;
+        esac
+    fi
+    quiet_color "$(dv GUI_rgbColor)"
+}
+
 # The colour, and the trip while one is planned. The destination is left out:
 # through the car API it reads "<redacted>".
 COLOR='#ffffff' TRIP=false ETA='' MIN='' KM=''
 quiet_trip() {
-    COLOR=$(quiet_color "$(dv GUI_rgbColor)")
+    COLOR=$(quiet_light)
     TRIP=false ETA='' MIN='' KM=''
     if [ "$(dv GUI_navNextDestinationArrivalInfoValid)" = true ]; then
         ETA=$(quiet_time "$(dv GUI_navNextDestinationArrivalTime)")

@@ -123,6 +123,28 @@ for k in 5.4 0 "<invalid>"; do printf '[%s]\\n' "$(quiet_km "$k")"; done''')
             '[15]', '[15]', '[0]', '[]', '[]',
             '[8,7]', '[0,0]', '[]'])
 
+    def test_colour_follows_what_the_ambient_lights_show(self):
+        light = '{blue:36,brightness:24,effect:250ms,green:73,lightSync:false,powerOverride:true,red:255,target:.*,usercolor:true}'
+        cases = [
+            # What QtCar sends the lights, also while they take the album colour.
+            ({'GUI_rgbMap': light, 'GUI_rgbSyncAlbumArtColor': 'true', 'GUI_rgbAlbumColor': '#00ff00'}, '#ff4924'),
+            ({'GUI_rgbMap': '{red:255,green:255,blue:255}'}, '#ffffff'),
+            # Without the map: the album colour while that sync is on.
+            ({'GUI_rgbMap': '<invalid>', 'GUI_rgbSyncAlbumArtColor': 'true', 'GUI_rgbAlbumColor': '#FF4924'}, '#ff4924'),
+            ({'GUI_rgbMap': '{red:300,green:73,blue:36}', 'GUI_rgbSyncAlbumArtColor': 'true',
+              'GUI_rgbAlbumColor': '#123abc'}, '#123abc'),
+            # Else the colour set in the colorizer.
+            ({'GUI_rgbMap': '{red:255,green:73}', 'GUI_rgbSyncAlbumArtColor': 'false', 'GUI_rgbAlbumColor': '#123abc'},
+             '#ff8300'),
+            ({'GUI_rgbMap': '<invalid>', 'GUI_rgbSyncAlbumArtColor': 'true', 'GUI_rgbAlbumColor': '<invalid>'}, '#ff8300'),
+        ]
+        for values, expected in cases:
+            with self.subTest(values):
+                for name in ['GUI_rgbMap', 'GUI_rgbSyncAlbumArtColor', 'GUI_rgbAlbumColor']:
+                    (self.daemon / 'dv' / name).unlink(missing_ok=True)
+                self.dv(**values)
+                self.assertEqual(self.bash('quiet_light'), expected + '\n')
+
     def test_state_without_a_trip_has_only_the_colour(self):
         self.bash('quiet_state')
         self.assertEqual(self.state(), {'color': '#ff8300', 'trip': False, 'eta': '', 'min': '', 'km': '', 'yaw': '0.0'})
@@ -305,6 +327,7 @@ class QuietViewFiles(unittest.TestCase):
         self.assertIn("askWindow('close')", js)
         self.assertIn("'X-Quiet': '1'", js)
         self.assertIn('bendFor(state.yaw)', js)
+        self.assertIn('if (c) light = c;', js)
 
     @unittest.skipUnless(shutil.which('node'), 'node checks the script syntax')
     def test_script_parses(self):
