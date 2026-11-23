@@ -187,6 +187,15 @@ Seite glättet den Lenkwinkel nur über 0,1 s. Ab alpha.12 richtet sich die
 Straße auf Wunsch des Fahrers nur nach dem Lenkwinkel, nicht mehr nach
 Abbiegehinweisen oder der Fahrtrichtung.
 
+## Lenkwinkel direkt (alpha.13)
+
+Mit dem Lenkrad im Stand bewegt, zehnmal pro Sekunde über `lv` gelesen:
+- **über den Watch-Stream der Schnittstelle:** 8 Änderungen in 14 s, im Median
+  1,72 s nach `lv` (bis 2,6 s), etwa alle 1,6 s eine.
+- **direkt über D-Bus** (`com.tesla.Debug.get_data_value` alle 50 ms, eigene
+  Verbindung zum Systembus unter `/var/run/dbus/system_bus_socket`): 250
+  Änderungen in 15 s, im Median 0,07 s nach `lv`, etwa alle 0,05 s eine.
+
 ## Am Auto offen
 
 1. Wie sich die Straße mit dem Lenkwinkel anfühlt, auch auf der Autobahn.
