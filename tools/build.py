@@ -39,6 +39,8 @@ def validate_settings(manifest):
             raise ValueError('Invalid SDK enum setting: ' + setting['id'])
 
 
+# Shell only: hooks and the library the welcome packages share, no README.
+WELCOME_FILES = {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'lib', 'lib/intro.sh'}
 # Packages with a panel get a versioned HTML entry and content-addressed assets,
 # so a cached old page can never be served under the URLs of a new release. The
 # archive of such a package holds an explicit allowlist: no developer docs or source.
@@ -58,10 +60,8 @@ RELEASES = {
                     'LICENSE-CoilShift-SDK', 'LICENSE-QR-Code', 'web', 'web/app.html', 'web/app.js',
                     'web/app.css', 'web/csdk-panel.css', 'web/icon.png'},
     },
-    # Shell only: hooks and the library they share, no README.
-    'com.appenetic.welcome-animation': {
-        'allowed': {'coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'lib', 'lib/intro.sh'},
-    },
+    'com.appenetic.welcome-performance': {'allowed': WELCOME_FILES},
+    'com.appenetic.welcome-launch': {'allowed': WELCOME_FILES},
 }
 
 

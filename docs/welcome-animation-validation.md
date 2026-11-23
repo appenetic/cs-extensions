@@ -1,7 +1,27 @@
 # Welcome-Animation: Validierung, 2026-11-23
 
-Version `0.1.0-alpha.1`. Untersucht offline an der Firmware `2026.38.5.12` und
-nur lesend am Auto des Nutzers (Model Y, Firmware `2026.32.7`, geparkt, per SSH).
+`com.appenetic.welcome-performance` und `com.appenetic.welcome-launch`, je
+`0.1.0-alpha.1`. Untersucht offline an der Firmware `2026.38.5.12` und nur
+lesend am Auto des Nutzers (Model Y, Firmware `2026.32.7`, geparkt, per SSH).
+
+## Einstellungen gibt es nicht
+
+Die erste Fassung `com.appenetic.welcome-animation` (alpha.1) hatte eine Auswahl
+in den SDK-Einstellungen. Am Auto installiert erschien sie nirgends:
+
+- **Repositories-Seite:** Die CoilShift-App listet Pakete aus Repositories nur
+  dort, mit „Update“, „Hold“ und „Uninstall“.
+- **Paketseite:** Einstellungen zeigt sie nur für die eigenen Pakete der
+  Policy.
+- **Einstellungsordner:** Am Auto sind `/run/coilshift/pkgs/<id>/settings/`
+  aller vier Fremdpakete leer (Claude, Home Assistant, ISA-Profiles, dv-list),
+  die der eingebauten `dev.coilshift.*`-Pakete nicht.
+- **Ausweg anderer Pakete:** Das Panel von `dev.michije.isa-profiles` weicht
+  deshalb auf seinen eigenen Dienst aus. Beim HA-Paket lieferte
+  `settings.set` `not_found`.
+
+Deshalb gibt es jetzt je Animation ein Paket ohne Einstellungen. Die
+Paket-ID wählt die Animation.
 
 ## Video
 
@@ -40,7 +60,7 @@ nur lesend am Auto des Nutzers (Model Y, Firmware `2026.32.7`, geparkt, per SSH)
 
   | Wahl | `FILE_SUFFIX` | Faktor | zweites Display |
   | --- | --- | --- | --- |
-  | Ab Werk / Standard | leer | 0,75 | `vehicle-intro-1.mp4` |
+  | Ab Werk | leer | 0,75 | `vehicle-intro-1.mp4` |
   | Performance | `-perf` | 0,75 | `vehicle-intro-perf-1.mp4` |
   | Launch Series | `-launch` | 1,0 | keins |
 
@@ -83,21 +103,24 @@ nur lesend am Auto des Nutzers (Model Y, Firmware `2026.32.7`, geparkt, per SSH)
   Bash 3.2.57.
 - **Automatische Tests:** `tests/test_welcome_animation.py`, 14 Tests mit
   `/bin/bash` 3.2 gegen einen nachgebauten Daemon:
-  - Werkszustand ohne Einstellung, Performance mit Licht und Neustart
-  - erneutes Anwenden ohne Neustart, Wechsel über die Originalsicherung und
-    ohne sie
-  - zurück zu Ab Werk (byte-gleich), Licht aus, kein Neustart ohne QtCar
+  - beide Pakete mit Video, Licht und Neustart
+  - erneutes Anwenden ohne Neustart, mit und ohne Originalsicherung
+  - Deinstallieren stellt jede Datei byte-gleich wieder her
+  - das zweite Paket lässt das aktive erste in Ruhe
+  - kein Neustart ohne QtCar
   - andere Firmware-Logik, fehlendes Video, Firmware ohne Lichtanimation
-  - abgelehntes Overlay, zwei `tvideo.env`-Zeilen, Entfernen mit und ohne Licht
+  - abgelehntes Overlay, zwei `tvideo.env`-Zeilen, unbekannte Paket-ID
+  - byte-gleicher Code beider Pakete
 
-  Absichtlich eingebaute Fehler fallen auf: falscher Wert, fehlendes `unset`,
-  nur ein Licht-Eintrag, kein Neustart, Dateirechte 0600.
+  Absichtlich in beiden Kopien eingebaute Fehler fallen auf: keine
+  Fremdprüfung, falscher Wert, fehlendes `unset`, kein Neustart beim
+  Anwenden und beim Entfernen, keine Originalsicherung.
 
 ## Am Auto offen
 
-1. Installation über den Feed und ob CoilShift `overlay` auf
-   `/etc/sv/vehicle-intro*/run` und die JSON annimmt. Das Muster ist von
-   anderen Paketen belegt, für diese Ziele aber noch nicht.
+1. Ob CoilShift `overlay` auf `/etc/sv/vehicle-intro*/run` und die JSON
+   annimmt. Das Muster ist von anderen Paketen belegt, für diese Ziele aber
+   noch nicht.
 2. Ob das Performance- und das Launch-Video beim Einsteigen laufen und den
    Bildschirm füllen.
 3. Ob QtCar mit dem kürzeren Launch-Video (3,42 s statt 4,00 s) sauber

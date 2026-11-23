@@ -41,11 +41,12 @@ des Go-Quelltexts liegt unter `../CS_Plugins-backup/claude-src-alpha.1-2026-11-1
 
 ## Welcome-Animation (ab 2026-11-23)
 
-`com.appenetic.welcome-animation` besteht nur aus Shell-Skripten: zwei Hooks
-und `lib/intro.sh`. Es gibt keinen privaten Quelltext. Der Export nimmt das
-Paket mit einer festen Dateiliste auf, ohne README und ohne ELF-Prüfung. Er
-verlangt jetzt genau ein Release je zugelassenem Paket: HA, Claude und
-Welcome-Animation.
+`com.appenetic.welcome-performance` und `com.appenetic.welcome-launch` bestehen
+nur aus Shell-Skripten: zwei Hooks und `lib/intro.sh`. Es gibt keinen privaten
+Quelltext. Der Export nimmt beide mit einer festen Dateiliste auf, ohne README
+und ohne ELF-Prüfung. Er verlangt jetzt genau ein Release je zugelassenem
+Paket: HA, Claude und die beiden Welcome-Pakete. Die erste Fassung
+`com.appenetic.welcome-animation` ist nicht mehr im Feed.
 
 ## Build und Export
 

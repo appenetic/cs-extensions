@@ -13,9 +13,15 @@ import tarfile
 ROOT = Path(__file__).resolve().parents[1]
 HOME_ASSISTANT = 'com.appenetic.home-assistant'
 CLAUDE = 'com.appenetic.claude'
-WELCOME_ANIMATION = 'com.appenetic.welcome-animation'
+WELCOME_PERFORMANCE = 'com.appenetic.welcome-performance'
+WELCOME_LAUNCH = 'com.appenetic.welcome-launch'
 # Shell lifecycle adapters are intentionally readable; application logic is ELF,
-# except in the Welcome Animation, whose hooks are the whole package.
+# except in the welcome packages, whose hooks are the whole package.
+WELCOME = {
+    'runtime': {'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'lib/intro.sh'},
+    'directories': {'hooks', 'lib'},
+    'assets': [],
+}
 RELEASES = {
     HOME_ASSISTANT: {
         'runtime': {
@@ -40,19 +46,16 @@ RELEASES = {
         'assets': [],
         'binary': 'bin/claude-linux-amd64',
     },
-    WELCOME_ANIMATION: {
-        'runtime': {'coilshift.json', 'hooks/apply.sh', 'hooks/remove.sh', 'lib/intro.sh'},
-        'directories': {'hooks', 'lib'},
-        'assets': [],
-    },
+    WELCOME_PERFORMANCE: WELCOME,
+    WELCOME_LAUNCH: WELCOME,
 }
 PUBLIC_README = '''# Appenetic CS package feed
 
 This export contains generated package artifacts only: the Home Assistant
-Bridge, Claude Code for the MCU and the Welcome Animation. The application
+Bridge, Claude Code for the MCU and the two welcome animations. The application
 source belongs in a separate private repository and is not included here. The
 first two contain a compiled Linux executable, their panel files and small,
-readable lifecycle scripts; the Welcome Animation is shell scripts only.
+readable lifecycle scripts; the welcome animations are shell scripts only.
 Compiled executables can still be reverse engineered.
 
 Feed path: `cs-extensions/index.json`
@@ -70,7 +73,7 @@ def digest(data):
 def validate_package(entry, repository):
     release = RELEASES.get(entry['id'])
     if not release:
-        raise ValueError('Only the Home Assistant, Claude and Welcome Animation packages are approved for this feed')
+        raise ValueError('Only the Home Assistant, Claude and welcome animation packages are approved for this feed')
     archive = entry['archive']
     sha = archive['sha256']
     if not re.fullmatch(r'[0-9a-f]{64}', sha) or archive['url'] != 'pool/' + sha:

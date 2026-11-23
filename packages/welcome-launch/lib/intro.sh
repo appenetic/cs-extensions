@@ -1,7 +1,9 @@
 #!/bin/bash
-# Bash 3.2 and BusyBox. Video: the firmware's vehicle-intro services source
-# /etc/tvideo.env, which picks vehicle-intro[-launch|-perf].mp4 by what lv reads
-# for VAPI_vehicleBadging and VAPI_performancePackage. Our overlay of each intro
+# Bash 3.2 and BusyBox. Shared, byte for byte, by com.appenetic.welcome-performance
+# and com.appenetic.welcome-launch: the package id names the animation.
+# Video: the firmware's vehicle-intro services source /etc/tvideo.env, which
+# picks vehicle-intro[-launch|-perf].mp4 by what lv reads for
+# VAPI_vehicleBadging and VAPI_performancePackage. Our overlay of each intro
 # run script answers just those two reads, and only while it sources tvideo.env:
 # the firmware still picks the video and its scaling, and nothing else on the
 # car sees a changed value.
@@ -9,7 +11,10 @@
 # "welcomePerf" or "welcomeLS" only on a Model Y of that kind, "welcome" on any
 # other car. Our copy of the file gives all three the frames of the chosen one.
 R=${CSDK_FAKE_ROOT:-}
-MARK='# com.appenetic.welcome-animation'
+ANIMATION=${CSDK_PKG:-}
+ANIMATION=${ANIMATION#com.appenetic.welcome-}
+FAMILY='# com.appenetic.welcome-'
+MARK="# ${CSDK_PKG:-}:"
 TVIDEO=/etc/tvideo.env
 VIDEOS=/usr/tesla/UI/assets/videos
 LIGHTS=/usr/tesla/UI/assets/AmbientLightsAnimation.json
@@ -24,17 +29,11 @@ status() {
     # Reasons are fixed source strings, never vehicle or user input.
     api PUT /status "{\"state\":\"$1\",\"reason\":\"$2\"}" >/dev/null || :
 }
-setting() {
-    local value
-    value=$(cat "${CSDK_SETTINGS:-}/$1" 2>/dev/null) || value=$2
-    printf '%s' "$value"
-}
 
 # Badging, performance package, video and light animation of a car of that
 # kind. tvideo.env tests the badging first.
 intro_choice() {
-    case "$1" in
-    standard) echo 'Base Base vehicle-intro.mp4 welcome' ;;
+    case "$ANIMATION" in
     performance) echo 'Base Performance vehicle-intro-perf.mp4 welcomePerf' ;;
     launch) echo 'LaunchSeries Base vehicle-intro-launch.mp4 welcomeLS' ;;
     *) return 1 ;;
@@ -49,6 +48,15 @@ intro_services() {
         case "$name" in *[!a-z0-9-]*) continue ;; esac
         [ -f "$dir/run" ] && printf '%s\n' "$name"
     done
+}
+
+# Another welcome package has its copy on an intro run script.
+intro_foreign() {
+    local name
+    for name in $(intro_services); do
+        grep -F "$FAMILY" "$R/etc/sv/$name/run" | grep -qvF "$MARK" && return 0
+    done
+    return 1
 }
 
 # tvideo.env picks the video as on 2026.32.7 and 2026.38.5.12.
@@ -66,7 +74,7 @@ intro_stock_script() {
     local name=$1 target=$R/etc/sv/$1/run pristine=$CSDK_STATE/overlays/$1/pristine
     if ! grep -qF "$MARK" "$target"; then
         printf '%s' "$target"
-    elif [ -f "$pristine" ] && ! grep -qF "$MARK" "$pristine"; then
+    elif [ -f "$pristine" ] && ! grep -qF "$FAMILY" "$pristine"; then
         printf '%s' "$pristine"
     else
         api DELETE "/overlays/$name" >/dev/null || :
@@ -78,8 +86,8 @@ intro_stock_script() {
 # The stock script with lv answering the two DataValues around its one
 # ". /etc/tvideo.env"; fails unless there is exactly one such line.
 intro_render() {
-    awk -v mark="$MARK ($2): tvideo.env picks the video by these two DataValues" \
-        -v shim="lv() { case \"\$1\" in VAPI_vehicleBadging) echo '\"$3\"' ;; VAPI_performancePackage) echo '\"$4\"' ;; *) command lv \"\$@\" ;; esac; }" '
+    awk -v mark="$MARK tvideo.env picks the video by these two DataValues" \
+        -v shim="lv() { case \"\$1\" in VAPI_vehicleBadging) echo '\"$2\"' ;; VAPI_performancePackage) echo '\"$3\"' ;; *) command lv \"\$@\" ;; esac; }" '
         $0 == ". /etc/tvideo.env" { print mark; print shim; print; print "unset -f lv"; n++; next }
         { print }
         END { exit (n == 1 ? 0 : 1) }' "$1"
@@ -101,13 +109,13 @@ overlay_put() {
 # Puts the rendered run script over every intro service that picks its video
 # through tvideo.env.
 intro_overlay() {
-    local animation=$1 badging=$2 package=$3 name script copy count=0
+    local badging=$1 package=$2 name script copy count=0
     mkdir -p "$CSDK_RUN/overlays" || return 1
     for name in $(intro_services); do
         script=$(intro_stock_script "$name") || return 1
         grep -q FILE_SUFFIX "$script" || continue
         copy=$CSDK_RUN/overlays/$name.run
-        if ! intro_render "$script" "$animation" "$badging" "$package" > "$copy.new" ||
+        if ! intro_render "$script" "$badging" "$package" > "$copy.new" ||
             ! /bin/bash -n "$copy.new"; then
             rm -f "$copy.new"
             return 1

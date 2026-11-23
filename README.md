@@ -25,12 +25,13 @@ dem Mac. Es ist öffentlich, auch für Kollegen:
 
 ## Welcome-Animation (neu, experimentell)
 
-Spielt beim Einsteigen die Performance- oder die Launch-Series-Animation, auf
-Wunsch mit deren Ambientelicht. Das Paket legt per CoilShift-`overlay` Kopien
-über die Startskripte des Intro-Dienstes und über die Lichtanimationen der
-Oberfläche. Am Fahrzeug wird kein Wert geschrieben. Installiert ändert es
-nichts; gewählt wird in den Einstellungen.
-[Funktionsweise](packages/welcome-animation/README.md) ·
+Zwei Pakete, „Welcome-Animation Performance“ und „Welcome-Animation Launch
+Series“. Beim Einsteigen spielen sie die Animation dieser Ausstattung mit ihrem
+Ambientelicht. Installieren schaltet ein, Deinstallieren zurück auf ab Werk;
+es kann nur eins wirken. Sie legen per CoilShift-`overlay` Kopien über die
+Startskripte des Intro-Dienstes und über die Lichtanimationen der Oberfläche.
+Am Fahrzeug wird kein Wert geschrieben.
+[Funktionsweise](packages/welcome-performance/README.md) ·
 [Validierung](docs/welcome-animation-validation.md). Am Auto bisher nur lesend
 durchgespielt.
 

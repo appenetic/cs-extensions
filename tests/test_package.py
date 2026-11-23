@@ -89,25 +89,26 @@ class Package(unittest.TestCase):
             self.assertFalse(any(n.endswith(('.go', '.md', '.mjs', '.py')) for n in names))
             self.assertEqual(json.load(archive.extractfile('coilshift.json')), manifest)
 
-    def test_welcome_animation_archive(self):
+    def test_welcome_archives(self):
         subprocess.run(['python3', 'tools/build.py'], cwd=ROOT, check=True, capture_output=True)
         entries = json.loads((ROOT / 'repository/index.json').read_text())['packages']
-        entry = next(e for e in entries if e['id'] == 'com.appenetic.welcome-animation')
-        manifest = entry['manifest']
-        data = (ROOT / 'repository' / entry['archive']['url']).read_bytes()
-        self.assertEqual(hashlib.sha256(data).hexdigest(), entry['archive']['sha256'])
-        # Overlays and a parked UI restart only: no DataValue is written.
-        self.assertEqual(manifest['capabilities'], ['overlay', 'restart:ui'])
-        self.assertNotIn('service', manifest['hooks'])
-        settings = {s['id']: s for s in manifest['settings']}
-        self.assertEqual(settings['animation']['default'], 'stock', 'installing alone changes nothing')
-        self.assertEqual([v['value'] for v in settings['animation']['values']], ['stock', 'standard', 'performance', 'launch'])
-        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
-            self.assertEqual(sorted(archive.getnames()),
-                             ['coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'lib', 'lib/intro.sh'])
-            for hook in ['hooks/apply.sh', 'hooks/remove.sh']:
-                self.assertEqual(archive.getmember(hook).mode, 0o755)
-            self.assertEqual(json.load(archive.extractfile('coilshift.json')), manifest)
+        ids = [e['id'] for e in entries]
+        self.assertNotIn('com.appenetic.welcome-animation', ids, 'its settings were unreachable; retired')
+        for kind in ['performance', 'launch']:
+            entry = next(e for e in entries if e['id'] == 'com.appenetic.welcome-' + kind)
+            manifest = entry['manifest']
+            data = (ROOT / 'repository' / entry['archive']['url']).read_bytes()
+            self.assertEqual(hashlib.sha256(data).hexdigest(), entry['archive']['sha256'])
+            # Overlays and a parked UI restart only: no DataValue is written.
+            self.assertEqual(manifest['capabilities'], ['overlay', 'restart:ui'])
+            self.assertNotIn('service', manifest['hooks'])
+            self.assertNotIn('settings', manifest)
+            with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+                self.assertEqual(sorted(archive.getnames()),
+                                 ['coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'lib', 'lib/intro.sh'])
+                for hook in ['hooks/apply.sh', 'hooks/remove.sh']:
+                    self.assertEqual(archive.getmember(hook).mode, 0o755)
+                self.assertEqual(json.load(archive.extractfile('coilshift.json')), manifest)
 
     def test_sdk_enum_tokens(self):
         import importlib.util
