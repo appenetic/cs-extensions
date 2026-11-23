@@ -126,6 +126,17 @@ main {
 
 .hint.gone { opacity: 0; }
 
+/* The buildings' sources, as their licences ask, quietly in a corner. */
+.credit {
+  position: fixed;
+  right: 18px;
+  bottom: 8px;
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 .menu {
   position: fixed;
   inset: 0;

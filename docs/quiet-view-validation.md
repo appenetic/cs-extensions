@@ -238,19 +238,47 @@ der Linie sammelt, je weiter er von ihr weg ist; weit weg bleibt nur sein
 Mittel. Der Kopf auf der Linie ist etwas weicher (mindestens 1,2 m statt
 0,72 m).
 
+## Gebäude aus OpenStreetMap (alpha.17)
+
+Am Auto in P geprüft (nur lesend), bevor gebaut wurde:
+
+- `com.tesla.SensitiveDataValues.get_LOC_geoLocation` antwortet sofort mit
+  `boolean true` und `"(… N, … E)"` (sechs Nachkommastellen). Die
+  `NAV_`-Koordinaten bleiben geschwärzt.
+- Der Dienst läuft als root in einem eigenen Netz-Namespace mit Route nach
+  draußen (`default via 192.168.93.149 dev vpeer37`), aber ohne DNS:
+  `resolv.conf` nennt 127.0.0.1, wo dort niemand antwortet. Über 1.1.1.1
+  aufgelöst lädt `curl` aus diesem Namespace die TileJSON von OpenFreeMap
+  (HTTP 200, 0,18 s, Zertifikat gültig). Der Dienst löst deshalb selbst über
+  öffentliche Resolver auf, nur über IPv4.
+- Overpass (overpass-api.de) war in dem Moment überlastet (502). Deshalb die
+  statischen Kacheln von OpenFreeMap über ein CDN.
+
+Am Mac: Eine echte Kachel aus Paris (14/8296/5635, 575 KB) ergibt 3674
+Gebäudeumrisse in etwa 10 ms. Auf einer echten Straße darin gerendert säumen
+die Gebäude beide Seiten und laufen zum Fluchtpunkt zusammen. Die Go-Tests
+decken Dekodierung, Zuschnitt an der Kachelkante, Auswahl, Abruf mit Cache und
+die Position über D-Bus ab.
+
+Erst bei einer Fahrt zu sehen: wie oft `LOC_estimatedHdg` und die Position
+sich wirklich ändern und ob sich die Gebäude damit ruhig bewegen. `turns.log`
+zählt dafür je Zeile die neuen Kurse und Positionen seit der vorigen.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
    (alpha.14 und 15 bisher nur in der Demo und im Rendering gesehen).
-2. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
+2. Ob die Gebäude im Auto ankommen und sich beim Fahren ruhig mitbewegen; wie
+   oft Kurs und Position sich ändern (`turns.log`).
+3. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
-3. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
+4. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
    Farben aussieht, auch tagsüber.
-4. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
-5. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
+5. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
+6. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
    Paketlog.
-6. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
+7. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
    Auslöser stehen mit ihrem Wert im Paketlog.
-7. Die Einheit von `VAPI_yawRate`.
-8. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation die
+8. Die Einheit von `VAPI_yawRate`.
+9. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation die
    Route beendet.

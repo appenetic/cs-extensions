@@ -11,6 +11,9 @@ im Stand stehen sie.
 Die beiden Linien zeigen die Bahn, die das Auto beim gerade eingeschlagenen
 Lenkwinkel fahren würde, wie die Hilfslinien einer Rückfahrkamera: leicht
 gelenkt eine sanfte Kurve, voll eingeschlagen ein enger Bogen zur Seite. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
+Dahinter stehen schematisch die Gebäude rund um das Auto, aus OpenStreetMap:
+dunkle, halbdurchsichtige Körper mit feinen Lichtkanten in der Farbe des
+Scheins. Sie blenden ab 30 m ein und verlieren sich gegen 500 m im Dunst.
 
 Ruhig darüber: oben links der Tacho, in der Mitte Ankunftszeit, Restzeit,
 Reststrecke und die nächste Abbiegung („in 200 m rechts“), unten eine Linie für
@@ -37,8 +40,36 @@ Zeitzone als die Anzeige im Auto.
 
 Pakete aus einem Repository bekommen in CoilShift keine Einstellungen. Ein
 langer Druck in der App öffnet deshalb ein Menü: Ankunftszeit und Fortschritt,
-Abbiegehinweise, Tacho und Lichtstreifen an oder aus, Helligkeit Auto, Hell oder
-Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
+Abbiegehinweise, Tacho, Lichtstreifen und Gebäude an oder aus, Helligkeit Auto,
+Hell oder Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
+
+## Gebäude
+
+Die Gebäude kommen als Vektorkacheln von [OpenFreeMap](https://openfreemap.org)
+(OpenMapTiles-Schema, Zoomstufe 14, frei und ohne Schlüssel): Grundriss, Höhe
+und Sockelhöhe aus OpenStreetMap. Wo dort keine Höhe steht, setzt OpenMapTiles
+eine eigene an. Der Dienst lädt nur, solange die App offen und die Option an
+ist, die Kacheln im Umkreis von 450 m um das Auto (meist ein bis zwei von
+1,5 km Kantenlänge). Neue Kacheln kosten je etwa 0,3 bis 0,6 MB über das Netz
+des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
+
+- **Position:** QtCar schwärzt `NAV_vehicleLatitude` und `NAV_vehicleLongitude`
+  auch über D-Bus. Die Nur-Lese-Methode
+  `com.tesla.SensitiveDataValues.get_LOC_geoLocation` liefert die Position aber,
+  wie das Home-Assistant-Paket sie liest. Der Dienst fragt sie zweimal pro
+  Sekunde ab, den Kurs (`LOC_estimatedHdg`) und das Tempo fünfmal.
+- **Datenschutz:** Seite, Stream und Gebäude kennen nur Meter östlich und
+  nördlich des ersten Standorts der Sitzung, nie den Ort selbst. Ins Log und
+  nach `turns.log` kommt keine Position. OpenFreeMap (über Cloudflare) sieht,
+  welche Kacheln das Auto lädt, also seine Gegend auf etwa 1,5 km genau.
+  Öffentliche DNS-Server (1.1.1.1, 9.9.9.9, 8.8.8.8) sehen den Namen
+  `tiles.openfreemap.org`, denn das Netz des Dienstes hat keinen eigenen
+  DNS-Server. Wer das nicht will, schaltet die Gebäude im Menü aus.
+- **Lizenz:** Solange Gebäude zu sehen sind, steht unten rechts klein
+  „OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende“.
+- **Bewegung:** Zwischen zwei Positionen fährt die Seite mit dem Tempo weiter und
+  dreht mit dem Kurs, wie schnell er sich zuletzt drehte. Neue Positionen
+  gleitet sie über etwa 0,35 s an.
 
 ## Sicherheit
 
@@ -67,9 +98,10 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
   Auto noch nicht zu sehen. Das Paket erkennt sie an Wörtern (`left`, `right`,
   `both`, `visual`, `chime`, `slow`, `struck`, `escalat`).
 - **Lenkwinkel im Stand:** In P kann `VAPI_steeringAngle` `<invalid>` sein;
-  dann bleibt die Straße gerade. Der Dienst schreibt während der Fahrt
-  Drehrate, Gierrate und Lenkwinkel in `CSDK_STATE/turns.log` (höchstens etwa
-  512 KB).
+  dann bleibt die Bahn gerade. Der Dienst schreibt während der Fahrt
+  Drehrate, Gierrate, Lenkwinkel, Tempo, Kurs, den Ort im Rahmen der Sitzung
+  und wie oft Kurs und Position neu kamen in `CSDK_STATE/turns.log` (höchstens
+  etwa 512 KB).
 
 ## So funktioniert es
 
@@ -113,6 +145,7 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 | Bahn | Nur `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt). Die Krümmung ist tan(Lenkwinkel / 10) / 2,89 m, also Lenkübersetzung etwa 10:1 und Radstand 2,89 m: 2° biegen die Bahn auf 60 m ein wenig, 180° auf einen Radius von etwa 9 m. Die Linien sind Kreisbögen 1,75 m innen und außen; sichtbar sind etwa 60 m, nie über die Umkehr hinaus. Unter 0,3° bleibt sie gerade. Der Dienst liest den Winkel 30-mal pro Sekunde direkt bei QtCar und gibt jeden neuen Wert sofort weiter; eine kritisch gedämpfte Feder auf der Seite trägt die Bahn ohne Stufen von Wert zu Wert, etwa 0,08 s hinter einem drehenden Lenkrad. Ohne gültigen Lenkwinkel läuft die Bahn gerade; Abbiegehinweise biegen sie nicht |
 | Tempo | Die Lichtstreifen laufen langsam so schnell wie die Straße (1,3 m/s bei 5 km/h), darüber gebremst gegen 13 m/s (8,5 m/s bei 50 km/h, 12 m/s bei 120 km/h). Sie folgen dem Tempo über etwa 1,5 s und kommen im Stand ganz zum Stehen |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
+| Gebäude | Position aus `com.tesla.SensitiveDataValues.get_LOC_geoLocation` (2-mal pro Sekunde), Kurs `LOC_estimatedHdg` und Tempo (5-mal), Gebäude aus OpenFreeMap-Kacheln im Umkreis von 450 m, neu ausgewählt alle 60 m |
 
 Das Bild zeichnet ein WebGL-Shader in echter Perspektive: eine Kamera 1,25 m
 über der Mitte einer 3,5 m breiten Spur, der Horizont auf 58 % der Höhe. Die
@@ -125,7 +158,9 @@ stehen ein filmisches Tonemapping und feines Rauschen, damit dunkle Verläufe
 keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder länger
 als etwa 26 ms, zeichnet die Seite weniger Pixel. Ohne WebGL steht ein
 schlichteres Canvas-Bild da. Farbe, Helligkeit, Bahn und Tempo gleiten weich
-in ihre neuen Werte.
+in ihre neuen Werte. Die Gebäude zeichnet ein zweiter Durchgang aus derselben
+Kamera: Wände, die wenig abdunkeln, aber verdecken, was hinter ihnen steht, und
+darüber Dachkanten und Ecken als feine Linien. Das Canvas-Bild zeigt keine.
 
 ## Entwicklung und Validierungsstand
 

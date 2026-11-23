@@ -37,7 +37,7 @@
   let state = null;
   let lastState = 0;
   let lastFrame = 0;
-  let options = { eta: true, speed: true, turns: true, pulses: true, bright: 'auto' };
+  let options = { eta: true, speed: true, turns: true, pulses: true, bright: 'auto', buildings: true };
   let source = null;
   let polling = null;
 
@@ -270,8 +270,77 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
+  // The buildings around the car, from the same camera, after the road: walls
+  // that only darken a little but hide what stands behind them, and their roof
+  // edges and corners as fine lines in the light's colour. They fade in from
+  // 30 m and out towards 500 m, so those beside the car stay out of the way.
+  // Points are metres east and north in the service's frame, and up.
+  const BUILDING_VERTEX = `
+attribute vec3 aPos;
+uniform vec2 uCam;
+uniform vec2 uDir;
+uniform vec4 uView;
+varying float vDist;
+void main() {
+  vec2 d = aPos.xy - uCam;
+  float ahead = dot(d, uDir);
+  float right = d.x * uDir.y - d.y * uDir.x;
+  float up = aPos.z - 1.25;
+  // uView: focal length, width, height and horizon, in pixels; depth from 5 m.
+  gl_Position = vec4(right * 2.0 * uView.x / uView.y,
+    (1.0 - 2.0 * uView.w / uView.z) * ahead + up * 2.0 * uView.x / uView.z,
+    ahead * 3005.0 / 2995.0 - 30000.0 / 2995.0, ahead);
+  vDist = length(d);
+}`;
+
+  const BUILDING_FRAGMENT = `
+precision mediump float;
+uniform vec4 uTint;
+uniform float uFade;
+varying float vDist;
+void main() {
+  float a = uTint.a * uFade * smoothstep(30.0, 90.0, vDist) * exp(-vDist / 260.0);
+  // A wall too faint to see hides nothing either.
+  if (a < 0.004) discard;
+  gl_FragColor = vec4(uTint.rgb, a);
+}`;
+
+  // The service's lines as walls and edges: per line its height, its base,
+  // 1 when closed, then its points. Corners are where an outline turns by more
+  // than 25°; an open line's ends lie on a tile's border and are none.
+  function buildingGeometry(lines) {
+    const walls = [];
+    const edges = [];
+    const bend = Math.cos((25 * Math.PI) / 180);
+    for (const row of lines) {
+      if (!Array.isArray(row) || row.length < 7 || row.length % 2 === 0) continue;
+      const [top, base] = row;
+      const closed = row[2] === 1;
+      const n = (row.length - 3) / 2;
+      const x = (i) => row[3 + 2 * i];
+      const y = (i) => row[4 + 2 * i];
+      for (let i = 0; i < (closed ? n : n - 1); i++) {
+        const j = (i + 1) % n;
+        walls.push(x(i), y(i), base, x(j), y(j), base, x(j), y(j), top, x(i), y(i), base, x(j), y(j), top, x(i), y(i), top);
+        edges.push(x(i), y(i), top, x(j), y(j), top);
+      }
+      for (let i = closed ? 0 : 1; i < (closed ? n : n - 1); i++) {
+        const p = (i + n - 1) % n;
+        const q = (i + 1) % n;
+        const ux = x(i) - x(p);
+        const uy = y(i) - y(p);
+        const vx = x(q) - x(i);
+        const vy = y(q) - y(i);
+        if ((ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1) < bend) {
+          edges.push(x(i), y(i), base, x(i), y(i), top);
+        }
+      }
+    }
+    return { walls: new Float32Array(walls), edges: new Float32Array(edges) };
+  }
+
   function webglPicture(canvas) {
-    const gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false,
+    const gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: true, stencil: false,
       preserveDrawingBuffer: false, powerPreference: 'low-power' });
     if (!gl) return null;
     // Screen derivatives keep the lines' width; the shader does without them.
@@ -285,13 +354,18 @@ void main() {
     const vs = shader(gl.VERTEX_SHADER, 'attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }');
     const fs = shader(gl.FRAGMENT_SHADER, FRAGMENT);
     if (!vs || !fs) return null;
-    const program = gl.createProgram();
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
+    const link = (v, f) => {
+      const pr = gl.createProgram();
+      gl.attachShader(pr, v);
+      gl.attachShader(pr, f);
+      gl.linkProgram(pr);
+      return gl.getProgramParameter(pr, gl.LINK_STATUS) ? pr : null;
+    };
+    const program = link(vs, fs);
+    if (!program) return null;
     gl.useProgram(program);
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    const quad = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const at = gl.getAttribLocation(program, 'p');
     gl.enableVertexAttribArray(at);
@@ -300,6 +374,29 @@ void main() {
     for (const name of ['uRes', 'uColor', 'uGlow', 'uCurv', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed', 'uArrive', 'uTime']) {
       u[name] = gl.getUniformLocation(program, name);
     }
+    // The buildings: without their shaders the picture goes on without them.
+    const bvs = shader(gl.VERTEX_SHADER, BUILDING_VERTEX);
+    const bfs = shader(gl.FRAGMENT_SHADER, BUILDING_FRAGMENT);
+    const houses = bvs && bfs ? link(bvs, bfs) : null;
+    const bAt = houses ? gl.getAttribLocation(houses, 'aPos') : -1;
+    const bu = {};
+    for (const name of houses ? ['uCam', 'uDir', 'uView', 'uTint', 'uFade'] : []) {
+      bu[name] = gl.getUniformLocation(houses, name);
+    }
+    let walls = null;
+    let edges = null;
+    const upload = (data) => {
+      if (!data.length) return null;
+      const b = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, b);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      return { b, n: data.length / 3 };
+    };
+    const drawWith = (x, mode) => {
+      gl.bindBuffer(gl.ARRAY_BUFFER, x.b);
+      gl.vertexAttribPointer(bAt, 3, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(mode, 0, x.n);
+    };
     const info = gl.getExtension('WEBGL_debug_renderer_info');
     const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
     return {
@@ -308,7 +405,21 @@ void main() {
       resize(width, height) {
         gl.viewport(0, 0, width, height);
       },
+      // Lines from the service, or null for none; true when there are some.
+      setBuildings(lines) {
+        for (const x of [walls, edges]) if (x) gl.deleteBuffer(x.b);
+        walls = edges = null;
+        if (!houses || !lines) return false;
+        const g = buildingGeometry(lines);
+        walls = upload(g.walls);
+        edges = upload(g.edges);
+        return !!walls;
+      },
       draw(p) {
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+        gl.enableVertexAttribArray(at);
+        gl.vertexAttribPointer(at, 2, gl.FLOAT, false, 0, 0);
         gl.uniform2f(u.uRes, canvas.width, canvas.height);
         gl.uniform3f(u.uColor, p.rgb[0] / 255, p.rgb[1] / 255, p.rgb[2] / 255);
         gl.uniform1f(u.uGlow, p.glow);
@@ -321,6 +432,38 @@ void main() {
         gl.uniform1f(u.uArrive, p.arrive);
         gl.uniform1f(u.uTime, p.time % 3600);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (!houses || !walls || !p.cam || p.buildings < 0.01) return;
+        gl.useProgram(houses);
+        if (bAt !== at) gl.disableVertexAttribArray(at);
+        gl.enableVertexAttribArray(bAt);
+        const r = (p.cam.h * Math.PI) / 180;
+        gl.uniform2f(bu.uCam, p.cam.x, p.cam.y);
+        gl.uniform2f(bu.uDir, Math.sin(r), Math.cos(r));
+        gl.uniform4f(bu.uView, 0.78 * canvas.width, canvas.width, canvas.height, 0.58 * canvas.height);
+        gl.uniform1f(bu.uFade, p.buildings);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+        gl.enable(gl.BLEND);
+        // Walls darken and write depth, set back a little so their own edges
+        // still show; the edges add light and write none.
+        gl.enable(gl.POLYGON_OFFSET_FILL);
+        gl.polygonOffset(1, 2);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.uniform4f(bu.uTint, 0, 0, 0, 0.45);
+        drawWith(walls, gl.TRIANGLES);
+        gl.disable(gl.POLYGON_OFFSET_FILL);
+        if (edges) {
+          gl.depthMask(false);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+          const hot = p.rgb.map((c) => (c + (255 - c) * 0.35) / 255);
+          gl.uniform4f(bu.uTint, hot[0], hot[1], hot[2], 0.34 * Math.min(1.2, p.glow));
+          drawWith(edges, gl.LINES);
+          gl.depthMask(true);
+        }
+        gl.disable(gl.BLEND);
+        gl.disable(gl.DEPTH_TEST);
+        if (bAt !== at) gl.disableVertexAttribArray(bAt);
       },
     };
   }
@@ -340,6 +483,9 @@ void main() {
     return {
       soft: true,
       resize() {},
+      setBuildings() {
+        return false;
+      },
       draw(p) {
         const w = canvas.width;
         const h = canvas.height;
@@ -392,6 +538,7 @@ void main() {
     canvas.replaceWith(fresh);
     canvas = fresh;
     picture = canvasPicture(canvas);
+    hasBuildings = false;
     layout();
   });
 
@@ -441,8 +588,16 @@ void main() {
       if (state.signal !== 'right') left = b;
       if (state.signal !== 'left') right = b;
     }
+    follow(dt, now);
+    const showing = hasBuildings && options.buildings && cam && cam.o === buildingsOrigin;
+    buildingsFade += ((showing ? 1 : 0) - buildingsFade) * Math.min(1, dt / 1.5);
+    if ((buildingsFade > 0.05) !== creditShown) {
+      creditShown = !creditShown;
+      $('credit').hidden = !creditShown;
+    }
     picture.draw({ rgb, glow, curv, travel, streaks: options.pulses, left, right, arrive,
-      breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s });
+      breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, cam: showing || buildingsFade > 0.01 ? cam : null,
+      buildings: buildingsFade });
     if (++measured === 90) {
       if ((now - measureStart) / measured > 26 && quality > 0.35) {
         quality = Math.max(0.35, quality * 0.75);
@@ -490,7 +645,8 @@ void main() {
   }
 
   function applyOptions(o) {
-    options = { eta: !!o.eta, speed: !!o.speed, turns: !!o.turns, pulses: !!o.pulses, bright: o.bright in BRIGHT ? o.bright : 'auto' };
+    options = { eta: !!o.eta, speed: !!o.speed, turns: !!o.turns, pulses: !!o.pulses,
+      bright: o.bright in BRIGHT ? o.bright : 'auto', buildings: o.buildings !== false };
     if (state) {
       glowGoal = glowFor(state);
       target = targetFor(state);
@@ -508,6 +664,12 @@ void main() {
     if (c) light = c;
     paceGoal = paceFor(v.kmh);
     arriveGoal = v.arrived ? 1 : 0;
+    takeFix(v.pose);
+    // Each new pick of buildings is fetched once.
+    if (typeof v.bv === 'number' && v.bv !== buildingsAt) {
+      buildingsAt = v.bv;
+      loadBuildings();
+    }
     // A choice still on its way to the service is not undone by an older view.
     applyOptions(v.options && !pending ? v.options : options);
     if (first) {
@@ -515,6 +677,80 @@ void main() {
       rgb = c;
       glow = glowGoal;
       document.documentElement.style.setProperty('--light', `rgb(${rgb.join(',')})`);
+    }
+  }
+
+  // Where the car is, for the buildings: its last fix in the service's frame
+  // and its heading, carried on between fixes by the speed and by how fast the
+  // heading turned lately, and eased over about 0.35 s, so a fix never jumps.
+  let fix = null;
+  let cam = null;
+  let hasBuildings = false;
+  let buildingsAt = -1;
+  let buildingsOrigin = 0;
+  let buildingsFade = 0;
+  let creditShown = false;
+
+  const turnOf = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
+
+  function takeFix(p) {
+    if (!p || typeof p.x !== 'number' || typeof p.y !== 'number' || typeof p.h !== 'number') {
+      fix = null;
+      return;
+    }
+    const now = performance.now();
+    let rate = fix && fix.o === p.o ? fix.rate : 0;
+    if (fix && fix.o === p.o && p.h !== fix.h) {
+      const dt = (now - fix.turnedAt) / 1000;
+      rate = dt < 3 ? 0.5 * rate + 0.5 * clamp(turnOf(p.h, fix.h) / Math.max(dt, 0.05), -60, 60) : 0;
+    }
+    const turnedAt = !fix || p.h !== fix.h ? now : fix.turnedAt;
+    fix = { x: p.x, y: p.y, h: p.h, o: p.o, at: now, turnedAt, rate };
+  }
+
+  function follow(dt, now) {
+    if (!fix) {
+      cam = null;
+      return;
+    }
+    const v = Math.max(0, Number.parseFloat(state && state.kmh) || 0) / 3.6;
+    const age = Math.min(1.5, (now - fix.at) / 1000);
+    // The turn carries the heading on for 0.3 s; a heading that then stays
+    // put means the turn ended, and the carrying fades out by 0.9 s.
+    const since = (now - fix.turnedAt) / 1000;
+    const carry = since <= 0.3 ? since : 0.3 * Math.max(0, (0.9 - since) / 0.6);
+    const h = fix.h + (v > 1 ? fix.rate * carry : 0);
+    const r = (h * Math.PI) / 180;
+    const tx = fix.x + v * Math.sin(r) * age;
+    const ty = fix.y + v * Math.cos(r) * age;
+    if (!cam || cam.o !== fix.o || Math.hypot(tx - cam.x, ty - cam.y) > 50) {
+      cam = { x: tx, y: ty, h, o: fix.o };
+      return;
+    }
+    const cr = (cam.h * Math.PI) / 180;
+    cam.x += v * Math.sin(cr) * dt;
+    cam.y += v * Math.cos(cr) * dt;
+    const k = Math.min(1, dt / 0.35);
+    cam.x += (tx - cam.x) * k;
+    cam.y += (ty - cam.y) * k;
+    cam.h += turnOf(h, cam.h) * k;
+  }
+
+  async function loadBuildings() {
+    try {
+      const res = await fetch('buildings', { cache: 'no-store' });
+      if (res.status === 204) {
+        hasBuildings = picture.setBuildings(null);
+        return;
+      }
+      if (!res.ok) return;
+      const doc = await res.json();
+      if (doc && Array.isArray(doc.b)) {
+        hasBuildings = picture.setBuildings(doc.b);
+        buildingsOrigin = doc.o;
+      }
+    } catch {
+      // The next pick tries again.
     }
   }
 
@@ -585,7 +821,8 @@ void main() {
       const res = await fetch('options', {
         method: 'POST',
         headers: { 'X-Quiet': '1', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eta: options.eta, speed: options.speed, turns: options.turns, pulses: options.pulses, bright: options.bright }),
+        body: JSON.stringify({ eta: options.eta, speed: options.speed, turns: options.turns, pulses: options.pulses,
+          bright: options.bright, buildings: options.buildings }),
       });
       if (!res.ok) throw new Error(String(res.status));
     } catch {

@@ -153,7 +153,8 @@ class QuietViewFiles(unittest.TestCase):
         self.assertNotIn('http', html)
         js = (PACKAGE / 'web/app.js').read_text()
         for needle in ["new EventSource('events')", "fetch('state'", "askWindow('max')", "askWindow('close')",
-                       "'X-Quiet': '1'", "fetch('options'", 'steerCurvature(v.steer)', 'paceFor(v.kmh)']:
+                       "'X-Quiet': '1'", "fetch('options'", 'steerCurvature(v.steer)', 'paceFor(v.kmh)',
+                       "fetch('buildings'", 'takeFix(v.pose)']:
             self.assertIn(needle, js)
 
     @unittest.skipUnless(shutil.which('node'), 'node checks the script syntax')
