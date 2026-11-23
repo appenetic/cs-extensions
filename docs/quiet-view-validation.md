@@ -167,6 +167,16 @@ auf false und `NAV_milesToArrival` auf `<invalid>`. Die Systemuhr der MCU läuft
 auf US-Pazifikzeit (`date` zeigte PST, als das Auto 17:19 anzeigte); die
 Uhrzeit der Ankunft kommt deshalb aus der letzten Ankunftszeit der Navigation.
 
+## Bestätigt im Auto (alpha.10)
+
+- **Wischen schließt:** Fest nach unten wischen schließt die App. Der Dienst
+  ruft dafür QtCars `dismissApp` mit dem Titel „Quiet“; denselben Aufruf nutzt
+  das Schließen bei Warnungen.
+- **Menü:** Eine Wahl im Menü (Lichtstreifen aus) blieb über einen Neustart des
+  Dienstes erhalten (`options.json`).
+- **Update ohne Neustart:** Nach einem Update startete der Daemon den Dienst
+  etwa eine Minute später neu; bis dahin lief der alte Prozess weiter.
+
 ## Am Auto offen
 
 1. Wie sich die Straße mit dem Lenkwinkel anfühlt, auch auf der Autobahn.
@@ -175,8 +185,8 @@ Uhrzeit der Ankunft kommt deshalb aus der letzten Ankunftszeit der Navigation.
 3. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
    Farben aussieht, auch tagsüber.
 4. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
-5. Ob das Wischen die App über `dismissApp` schließt; davon hängt auch das
-   Schließen bei Warnungen ab.
+5. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
+   Paketlog.
 6. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
    Auslöser stehen mit ihrem Wert im Paketlog.
 7. Die Einheit von `VAPI_yawRate`.
