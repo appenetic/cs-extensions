@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "com.appenetic.quiet-view",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "sdk": ">=1.0 <2",
   "title": "Quiet-Ansicht (experimental)",
   "summary": "Eine App nach dem Quiet Mode von FSD v15: ein animierter Lichtschein in der Farbe deines Ambientelichts mit der Ankunftszeit, direkt im Vollbild. Nach unten wischen schließt sie.",

@@ -42,10 +42,10 @@ if (method, path) == ('PUT', '/v1/status'):
 if (method, path) == ('PUT', '/v1/web/app'):
     print('{{"port":29911,"netns":"chromium-entertainment","origin":"http://127.0.0.1:29911"}}')
     sys.exit(0)
-if method == 'PUT' and path.startswith('/v1/tiles/'):
+if (method, path) == ('PUT', '/v1/tiles/app'):
     if (daemon / 'fail-tiles').exists():
         sys.exit(22)
-    print('{{"id":"' + path[len('/v1/tiles/'):] + '"}}')
+    print('{{"id":"com-appenetic-quiet-view.app"}}')
     sys.exit(0)
 if method == 'GET' and path.startswith('/v1/dv/'):
     value = daemon / 'dv' / path[len('/v1/dv/'):]
@@ -195,7 +195,8 @@ for k in 5.4 0 "<invalid>"; do printf '[%s]\\n' "$(quiet_km "$k")"; done''')
         self.assertEqual(result.returncode, 0, result.stderr)
         tile = self.state_dir / 'tile'
         requests = (self.daemon / 'requests').read_text().splitlines()
-        self.assertIn(f'PUT /v1/tiles/{TILE} {{"dir":"{tile}"}}', requests)
+        # The route names the tile; the daemon makes the tile ID of it.
+        self.assertIn(f'PUT /v1/tiles/app {{"dir":"{tile}"}}', requests)
         definition = tile / 'def'
         self.assertEqual(sorted(p.name for p in definition.iterdir()),
                          ['config', 'icon.png', 'webapp.json', 'webappLocData_en.json'])

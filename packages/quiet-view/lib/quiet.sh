@@ -80,8 +80,8 @@ quiet_state() {
 
 # The tile as the daemon builds one for a manifest tile (the browser config and
 # webapp.json), but with a window that opens maximized and stays so, without a
-# top bar, and allowed in Drive. PUT /v1/tiles installs it in the ledger and has
-# QtCar rescan its tiles; the same definition again is no change.
+# top bar, and allowed in Drive. PUT /v1/tiles/app installs it in the ledger as
+# $TILE and has QtCar rescan its tiles; the same definition again is no change.
 quiet_tile() {
     local dir=$CSDK_STATE/tile origin="http://127.0.0.1:$PORT" host='127\\.0\\.0\\.1'
     rm -rf "$dir"
@@ -114,7 +114,7 @@ EOF
     # QtCar reads the definition as its own user; hooks run with umask 0077.
     chmod 755 "$dir" "$dir/def"
     chmod 644 "$dir/def"/*
-    api PUT "/tiles/$TILE" "{\"dir\":\"$dir\"}" >/dev/null
+    api PUT /tiles/app "{\"dir\":\"$dir\"}" >/dev/null
 }
 
 # QtCar's app window: maximized, with the swipe that dismisses it; or closed.

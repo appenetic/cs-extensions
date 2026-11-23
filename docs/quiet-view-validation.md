@@ -63,7 +63,14 @@ Kachel, so wie Netflix. Am Auto geprüft (Firmware 2026.32.7, simulierte Fahrt):
   `appWindowDefaultOpensToMaximized`, `appWindowIsMaximizedOnly` und
   `canMaximizeAppWindow` (Photobooth). Die Kachel, die CoilShift aus dem
   Manifest baut, setzt `canMaximizeAppWindow: false`. Laut SDK darf ein Paket
-  die Definition über `PUT /v1/tiles/{tile}` `{dir}` selbst liefern.
+  die Definition über `PUT /v1/tiles/{tile}` `{dir}` selbst liefern. `{tile}`
+  ist nur der Kachelname (`app`). Mit der vollen ID antwortet der Daemon 400
+  („the name com-appenetic-quiet-view.app is not valid for this route“), daran
+  scheiterte alpha.1. Mit `app` kam 200 und die Definition unter
+  `/usr/tesla/UI/assets/web-apps/com-appenetic-quiet-view.app`.
+- **Installieren aus dem Feed:** Die CoilShift-App installiert über
+  `POST api/packages/{id}` `{action: "install", repository_id, version,
+  entry_sha256}`. Das Paket wird dabei sofort angewendet, auch in D.
 - **Netz-Namespaces:** Browser-Prozesse laufen auch in eigenen Namespaces, die
   unter keinem Namen stehen. Der Dienst sucht sie wie der Claude-Server über
   `/proc/*/comm` und öffnet dort seinen Port.
@@ -72,8 +79,7 @@ Kachel, so wie Netflix. Am Auto geprüft (Firmware 2026.32.7, simulierte Fahrt):
 
 ## Am Auto offen
 
-1. Ob CoilShift die selbst gelieferte Definition annimmt und QtCar die Kachel
-   ohne Neustart zeigt.
+1. Ob QtCar die Kachel ohne Neustart zeigt.
 2. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
 3. Ob das Wischen nach unten die App über `dismissApp` schließt.
