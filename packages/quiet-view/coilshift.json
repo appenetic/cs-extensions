@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "com.appenetic.quiet-view",
+  "version": "0.1.0-alpha.1",
+  "sdk": ">=1.0 <2",
+  "title": "Quiet-Ansicht (experimental)",
+  "summary": "Eine App nach dem Quiet Mode von FSD v15: ein animierter Lichtschein in der Farbe deines Ambientelichts mit der Ankunftszeit, direkt im Vollbild. Nach unten wischen schließt sie.",
+  "authors": [
+    {
+      "name": "Appenetic",
+      "url": "https://github.com/appenetic/cs-extensions"
+    }
+  ],
+  "capabilities": [
+    "service",
+    "tile",
+    "web.listen",
+    "bind",
+    "dv.read"
+  ],
+  "web": [
+    {
+      "name": "app",
+      "service": "web"
+    }
+  ],
+  "hooks": {
+    "apply": {
+      "run": "hooks/apply.sh",
+      "rerun": "in-place",
+      "phase": "late",
+      "timeout": 10
+    },
+    "remove": {
+      "run": "hooks/remove.sh",
+      "timeout": 10
+    },
+    "service": [
+      {
+        "id": "web",
+        "run": "hooks/web.sh",
+        "restart": "on-failure"
+      }
+    ]
+  }
+}

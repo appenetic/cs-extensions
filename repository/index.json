@@ -414,6 +414,66 @@
       }
     },
     {
+      "id": "com.appenetic.quiet-view",
+      "version": "0.1.0-alpha.1",
+      "sdk": ">=1.0 <2",
+      "title": "Quiet-Ansicht (experimental)",
+      "published_unix": 1794614400,
+      "withdrawn": false,
+      "manifest": {
+        "schema": 1,
+        "id": "com.appenetic.quiet-view",
+        "version": "0.1.0-alpha.1",
+        "sdk": ">=1.0 <2",
+        "title": "Quiet-Ansicht (experimental)",
+        "summary": "Eine App nach dem Quiet Mode von FSD v15: ein animierter Lichtschein in der Farbe deines Ambientelichts mit der Ankunftszeit, direkt im Vollbild. Nach unten wischen schließt sie.",
+        "authors": [
+          {
+            "name": "Appenetic",
+            "url": "https://github.com/appenetic/cs-extensions"
+          }
+        ],
+        "capabilities": [
+          "service",
+          "tile",
+          "web.listen",
+          "bind",
+          "dv.read"
+        ],
+        "web": [
+          {
+            "name": "app",
+            "service": "web"
+          }
+        ],
+        "hooks": {
+          "apply": {
+            "run": "hooks/apply.sh",
+            "rerun": "in-place",
+            "phase": "late",
+            "timeout": 10
+          },
+          "remove": {
+            "run": "hooks/remove.sh",
+            "timeout": 10
+          },
+          "service": [
+            {
+              "id": "web",
+              "run": "hooks/web.sh",
+              "restart": "on-failure"
+            }
+          ]
+        }
+      },
+      "manifest_sha256": "fb0029856f9e7160b251aea5b49408affe0f7b82d04c133a1444652be50df52f",
+      "archive": {
+        "url": "pool/c8231acab0ba2724c63f0ba01267115000b91ed1f6374f898483eab930b3e2eb",
+        "sha256": "c8231acab0ba2724c63f0ba01267115000b91ed1f6374f898483eab930b3e2eb",
+        "bytes": 61440
+      }
+    },
+    {
       "id": "com.appenetic.welcome-animation",
       "version": "0.1.0-alpha.1",
       "sdk": ">=1.0 <2",

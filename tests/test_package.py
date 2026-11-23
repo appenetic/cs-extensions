@@ -131,6 +131,28 @@ class Package(unittest.TestCase):
             builder.validate_settings({'settings': [{'id': 'speed_unit', 'type': 'enum',
                 'values': [{'value': 'km/h'}, {'value': 'm/s'}], 'default': 'km/h'}]})
 
+    def test_quiet_view_archive(self):
+        subprocess.run(['python3', 'tools/build.py'], cwd=ROOT, check=True, capture_output=True)
+        entries = json.loads((ROOT / 'repository/index.json').read_text())['packages']
+        entry = next(e for e in entries if e['id'] == 'com.appenetic.quiet-view')
+        manifest = entry['manifest']
+        data = (ROOT / 'repository' / entry['archive']['url']).read_bytes()
+        self.assertEqual(hashlib.sha256(data).hexdigest(), entry['archive']['sha256'])
+        # It reads DataValues and writes none; its tile comes from the apply hook; no
+        # settings CoilShift would never show.
+        self.assertFalse([c for c in manifest['capabilities'] if c.startswith('dv.write')])
+        self.assertIn('tile', manifest['capabilities'])
+        self.assertNotIn('tile', manifest)
+        self.assertNotIn('settings', manifest)
+        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+            self.assertEqual(sorted(archive.getnames()),
+                             ['coilshift.json', 'hooks', 'hooks/apply.sh', 'hooks/remove.sh', 'hooks/web.sh', 'lib',
+                              'lib/http.sh', 'lib/quiet.sh', 'web', 'web/app.css', 'web/app.js', 'web/icon.png',
+                              'web/index.html'])
+            for hook in ['hooks/apply.sh', 'hooks/remove.sh', 'hooks/web.sh']:
+                self.assertEqual(archive.getmember(hook).mode, 0o755)
+            self.assertEqual(json.load(archive.extractfile('coilshift.json')), manifest)
+
     def test_summaries_fit_the_coilshift_index(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location('builder', ROOT / 'tools/build.py')

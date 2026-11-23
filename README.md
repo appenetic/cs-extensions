@@ -35,6 +35,15 @@ Am Fahrzeug wird kein Wert geschrieben.
 [Validierung](docs/welcome-animation-validation.md). Am Auto bisher nur lesend
 durchgespielt.
 
+## Quiet-Ansicht (neu, experimentell)
+
+Nach dem „Quiet Mode“ von FSD v15: eine App mit eigener Kachel im Launcher. Sie
+öffnet sich direkt maximiert, auch in D, und zeigt einen animierten Lichtschein
+in der Farbe des Ambientelichts mit der Ankunftszeit. Fest nach unten wischen
+schließt sie.
+[Funktionsweise](packages/quiet-view/README.md) ·
+[Validierung](docs/quiet-view-validation.md).
+
 ## Home Assistant Bridge
 
 New experimental package: [setup and limitations](packages/home-assistant/README.md).
