@@ -7,8 +7,9 @@ Bildschirm mit einem Lichtschein in der Farbe deines Ambientelichts: oben ein
 weicher, atmender Schein, unten eine Straße bei Nacht, deren zwei Fahrbahnlinien
 feine Lichtfäden sind, die im Dunst verschwinden. Auf ihnen fließen
 Lichtstreifen zu dir hin, im Stand langsam, schneller, je schneller du fährst.
-Die Straße biegt sich mit dem Lenkrad: lenkst du nach links, nach links, und
-umso stärker, je weiter du lenkst. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
+Die beiden Linien zeigen die Bahn, die das Auto beim gerade eingeschlagenen
+Lenkwinkel fahren würde, wie die Hilfslinien einer Rückfahrkamera: leicht
+gelenkt eine sanfte Kurve, voll eingeschlagen ein enger Bogen zur Seite. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
 
 Ruhig darüber: oben links der Tacho, in der Mitte Ankunftszeit, Restzeit,
 Reststrecke und die nächste Abbiegung („in 200 m rechts“), unten eine Linie für
@@ -108,7 +109,7 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 | Ankunft | `GUI_navNextDestinationArrivalTime`, wenn `GUI_navNextDestinationArrivalInfoValid`; `NAV_minutesToArrival`; `NAV_milesToArrival` in den Einheiten des Autos (`GUI_distanceUnits`) |
 | Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
 | Abbiegung | `NAV_milesToNextTurn` ab 1,5 km, die Richtung aus `NAV_nextTurnAngle` im Uhrzeigersinn ab geradeaus (99 war rechts): unter 12° keine Abbiegung, bis 45° leicht, bis 135° normal, bis 165° scharf, darüber wenden. Ohne Winkel nur „Abbiegen in …“ |
-| Kurve | Nur `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt): bis wenige Grad wie die echte Krümmung (2° biegt leicht), darüber logarithmisch bis etwa 240°, unter 0,5° gerade. Der Dienst liest ihn 20-mal pro Sekunde direkt bei QtCar und gibt ihn spätestens nach 50 ms weiter; die Seite glättet nur über 0,06 s. Ohne gültigen Lenkwinkel bleibt die Straße gerade; Abbiegehinweise biegen sie nicht |
+| Bahn | Nur `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt). Die Krümmung ist tan(Lenkwinkel / 10) / 2,89 m, also Lenkübersetzung etwa 10:1 und Radstand 2,89 m: 2° biegen die Bahn auf 60 m ein wenig, 180° auf einen Radius von etwa 9 m. Die Linien sind Kreisbögen 1,75 m innen und außen; sichtbar sind etwa 60 m, nie über die Umkehr hinaus. Unter 0,3° bleibt sie gerade. Der Dienst liest den Winkel 30-mal pro Sekunde direkt bei QtCar und gibt jeden neuen Wert sofort weiter; die Seite glättet nur über 0,03 s. Ohne gültigen Lenkwinkel läuft die Bahn gerade; Abbiegehinweise biegen sie nicht |
 | Tempo | Ein Lichtstreifen braucht im Stand etwa 6 s vom Horizont bis zu dir, ab 120 km/h etwa 2 s, dazwischen mit der Wurzel der Geschwindigkeit |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
 

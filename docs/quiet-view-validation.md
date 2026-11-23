@@ -196,6 +196,16 @@ Mit dem Lenkrad im Stand bewegt, zehnmal pro Sekunde über `lv` gelesen:
   Verbindung zum Systembus unter `/var/run/dbus/system_bus_socket`): 250
   Änderungen in 15 s, im Median 0,07 s nach `lv`, etwa alle 0,05 s eine.
 
+## Bahn statt Kurve (alpha.14)
+
+Der Fahrer fand das Folgen nicht überzeugend: zu zappelig bei kleinen
+Korrekturen, zu schwach bei viel Lenken, falsche Form (gebogen hatte sich vor
+allem das ferne Ende), noch verzögert. Seitdem zeichnen die Linien die Bahn
+des Lenkwinkels als Kreisbögen (Lenkübersetzung 10:1 angenommen, Radstand
+2,89 m), etwa 60 m weit; der Dienst liest den Winkel 30-mal pro Sekunde und
+gibt jeden neuen Wert sofort weiter, die Seite glättet über 0,03 s. Die
+Lenkübersetzung des Model Y ist nicht nachgemessen.
+
 ## Am Auto offen
 
 1. Wie sich die Straße mit dem Lenkwinkel anfühlt, auch auf der Autobahn.

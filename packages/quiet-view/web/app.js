@@ -1,8 +1,8 @@
 // The quiet view: a glow in the ambient lights' colour over a dark screen and a
 // road at night, its two lane lines fine filaments of light that run into the
 // haze, with streaks of light flowing down them towards the driver at the pace
-// of the car. The road curves with the steering wheel; the line on the signalled
-// side brightens with the indicator. The speedometer, the arrival, the next
+// of the car. The lines mark the path the car would drive at the steering
+// wheel's angle; the line on the signalled side brightens with the indicator. The speedometer, the arrival, the next
 // turn and the route's progress sit quietly on top; on arriving, the road ends
 // in a ring of light with the drive's summary. A long press offers what to
 // show. A WebGL shader draws the picture in true perspective, with a filmic
@@ -17,14 +17,15 @@
   const menu = $('menu');
   const BRIGHT = { auto: 1, high: 1.3, low: 0.6 };
 
-  // What is shown eases towards what the car shows: colour, brightness, bend
-  // (-1 hard left to 1 hard right) and pace (0 standing to 1 motorway). travel
-  // is the distance the streaks have run, so a new pace never makes them jump.
+  // What is shown eases towards what the car shows: colour, brightness, the
+  // path's curvature (1/m, right positive) and pace (0 standing to 1
+  // motorway). travel is the distance the streaks have run, so a new pace
+  // never makes them jump.
   let rgb = [255, 255, 255];
   let light = null;
   let glow = 1;
   let glowGoal = 1;
-  let bend = 0;
+  let curv = 0;
   let target = 0;
   let pace = 0;
   let paceGoal = 0;
@@ -46,12 +47,14 @@
     return m ? [1, 2, 3].map((i) => parseInt(m[i], 16)) : null;
   }
 
-  // The steering wheel's angle (right positive) as a bend: up to a few degrees
-  // as the road would curve (2° on the motorway bends a little), above that
-  // graded on a log scale up to about 240°. Below 0.5° the wheel is straight.
-  function steerBend(angle) {
-    const a = Math.max(0, Math.abs(angle) - 0.5);
-    return Math.sign(angle) * Math.min(1, Math.log1p(a / 3) / Math.log1p(240 / 3));
+  // The steering wheel's angle (right positive) as the curvature of the path
+  // the car would drive, in 1/m: the road wheels turn about a tenth as far as
+  // the steering wheel, on a 2.89 m wheelbase. 2° bends the path a little over
+  // 60 m, 180° turns it on a radius of about 9 m. Under 0.3°, the sensor's
+  // jitter, it stays straight.
+  function steerCurvature(angle) {
+    const a = Math.min(400, Math.max(0, Math.abs(angle) - 0.3));
+    return (Math.sign(angle) * Math.tan((a / 10) * Math.PI / 180)) / 2.89;
   }
 
   // The speed as a pace: the square root keeps town speeds apart, the
@@ -70,24 +73,31 @@
     return clamp(f * (BRIGHT[options.bright] || 1), 0.3, 1.5);
   }
 
-  // Where the road heads: the steering wheel alone. Without its angle (in Park
-  // it can be invalid) the road straightens.
+  // Where the path heads: the steering wheel alone. Without its angle (in Park
+  // it can be invalid) the path straightens.
   function targetFor(v) {
-    return typeof v.steer === 'number' ? steerBend(v.steer) : 0;
+    return typeof v.steer === 'number' ? steerCurvature(v.steer) : 0;
   }
 
   // ---- The picture ----
 
   // A camera 1.25 m above the middle of a 3.5 m lane, the horizon at 58 % of
-  // the height. A pixel below the horizon sees the road z metres ahead; the
-  // lane's lines run at 1.75 m either side of a centre that curves as
-  // bend / 75 m. Streaks of light 24 m apart run down the lines.
+  // the height; a pixel below the horizon sees the ground z metres ahead. The
+  // lines mark the path the car would drive, like a backup camera's guides: a
+  // circle through the car for the steering's curvature, its lines circles
+  // 1.75 m inside and outside, so the lane keeps its width round the bend. The
+  // path shows for about 60 m and no further than it turns back. Streaks of
+  // light 24 m apart run down it. Line widths come from screen derivatives
+  // where the GPU has them, so a line keeps its width whichever way it runs.
   const FRAGMENT = `
+#ifdef GL_OES_standard_derivatives
+#extension GL_OES_standard_derivatives : enable
+#endif
 precision highp float;
 uniform vec2 uRes;
 uniform vec3 uColor;
 uniform float uGlow;
-uniform float uBend;
+uniform float uCurv;
 uniform float uTravel;
 uniform float uStreaks;
 uniform vec2 uBlink;
@@ -102,6 +112,15 @@ float grain(vec2 p) {
   return fract((p.x + p.y) * p.x);
 }
 
+// Metres per pixel of a ground coordinate.
+float perPixel(float v, float fallback) {
+#ifdef GL_OES_standard_derivatives
+  return max(fwidth(v), 1e-5);
+#else
+  return fallback;
+#endif
+}
+
 void main() {
   vec2 px = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
   float w = uRes.x;
@@ -114,26 +133,40 @@ void main() {
   float bx = (px.x - 0.5 * w) / (0.32 * w);
   col += uColor * exp(-by * by) * exp(-bx * bx) * 0.12;
   float dy = px.y - yH;
+  float f = 0.78 * w;
+  float z = f * 1.25 / max(dy, 0.25);
+  float mpp = z / f;
+  float x = (px.x - 0.5 * w) * mpp;
+  // Where the pixel lies against the path: metres to its right, metres along it.
+  float lateral = x;
+  float along = z;
+  float turn = 1.0;
+  if (abs(uCurv) > 1e-4) {
+    float r = 1.0 / abs(uCurv);
+    float xs = x * sign(uCurv);
+    float th = atan(z, r - xs);
+    lateral = (r - length(vec2(xs - r, z))) * sign(uCurv);
+    along = r * th;
+    turn = 1.0 - smoothstep(2.0, 2.5, th);
+  }
+  float m = perPixel(lateral, mpp);
+  float ma = perPixel(along, mpp);
   if (dy > 0.0) {
-    float f = 0.78 * w;
-    float z = f * 1.25 / max(dy, 0.25);
-    float mpp = z / f;
-    float x = (px.x - 0.5 * w) * mpp;
-    float centre = 0.5 * (uBend / 75.0) * z * z;
     float fog = exp(-z / 70.0);
-    float wpx = 0.04 / mpp;
+    float path = (1.0 - smoothstep(45.0, 75.0, along)) * turn;
+    float wpx = 0.04 / m;
     float coreW = max(1.1, wpx);
-    // On arrival the road ends 26 m ahead, in a ring of light.
-    float zEnd = mix(600.0, 26.0, uArrive);
-    float ends = 1.0 - uArrive * smoothstep(zEnd - 8.0, zEnd + 1.0, z);
+    // On arrival the path ends 26 m ahead, in a ring of light.
+    float aEnd = mix(600.0, 26.0, uArrive);
+    float ends = 1.0 - uArrive * smoothstep(aEnd - 8.0, aEnd + 1.0, along);
     for (int i = 0; i < 2; i++) {
       float side = i == 0 ? -1.0 : 1.0;
-      float d = abs(x - centre - side * 1.75) / mpp;
+      float d = abs(lateral - side * 1.75) / m;
       float core = exp(-d * d / (coreW * coreW)) * min(1.0, wpx / 1.1 + 0.2);
-      float s = fract((z + uTravel) / 24.0);
+      float s = fract((along + uTravel) / 24.0);
       float streak = uStreaks * (1.0 - uArrive) * smoothstep(0.0, 0.03, s) * pow(1.0 - smoothstep(0.03, 0.42, s), 1.5);
       float blink = i == 0 ? uBlink.x : uBlink.y;
-      float gain = (1.0 + 1.5 * blink) * fog * ends;
+      float gain = (1.0 + 1.5 * blink) * fog * ends * path;
       vec3 hot = mix(uColor, vec3(1.0), 0.55 + 0.25 * blink);
       // The streak lights the line and its near halo; the wide halo stays
       // even, or the streak's edge would draw a line across the screen.
@@ -142,11 +175,11 @@ void main() {
       col += uColor * exp(-d / (0.045 * w)) * 0.034 * gain;
     }
     if (uArrive > 0.0) {
-      // The ring lies on the road around the lane's centre, breathing slowly; a
-      // wave of light leaves it every 3.2 s, and a pool of light fills it.
-      vec2 pos = vec2(x - 0.5 * (uBend / 75.0) * zEnd * zEnd, z - zEnd);
+      // The ring lies on the path, breathing slowly; a wave of light leaves it
+      // every 3.2 s, and a pool of light fills it.
+      vec2 pos = vec2(lateral, along - aEnd);
       float len = length(pos);
-      float fw = max(mpp, 0.6 * z * z / (f * 1.25));
+      float fw = max(max(m, ma), 0.02);
       float r = 2.8 + 0.12 * sin(uTime * 1.4);
       float e = abs(len - r);
       float ew = e / max(0.07, fw);
@@ -159,7 +192,7 @@ void main() {
       float pool = exp(-pr * pr * 1.4) * 0.10;
       vec3 hot = mix(uColor, vec3(1.0), 0.6);
       // The haze at the pixel's own distance, and nothing far beyond the ring.
-      float near = fog * (1.0 - smoothstep(zEnd + 6.0, zEnd + 30.0, z));
+      float near = fog * (1.0 - smoothstep(aEnd + 6.0, aEnd + 30.0, along));
       col += (hot * ring + uColor * (halo + wave + pool)) * uArrive * near;
     }
   }
@@ -174,6 +207,8 @@ void main() {
     const gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false,
       preserveDrawingBuffer: false, powerPreference: 'low-power' });
     if (!gl) return null;
+    // Screen derivatives keep the lines' width; the shader does without them.
+    gl.getExtension('OES_standard_derivatives');
     const shader = (type, text) => {
       const s = gl.createShader(type);
       gl.shaderSource(s, text);
@@ -195,7 +230,7 @@ void main() {
     gl.enableVertexAttribArray(at);
     gl.vertexAttribPointer(at, 2, gl.FLOAT, false, 0, 0);
     const u = {};
-    for (const name of ['uRes', 'uColor', 'uGlow', 'uBend', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed', 'uArrive', 'uTime']) {
+    for (const name of ['uRes', 'uColor', 'uGlow', 'uCurv', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed', 'uArrive', 'uTime']) {
       u[name] = gl.getUniformLocation(program, name);
     }
     const info = gl.getExtension('WEBGL_debug_renderer_info');
@@ -210,7 +245,7 @@ void main() {
         gl.uniform2f(u.uRes, canvas.width, canvas.height);
         gl.uniform3f(u.uColor, p.rgb[0] / 255, p.rgb[1] / 255, p.rgb[2] / 255);
         gl.uniform1f(u.uGlow, p.glow);
-        gl.uniform1f(u.uBend, p.bend);
+        gl.uniform1f(u.uCurv, p.curv);
         gl.uniform1f(u.uTravel, p.travel % 2400);
         gl.uniform1f(u.uStreaks, p.streaks ? 1 : 0);
         gl.uniform2f(u.uBlink, p.left, p.right);
@@ -229,9 +264,10 @@ void main() {
     if (!ctx) return null;
     const rgba = (p, a, c = p.rgb) => `rgba(${c.map(Math.round).join(',')},${clamp(a * p.glow, 0, 1)})`;
     const point = (p, side, t) => {
+      const bend = clamp(p.curv * 75, -1, 1);
       const w = canvas.width;
       const h = canvas.height;
-      return { x: w / 2 + side * (0.03 * w + 0.45 * w * t) + p.bend * 0.3 * w * (1 - t) ** 2, y: h * 0.58 + h * 0.42 * t,
+      return { x: w / 2 + side * (0.03 * w + 0.45 * w * t) + bend * 0.3 * w * (1 - t) ** 2, y: h * 0.58 + h * 0.42 * t,
         width: 0.006 * w + 0.05 * w * t };
     };
     return {
@@ -311,10 +347,11 @@ void main() {
     lastFrame = s;
     // Without fresh state the road straightens and the streaks slow down.
     const fresh = (source && source.readyState === 1) || performance.now() - lastState < 3000;
-    // The steering angle comes 20 times a second and is smooth by itself: the
-    // easing only hides its 50 ms steps. Without it the road straightens slowly.
+    // The steering angle comes 30 times a second, and the path follows it
+    // exactly; the easing only bridges the frames between two readings. Without
+    // the angle the path straightens slowly.
     const steering = state && typeof state.steer === 'number';
-    bend += ((fresh ? target : 0) - bend) * Math.min(1, dt / (steering ? 0.06 : 0.6));
+    curv += ((fresh ? target : 0) - curv) * Math.min(1, dt / (steering ? 0.03 : 0.6));
     // A streak takes about 6 s from the horizon to the driver when standing
     // and 2 s on the motorway; the pace follows the speed over about 1.5 s.
     pace += ((fresh ? paceGoal : 0) - pace) * Math.min(1, dt / 1.5);
@@ -335,7 +372,7 @@ void main() {
       if (state.signal !== 'right') left = b;
       if (state.signal !== 'left') right = b;
     }
-    picture.draw({ rgb, glow, bend, travel, streaks: options.pulses, left, right, arrive,
+    picture.draw({ rgb, glow, curv, travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s });
     if (++measured === 90) {
       if ((now - measureStart) / measured > 26 && quality > 0.35) {
