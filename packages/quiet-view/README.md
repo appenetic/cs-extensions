@@ -117,8 +117,10 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
 Das Bild zeichnet ein WebGL-Shader in echter Perspektive: eine Kamera 1,25 m
 über der Mitte einer 3,5 m breiten Spur, der Horizont auf 58 % der Höhe. Die
 Linien haben einen fast weißen Kern, der mit der Entfernung feiner wird, und
-einen Bloom in Bildschirmpixeln, der auch am Boden nur wenige Meter um seine
-Linie reicht; die Bahn ist ein Kreisbogen, nahe der Geraden eine Parabel. Am Ende
+einen Bloom in Bildschirmpixeln, gemessen am Gefälle der Linie selbst und auch
+am Boden nur wenige Meter breit; ein Lichtstreifen leuchtet darin entlang der
+Linie und wird mit dem Abstand weicher. Die Bahn ist ein Kreisbogen, nahe der
+Geraden eine Parabel. Am Ende
 stehen ein filmisches Tonemapping und feines Rauschen, damit dunkle Verläufe
 keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder länger
 als etwa 26 ms, zeichnet die Seite weniger Pixel. Ohne WebGL steht ein

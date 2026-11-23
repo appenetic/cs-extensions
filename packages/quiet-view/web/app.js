@@ -136,6 +136,35 @@ float perPixel(float v, float fallback) {
 #endif
 }
 
+// One line of the path, c metres right of its middle, seen from a pixel Y
+// rows below the horizon: its distance in pixels across the screen, its metres
+// per pixel, and how far along the path its nearest point on the screen lies.
+// All taken from the line's own slope on the screen beside the pixel, not the
+// ground's at the pixel, so its light is even on both sides however fast the
+// ground shrinks, and a streak lights the halo along the line rather than in
+// level bars. A radius of 0 is the gentle path's parabola.
+vec3 lineAt(float c, float Y, float x, float z, float lateral, float rad, float f) {
+  float off = lateral - c;
+  if (rad == 0.0) {
+    vec2 g = vec2(1.25, 0.5 * uCurv * z * z - c) / Y;
+    float yF = max(Y - off * g.y / dot(g, g), 0.25);
+    return vec3(abs(off) / (abs(g.x) + abs(g.y)), abs(g.x) + abs(g.y), f * 1.25 / yF);
+  }
+  // Mirrored so that the bend's centre lies to the right, at (rad, 0); the
+  // line's nearest point on the ground lies on the same radius.
+  float sg = sign(uCurv);
+  float xs = x * sg;
+  vec2 n = normalize(vec2(xs - rad, z));
+  float lr = rad - c * sg;
+  float xq = rad + n.x * lr;
+  float zq = max(n.y * lr, 0.05);
+  vec2 g = vec2(-1.25 * n.x, xq * n.x + zq * n.y) * zq / (f * 1.25);
+  vec2 foot = vec2(xs * Y / 1.25, Y) - off * sg * g / max(dot(g, g), 1e-12);
+  float yF = max(foot.y, 0.25);
+  float aF = rad * atan(f * 1.25 / yF, rad - foot.x * 1.25 / yF);
+  return vec3(abs(off) / (abs(g.x) + abs(g.y)), abs(g.x) + abs(g.y), aF);
+}
+
 void main() {
   vec2 px = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
   float w = uRes.x;
@@ -159,12 +188,13 @@ void main() {
   float lateral = x - 0.5 * uCurv * z * z;
   float along = z;
   float turn = 1.0;
+  float rad = 0.0;
   if (abs(uCurv) > 1e-3) {
-    float r = 1.0 / abs(uCurv);
+    rad = 1.0 / abs(uCurv);
     float xs = x * sign(uCurv);
-    float th = atan(z, r - xs);
-    lateral = (r - length(vec2(xs - r, z))) * sign(uCurv);
-    along = r * th;
+    float th = atan(z, rad - xs);
+    lateral = (rad - length(vec2(xs - rad, z))) * sign(uCurv);
+    along = rad * th;
     turn = 1.0 - smoothstep(2.0, 2.5, th);
   }
   float m = perPixel(lateral, mpp);
@@ -172,23 +202,31 @@ void main() {
   if (dy > 0.0) {
     float fog = exp(-z / 70.0);
     float path = (1.0 - smoothstep(45.0, 75.0, along)) * turn;
-    float wpx = 0.04 / m;
-    float coreW = max(1.1, wpx);
     // On arrival the path ends 26 m ahead, in a ring of light.
     float aEnd = mix(600.0, 26.0, uArrive);
     float ends = 1.0 - uArrive * smoothstep(aEnd - 8.0, aEnd + 1.0, along);
-    // A streak's head is sharp, but never sharper than a pixel and a half.
-    float head = clamp(1.5 * ma / 24.0, 0.03, 0.2);
-    float s = fract((along + uTravel) / 24.0);
-    float streak = uStreaks * (1.0 - uArrive) * smoothstep(0.0, head, s) * pow(1.0 - smoothstep(0.03, 0.42, s), 1.5);
+    // A streak's head is crisp on the line, though no softer than a pixel and
+    // a half and no sharper than 1.2 m.
+    float head = clamp(1.5 * ma / 24.0, 0.05, 0.2);
+    float fade = uStreaks * (1.0 - uArrive);
     for (int i = 0; i < 2; i++) {
       float side = i == 0 ? -1.0 : 1.0;
+      vec3 ln = lineAt(side * 1.75, max(dy, 0.25), x, z, lateral, rad, f);
+      float d = ln.x;
+      float wpx = 0.04 / ln.y;
+      float coreW = max(1.1, wpx);
+      // The streak as at the line's nearest point, where the pixel's light
+      // comes from. In the halo it blurs over the halo's width and the
+      // pixel's distance, as a glow gathers more of the line the further it
+      // is from it; far off only the streaks' mean remains.
+      float s = fract((ln.z + uTravel) / 24.0);
+      float streak = fade * smoothstep(0.0, head, s) * pow(1.0 - smoothstep(0.03, 0.42, s), 1.5);
+      float blur = clamp((0.008 * w + d) * ma / 24.0, 0.05, 1.0);
+      float glint = fade * mix(smoothstep(0.0, blur, s) * pow(1.0 - smoothstep(0.03, 0.42 + blur, s), 1.5), 0.16,
+        smoothstep(0.25, 0.7, blur));
+      // The light also keeps within a few metres of its line on the ground,
+      // should the distance on the screen fail far from it.
       float dl = abs(lateral - side * 1.75);
-      float d = dl / m;
-      // d counts pixels as the ground runs at this pixel; far from the line,
-      // where the ground shrinks towards the horizon, it comes out far too
-      // short. So the light also keeps within a few metres of its line on the
-      // ground, or it would light whole rows, and the streaks cut edges in.
       float close = exp(-dl * dl / 2.0);
       float wide = exp(-dl * dl / 18.0);
       float core = exp(-d * d / (coreW * coreW)) * min(1.0, wpx / 1.1 + 0.2);
@@ -198,7 +236,7 @@ void main() {
       // The streak lights the line and its near halo; the wide halo stays
       // even, or the streak's edge would draw a line across the screen.
       col += hot * core * (0.34 + 1.3 * streak) * gain * close;
-      col += uColor * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * streak) * gain * close;
+      col += uColor * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * glint) * gain * close;
       col += uColor * exp(-d / (0.045 * w)) * 0.034 * gain * wide;
     }
     if (uArrive > 0.0) {

@@ -225,6 +225,19 @@ liefen die Lichtstreifen mit 4 m/s weiter. Jetzt laufen sie langsam so schnell
 wie die Straße, darüber gebremst gegen 13 m/s, und beim Anhalten kommen sie
 ganz zum Stehen.
 
+## Lichtpunkte ohne Balken (alpha.16)
+
+In der Demo zog jeder Lichtpunkt einen waagrechten Balken mit harter Kante
+durch seinen Schein. Der Schein nahm die Helligkeit des Streifens aus seiner
+eigenen Bildzeile, und der Kopf eines Streifens ist eine Zeile. Zudem war er
+außen breiter als innen, weil er den Abstand mit dem Gefälle des Bodens am
+Pixel maß. Abstand und Streifen kommen jetzt von der Linie selbst: aus ihrem
+Gefälle auf dem Bildschirm neben dem Pixel und von ihrem nächsten Punkt. Im
+Schein verschwimmt der Streifen mit dem Abstand, wie ein Lichtschein mehr von
+der Linie sammelt, je weiter er von ihr weg ist; weit weg bleibt nur sein
+Mittel. Der Kopf auf der Linie ist etwas weicher (mindestens 1,2 m statt
+0,72 m).
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
