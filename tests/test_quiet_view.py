@@ -159,6 +159,16 @@ class QuietViewFiles(unittest.TestCase):
                        "fetch('buildings'", 'takeFix(v.pose)']:
             self.assertIn(needle, js)
 
+    def test_page_sends_every_option(self):
+        # The service takes only a whole set of options; a choice sent without
+        # one of them comes back 400, and the page undoes it.
+        js = (PACKAGE / 'web/app.js').read_text()
+        default = re.search(r'let options = \{(.*?)\};', js, re.S).group(1)
+        sent = re.search(r"fetch\('options', \{.*?JSON\.stringify\(\{(.*?)\}\)", js, re.S).group(1)
+        keys = lambda text: sorted(re.findall(r'(\w+):', text))
+        self.assertEqual(keys(default), keys(sent))
+        self.assertIn('style', keys(sent))
+
     @unittest.skipUnless(shutil.which('node'), 'node checks the script syntax')
     def test_script_parses(self):
         subprocess.run(['node', '--check', str(PACKAGE / 'web/app.js')], check=True)
@@ -170,7 +180,7 @@ class QuietViewFiles(unittest.TestCase):
         # one is compiled here, and the walls' pair linked, as WebGL does with
         # the derivatives extension and without it.
         js = (PACKAGE / 'web/app.js').read_text()
-        names = ['FRAGMENT', 'BUILDING_CAMERA', 'BUILDING_SEEN', 'WALL_VERTEX', 'WALL_FRAGMENT']
+        names = ['DUSK_SKY', 'FRAGMENT', 'BUILDING_CAMERA', 'BUILDING_SEEN', 'WALL_VERTEX', 'WALL_FRAGMENT']
         consts = ''
         for name in names:
             m = re.search(r'const ' + name + r' = (.*?`);\n', js, re.S)

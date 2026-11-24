@@ -19,6 +19,8 @@
   const $ = (id) => document.getElementById(id);
   const menu = $('menu');
   const BRIGHT = { auto: 1, high: 1.3, low: 0.6 };
+  // The neon style's lines, as in the shader.
+  const NEON_LINE = [255, 199, 31];
 
   // What is shown eases towards what the car shows: colour, brightness, the
   // path's curvature (1/m, right positive) and the streaks' pace (m/s).
@@ -49,10 +51,16 @@
   // 0 the fine lines, 1 the soft beams of the original; it crossfades.
   let look = 0;
   let lookGoal = 0;
+  // 0 in the ambient lights' colour, 1 the neon city at dusk; it crossfades.
+  let neon = 0;
+  let neonGoal = 0;
+  // The heading the stars last stood at, kept while the car has no fix.
+  let heading = 0;
   let state = null;
   let lastState = 0;
   let lastFrame = 0;
-  let options = { eta: true, speed: true, turns: true, pulses: true, bright: 'auto', buildings: true, look: 'fine' };
+  let options = { eta: true, speed: true, turns: true, pulses: true, bright: 'auto', buildings: true, look: 'fine',
+    style: 'ambient' };
   let source = null;
   let polling = null;
 
@@ -115,6 +123,22 @@
 
   // ---- The picture ----
 
+  // The neon style's sky, t of the way from the horizon (0) to the top (1),
+  // bx the share of the half width from the middle; and its band of pink haze
+  // along the horizon, dy pixels below it. The sky and the haze the city
+  // stands in share them. Colours are before the roll-off.
+  const DUSK_SKY = `
+vec3 duskSky(float t, float bx) {
+  vec3 col = mix(vec3(0.60, 0.13, 0.34), vec3(0.34, 0.05, 0.30), smoothstep(0.0, 0.3, t));
+  col = mix(col, vec3(0.13, 0.025, 0.19), smoothstep(0.2, 0.65, t));
+  col = mix(col, vec3(0.035, 0.012, 0.08), smoothstep(0.55, 1.0, t));
+  return col * (0.7 + 0.3 * exp(-bx * bx * 2.0));
+}
+vec3 duskHaze(float dy, float h, float bx) {
+  float hz = dy / (0.03 * h);
+  return vec3(0.85, 0.24, 0.5) * 0.22 * exp(-hz * hz) * (0.55 + 0.45 * exp(-bx * bx * 3.0));
+}`;
+
   // A camera 1.25 m above the middle of a 3.5 m lane, the horizon at 58 % of
   // the height; a pixel below the horizon sees the ground z metres ahead. The
   // lines mark the path the car would drive, like a backup camera's guides: a
@@ -124,7 +148,8 @@
   // light 24 m apart run down it. Line widths come from screen derivatives
   // where the GPU has them, so a line keeps its width whichever way it runs.
   // In the soft look, as in the original, each line is a broad band of light
-  // on the ground instead, swelling as the streaks would pass.
+  // on the ground instead, swelling as the streaks would pass. In the neon
+  // style a retro city at dusk takes the glow's place, its lines in yellow.
   const FRAGMENT = `
 #ifdef GL_OES_standard_derivatives
 #extension GL_OES_standard_derivatives : enable
@@ -145,6 +170,8 @@ uniform float uArrive;
 uniform float uTime;
 uniform float uLook;
 uniform float uReach;
+uniform float uNeon;
+uniform float uHeading;
 
 float grain(vec2 p) {
   p = fract(p * vec2(443.897, 441.423));
@@ -159,6 +186,64 @@ float perPixel(float v, float fallback) {
 #else
   return fallback;
 #endif
+}
+
+// A number from 0 to 1 for whole numbers, the same for the same ones.
+float hash(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+` + DUSK_SKY + `
+
+// The neon style's sky at dusk and the wet road under it: deep indigo
+// overhead, through magenta to hot pink along the horizon; stars that keep
+// their place in the sky as the car turns, a few bright, most faint, slowly
+// twinkling; and a sun half set where the road meets the horizon, low enough
+// to stay below the arrival. The road mirrors the haze and the sun in a
+// rippled column.
+vec3 dusk(vec2 px, float w, float h, float f) {
+  float yH = 0.58 * h;
+  float dy = px.y - yH;
+  float bx = (px.x - 0.5 * w) / (0.5 * w);
+  vec3 col;
+  if (dy < 0.0) {
+    float t = -dy / yH;
+    col = duskSky(t, bx);
+    // Stars by bearing and height, 200 cells to a full turn.
+    vec2 sky = vec2(uHeading + atan((px.x - 0.5 * w) / f), atan(-dy / f)) * (200.0 / 6.2831853);
+    vec2 cell = floor(sky);
+    float n = hash(vec2(mod(cell.x, 200.0), cell.y) + 17.0);
+    if (n > 0.8) {
+      vec2 at = 0.15 + 0.7 * vec2(fract(n * 13.7), fract(n * 71.3));
+      float d = length(fract(sky) - at) * (6.2831853 / 200.0) * f;
+      float b = 0.08 + 0.9 * pow(fract(n * 37.1), 4.0);
+      float twinkle = 0.75 + 0.25 * sin(uTime * (0.5 + fract(n * 5.3)) + n * 40.0);
+      col += vec3(1.0, 0.9, 0.97) * b * twinkle * exp(-d * d / 0.8) * smoothstep(0.08, 0.3, t);
+    }
+    // The sun: pale yellow on top, pink where it sets, and its glow.
+    float R = 0.095 * h;
+    float r = length(vec2(px.x - 0.5 * w, dy));
+    vec3 sun = mix(vec3(1.6, 0.42, 0.55), vec3(1.7, 1.25, 0.6), smoothstep(0.0, 0.9, -dy / R));
+    float disc = 1.0 - smoothstep(R - 1.0, R + 1.0, r);
+    col = mix(col, sun, disc);
+    col += (1.0 - disc) * (vec3(1.0, 0.35, 0.5) * 0.45 * exp(-max(r - R, 0.0) / (0.3 * R))
+      + vec3(0.7, 0.16, 0.4) * 0.2 * exp(-r * r / (4.0 * R * R)));
+  } else {
+    col = mix(vec3(0.15, 0.03, 0.16), vec3(0.012, 0.004, 0.028), smoothstep(0.0, 0.3 * h, dy));
+    // The column under the sun, broken by ripples that come closer together
+    // towards the horizon until they are too fine to show and sway its edges;
+    // and the haze's broader sheen.
+    float wave = 30.0 * log(max(dy, 1.0) / h);
+    float sway = sin(1.7 * wave + uTime * 0.7) * 0.012 * h;
+    float sx = (px.x - 0.5 * w + sway) / (0.065 * h);
+    float ripple = mix(0.7, 0.55 + 0.3 * sin(wave + uTime * 0.9) + 0.25 * sin(2.3 * wave - uTime * 1.3),
+      smoothstep(8.0, 30.0, dy));
+    col += vec3(1.0, 0.5, 0.5) * 0.42 * exp(-sx * sx) * exp(-dy / (0.22 * h)) * smoothstep(0.0, 0.02 * h, dy) * ripple;
+    float wx = (px.x - 0.5 * w) / (0.3 * w);
+    col += vec3(0.6, 0.14, 0.4) * 0.12 * exp(-wx * wx) * exp(-dy / (0.12 * h));
+  }
+  return col + duskHaze(dy, h, bx);
 }
 
 // One line of the path, c metres right of its middle, seen from a pixel Y
@@ -208,6 +293,9 @@ void main() {
   col += C * exp(-by * by) * exp(-bx * bx) * 0.12;
   float dy = px.y - yH;
   float f = 0.78 * w;
+  if (uNeon > 0.001) col = mix(col, dusk(px, w, h, f), uNeon);
+  // The lines' colour.
+  vec3 L = mix(C, vec3(1.0, 0.78, 0.12), uNeon);
   float z = f * 1.25 / max(dy, 0.25);
   float mpp = z / f;
   float x = (px.x - 0.5 * w) * mpp;
@@ -245,10 +333,14 @@ void main() {
     // The soft beams fade sooner, as in the original, or their light would
     // crowd into a bright spot where the road narrows to a few pixels.
     float soft = uLook * exp(-z / 38.0) * (1.0 - smoothstep(30.0, 62.0, along)) * ends * path;
+    // In neon the broad beams are a pink glow on the wet road: yellow this
+    // wide would outshine the scene, and dimmed it turns olive.
+    soft *= 1.0 - 0.4 * uNeon;
+    vec3 B = mix(L, vec3(1.0, 0.3, 0.62), uNeon);
     // A wet road mirrors the sky's glow: a soft column under it that rises
     // from nothing at the horizon and fades towards the car.
     float sx = (px.x - 0.5 * w) / (0.26 * w);
-    col += C * 0.06 * exp(-sx * sx) * smoothstep(0.0, 0.03 * h, dy) * exp(-dy / (0.18 * h));
+    col += C * 0.06 * exp(-sx * sx) * smoothstep(0.0, 0.03 * h, dy) * exp(-dy / (0.18 * h)) * (1.0 - uNeon);
     for (int i = 0; i < 2; i++) {
       float side = i == 0 ? -1.0 : 1.0;
       vec3 ln = lineAt(side * 1.75, max(dy, 0.25), x, z, lateral, rad, f);
@@ -272,12 +364,12 @@ void main() {
       float core = exp(-d * d / (coreW * coreW)) * min(1.0, wpx / 1.1 + 0.2);
       float blink = i == 0 ? uBlink.x : uBlink.y;
       float gain = (1.0 + 1.5 * blink) * fog * ends * path * fine;
-      vec3 hot = mix(C, vec3(1.0), 0.55 + 0.25 * blink);
+      vec3 hot = mix(L, vec3(1.0), (0.55 + 0.25 * blink) * (1.0 - 0.45 * uNeon));
       // The streak lights the line and its near halo; the wide halo stays
       // even, or the streak's edge would draw a line across the screen.
       col += hot * core * (0.34 + 1.3 * streak) * gain * close;
-      col += C * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * glint) * gain * close;
-      col += C * exp(-d / (0.045 * w)) * 0.034 * gain * wide;
+      col += L * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * glint) * gain * close;
+      col += L * exp(-d / (0.045 * w)) * 0.034 * gain * wide;
       // The soft look, as in the original: a broad band of light on the
       // ground about the line, its width in metres, so the perspective
       // narrows it, round a brighter heart. The streaks run down the heart
@@ -290,11 +382,11 @@ void main() {
       float pulse = fade * mix(0.3, smoothstep(0.0, 0.15, ps) * (1.0 - smoothstep(0.15, 0.65, ps)),
         smoothstep(6.0, 20.0, 24.0 / ma));
       float beam = 0.55 * exp(-0.5 * sb * sb) + exp(-0.5 * sc * sc) * (0.3 + 0.7 * pulse);
-      col += mix(C, vec3(1.0), 0.06 + 0.12 * blink) * beam * (1.0 + 0.9 * blink) * soft;
+      col += mix(B, vec3(1.0), 0.06 + 0.12 * blink) * beam * (1.0 + 0.9 * blink) * soft;
     }
     // Between the beams the road holds a little of their light.
     float mid = lateral / 1.6;
-    col += C * 0.035 * exp(-mid * mid * mid * mid) * soft;
+    col += B * 0.035 * exp(-mid * mid * mid * mid) * soft;
     if (uArrive > 0.0) {
       // The ring lies on the path, breathing slowly; a wave of light leaves it
       // every 3.2 s, and a pool of light fills it.
@@ -313,10 +405,10 @@ void main() {
       float wave = exp(-wv * wv) * exp(-front * front / 2.0) * (1.0 - phase) * (1.0 - phase) * 0.5;
       float pr = len / r;
       float pool = exp(-pr * pr * 1.4) * 0.10;
-      vec3 hot = mix(C, vec3(1.0), 0.6);
+      vec3 hot = mix(L, vec3(1.0), 0.6);
       // The haze at the pixel's own distance, and nothing far beyond the ring.
       float near = fog * (1.0 - smoothstep(aEnd + 6.0, aEnd + 30.0, along));
-      col += (hot * ring + C * (halo + wave + pool)) * uArrive * near;
+      col += (hot * ring + L * (halo + wave + pool)) * uArrive * near;
     }
   }
   vec2 q = px / uRes - 0.5;
@@ -372,28 +464,36 @@ precision highp float;
 precision mediump float;
 #endif
 uniform float uFade;
+// How much of a building at d metres is there: from 40 m on, gone by 390 m.
+float present(float d) {
+  return uFade * smoothstep(40.0, 140.0, d) * (1.0 - smoothstep(310.0, 390.0, d));
+}
+// And how much of it shows through the haze.
 float seen(float d) {
-  return uFade * smoothstep(40.0, 140.0, d) * exp(-d / 260.0) * (1.0 - smoothstep(310.0, 390.0, d));
+  return present(d) * exp(-d / 260.0);
 }`;
 
   // aWall is the wall's run on the ground; aFace its metres along from its
   // start, a whole number of its own (0 to 96) for its windows, and its
-  // building's height; aEnds 1 for each end of it that is a corner.
+  // building's height; aEnds 1 for each end of it that is a corner, and its
+  // building's own number from 0 to 1.
   const WALL_VERTEX = BUILDING_CAMERA + `
 attribute vec4 aPos;
 attribute vec2 aWall;
 attribute vec3 aFace;
-attribute vec2 aEnds;
+attribute vec3 aEnds;
 uniform float uRise;
+// 1 for the walls' mirror image in the wet road.
+uniform float uMirror;
 varying vec2 vRel;
 varying vec2 vNormal;
 varying float vHeight;
 varying float vUp;
 varying vec3 vFace;
 varying float vLength;
-varying vec2 vEnds;
+varying vec3 vEnds;
 void main() {
-  gl_Position = project(vec3(aPos.xy, aPos.z * uRise));
+  gl_Position = project(vec3(aPos.xy, aPos.z * uRise * (1.0 - 2.0 * uMirror)));
   vRel = aPos.xy - uCam;
   vNormal = vec2(aWall.y, -aWall.x) / max(length(aWall), 0.001);
   vHeight = aPos.z;
@@ -403,20 +503,28 @@ void main() {
   vEnds = aEnds;
 }`;
 
-  const WALL_FRAGMENT = BUILDING_SEEN + `
+  const WALL_FRAGMENT = BUILDING_SEEN + DUSK_SKY + `
 uniform vec3 uLight;
 uniform float uShade;
 // The lines' colour, and their strength.
 uniform vec4 uEdge;
 // 1 while only the walls' depth is drawn.
 uniform float uDepth;
+// 0 in the ambient lights' colour, 1 the neon city.
+uniform float uNeon;
+// How strongly the mirror image in the wet road shows, 0 for the walls
+// themselves; and the time, for its ripples.
+uniform float uReflect;
+uniform float uShimmer;
+// The picture's width and height in pixels.
+uniform vec2 uScreen;
 varying vec2 vRel;
 varying vec2 vNormal;
 varying float vHeight;
 varying float vUp;
 varying vec3 vFace;
 varying float vLength;
-varying vec2 vEnds;
+varying vec3 vEnds;
 // A number from 0 to 1 for whole numbers, the same for the same ones.
 float hash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -427,7 +535,11 @@ void main() {
   float d = length(vRel);
   float face = abs(dot(vNormal, vRel)) / max(d, 0.001);
   float fog = seen(d);
-  float a = uShade * fog * (0.8 + 0.2 * face) * mix(0.35, 1.0, smoothstep(0.0, 10.0, vHeight));
+  // In the neon city the walls stay solid into the distance and take on the
+  // colour of the haze before them instead, the sky's where they meet it, so
+  // they hide the sun; their feet stand deeper in it.
+  float low = smoothstep(0.0, 10.0, vHeight);
+  float a = mix(uShade * fog * (0.8 + 0.2 * face) * mix(0.35, 1.0, low), present(d), uNeon);
   // A wall too faint to see hides nothing either.
   if (a < 0.004) discard;
 #ifdef GL_OES_standard_derivatives
@@ -443,8 +555,13 @@ void main() {
   // and over the first above its foot, the wall fades out.
   float top = (1.0 - vUp) * tall;
   float cover = clamp(top, 0.0, 1.0) * clamp(vUp * tall, 0.0, 1.0);
-  // Only a pixel mostly covered hides what lies behind it.
-  if (uDepth > 0.5 && cover < 0.5) discard;
+  // Only a pixel mostly covered hides what lies behind it; for the depth
+  // alone, nothing more is needed.
+  if (uDepth > 0.5) {
+    if (cover < 0.5) discard;
+    gl_FragColor = vec4(0.0);
+    return;
+  }
   // The windows, centred on the wall, above the ground floor and below the
   // parapet of a building over 6 m.
   float cells = floor(vLength / 2.6);
@@ -454,7 +571,13 @@ void main() {
   // The wall's number is whole at its corners; rounded, it stays so between
   // them, or the hash would turn the smallest wobble into stripes.
   float n = hash(cell + vec2(13.0, 7.0) * floor(vFace.y + 0.5));
-  float lit = step(0.83, n) * (0.45 + 0.55 * fract(n * 7.13));
+  // In the neon city each building is one of three kinds by its own number:
+  // its floors banded in cyan light, a tower of warm lit rooms, or dark with
+  // its roof edge in neon. The tower's rooms light up as the style comes.
+  float kind = vEnds.z;
+  float banded = uNeon * step(kind, 0.35);
+  float tower = uNeon * step(0.35, kind) * step(kind, 0.65);
+  float lit = step(mix(0.83, 0.42, tower), n) * (0.45 + 0.55 * fract(n * 7.13));
 #ifdef GL_OES_standard_derivatives
   vec2 fw = max(vec2(fwidth(g.x), fwidth(g.y)), vec2(1e-4));
 #else
@@ -466,13 +589,27 @@ void main() {
   vec2 beyond = max(abs(f - 0.5) - vec2(0.25, 0.28), 0.0);
   float halo = exp(-dot(beyond, beyond) / 0.006) * 0.35;
   float onWall = step(0.0, g.x) * step(g.x, cells) * step(1.0, g.y) * step(vHeight, vFace.z - 1.2) * step(6.0, vFace.z);
-  float windows = onWall * mix(0.045, (pane + halo) * lit, smoothstep(2.5, 6.0, 1.0 / max(fw.x, fw.y)));
-  // Some rooms are lit warmer, some more in the light's colour.
-  vec3 room = mix(uLight, vec3(1.0, 0.9, 0.78), 0.25 + 0.5 * fract(n * 3.7));
+  float windows = onWall * mix(0.045 * (1.0 + 2.0 * tower), (pane + halo) * lit,
+    smoothstep(2.5, 6.0, 1.0 / max(fw.x, fw.y)));
+  // Some rooms are lit warmer, some more in the light's colour; in the neon
+  // city peach, a few pink.
+  vec3 room = mix(mix(uLight, vec3(1.0, 0.9, 0.78), 0.25 + 0.5 * fract(n * 3.7)),
+    mix(vec3(1.0, 0.72, 0.42), vec3(1.0, 0.45, 0.8), step(0.75, fract(n * 3.7))), uNeon);
   // Light from below: the street's glow on the feet of the walls, more on
-  // those that face the road.
+  // those that face the road; pink in the neon city.
   float foot = exp(-vHeight / 4.0) * (0.4 + 0.6 * face);
-  vec3 glow = room * windows * 0.6 + uLight * foot * 0.06;
+  // A banded building's floors: a line of cyan light at each, a pixel or so
+  // wide, only their faint mean where the floors come too close together.
+#ifdef GL_OES_standard_derivatives
+  float storey = 3.3 / max(length(vec2(dFdx(vHeight), dFdy(vHeight))), 1e-5);
+#else
+  float storey = 0.0;
+#endif
+  float slab = abs(fract(g.y + 0.5) - 0.5) * storey;
+  float floors = mix(0.12, exp(-slab * slab / 1.2), smoothstep(3.0, 8.0, storey))
+    * step(1.0, g.y) * step(vHeight, vFace.z - 0.5) * banded;
+  vec3 glow = room * windows * mix(0.6, 0.8, uNeon) + mix(uLight * 0.06, vec3(0.85, 0.25, 0.75) * 0.05, uNeon) * foot
+    + vec3(0.25, 0.85, 1.0) * floors * 0.45;
   // The roof edge, a line along the wall's top pixels, and the corners, half
   // on each wall that meets there and fainter towards the ground. On a wall
   // only a few pixels high or wide they would fill it, so they leave it.
@@ -481,17 +618,38 @@ void main() {
   float end = (vLength - vFace.x) * metre;
   float corner = max(vEnds.x * exp(-start * start / 0.7), vEnds.y * exp(-end * end / 0.7))
     * mix(0.2, 1.0, vUp) * smoothstep(3.0, 8.0, vLength * metre);
-  vec3 edge = uEdge.rgb * uEdge.a * fog * max(1.1 * roof, 0.3 * corner);
-  // Dark glass, tinted by the light, and what shines from it, premultiplied.
-  gl_FragColor = vec4(uLight * 0.025 * a + glow * fog + edge, a) * cover;
+  // In the neon city the lines are cyan or pink by the building, and stronger.
+  vec3 trim = mix(vec3(1.0, 0.32, 0.78), vec3(0.3, 0.88, 1.0), step(kind, 0.35) + step(0.82, kind));
+  vec3 edge = mix(uEdge.rgb, trim, uNeon) * uEdge.a * fog
+    * max(mix(1.1, 1.5, uNeon) * roof, mix(0.3, 0.5, uNeon) * corner);
+  // The mirror image: only what shines, broken by ripples and fainter
+  // further from the wall's foot, with a little of the walls' dark.
+  if (uReflect > 0.0) {
+    float ripple = 0.55 + 0.45 * sin(vHeight * 1.9 - uShimmer * 1.2) * sin(vHeight * 0.7 + uShimmer * 0.5);
+    gl_FragColor = vec4((glow * fog + edge) * uReflect * ripple * exp(-vHeight / 25.0), a * 0.35 * uReflect) * cover;
+    return;
+  }
+  // Dark glass, tinted by the light, or violet in the haze, and what shines
+  // from it, premultiplied.
+  vec3 tint = uLight * 0.025;
+  if (uNeon > 0.001) {
+    vec2 at = vec2(gl_FragCoord.x, uScreen.y - gl_FragCoord.y);
+    float dy = at.y - 0.58 * uScreen.y;
+    float bx = (at.x - 0.5 * uScreen.x) / (0.5 * uScreen.x);
+    vec3 haze = duskSky(max(-dy / (0.58 * uScreen.y), 0.0), bx) * exp(-max(dy, 0.0) / (0.08 * uScreen.y))
+      + duskHaze(dy, uScreen.y, bx);
+    vec3 violet = vec3(0.09, 0.03, 0.17) * (1.3 - 0.3 * face);
+    tint = mix(tint, mix(haze, violet, exp(-d / 260.0) * mix(0.5, 1.0, low)), uNeon);
+  }
+  gl_FragColor = vec4(tint * a + glow * fog + edge, a) * cover;
 }`;
 
   // The service's lines as walls: per line its height, its base, 1 when
   // closed, then its points. A wall vertex carries its point and how far up
   // the wall it lies, the wall's direction on the ground, its face (metres
-  // along, a number from where it starts, the height) and its corners: those
-  // of its ends where the outline turns by more than 25°. An open line's ends
-  // lie on a tile's border and are none.
+  // along, a number from where it starts, the height), its corners (those of
+  // its ends where the outline turns by more than 25°; an open line's ends lie
+  // on a tile's border and are none) and its building's own number.
   function buildingGeometry(lines) {
     const walls = [];
     const bend = Math.cos((25 * Math.PI) / 180);
@@ -506,6 +664,7 @@ void main() {
       const n = (row.length - 3) / 2;
       const x = (i) => row[3 + 2 * i];
       const y = (i) => row[4 + 2 * i];
+      const kind = (seed(y(0), x(0)) + 0.5) / 97;
       const corner = [];
       for (let i = 0; i < n; i++) {
         const p = (i + n - 1) % n;
@@ -524,7 +683,7 @@ void main() {
         const len = Math.hypot(dx, dy);
         const own = seed(x(i), y(i));
         for (const [k, up] of [[i, 0], [j, 0], [j, 1], [i, 0], [j, 1], [i, 1]]) {
-          walls.push(x(k), y(k), up ? top : base, up, dx, dy, k === i ? 0 : len, own, top, corner[i], corner[j]);
+          walls.push(x(k), y(k), up ? top : base, up, dx, dy, k === i ? 0 : len, own, top, corner[i], corner[j], kind);
         }
       }
     }
@@ -561,7 +720,7 @@ void main() {
     };
     const road = link('attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }', FRAGMENT, ['p'],
       ['uRes', 'uColor', 'uColorOld', 'uWave', 'uGlow', 'uCurv', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed',
-        'uArrive', 'uTime', 'uLook', 'uReach']);
+        'uArrive', 'uTime', 'uLook', 'uReach', 'uNeon', 'uHeading']);
     if (!road) return null;
     const u = road.u;
     const quad = gl.createBuffer();
@@ -571,7 +730,7 @@ void main() {
     // The buildings: without their shaders the picture goes on without them.
     const camera = ['uCam', 'uDir', 'uView', 'uFade'];
     const wallsGL = link(WALL_VERTEX, WALL_FRAGMENT, ['aPos', 'aWall', 'aFace', 'aEnds'],
-      [...camera, 'uRise', 'uLight', 'uShade', 'uEdge', 'uDepth']);
+      [...camera, 'uRise', 'uLight', 'uShade', 'uEdge', 'uDepth', 'uNeon', 'uMirror', 'uReflect', 'uShimmer', 'uScreen']);
     let walls = null;
     // A buffer of vertices with their attributes' sizes, interleaved.
     const upload = (data, sizes) => {
@@ -610,7 +769,7 @@ void main() {
         if (walls) gl.deleteBuffer(walls.b);
         walls = null;
         if (!wallsGL || !lines) return false;
-        walls = upload(buildingGeometry(lines), [4, 2, 3, 2]);
+        walls = upload(buildingGeometry(lines), [4, 2, 3, 3]);
         return !!walls;
       },
       draw(p) {
@@ -622,6 +781,8 @@ void main() {
         gl.uniform3f(u.uColorOld, p.old[0] / 255, p.old[1] / 255, p.old[2] / 255);
         gl.uniform1f(u.uWave, p.wave);
         gl.uniform1f(u.uLook, p.look);
+        gl.uniform1f(u.uNeon, p.neon);
+        gl.uniform1f(u.uHeading, (p.heading * Math.PI) / 180);
         gl.uniform1f(u.uReach, p.reach);
         gl.uniform1f(u.uGlow, p.glow);
         gl.uniform1f(u.uCurv, p.curv);
@@ -635,34 +796,44 @@ void main() {
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         if (!walls || !p.cam || p.buildings < 0.01) return;
         const r = (p.cam.h * Math.PI) / 180;
-        gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
         // The walls: first their depth alone, then their shade where each is
-        // the nearest, with their lines in a colour nearer white.
+        // the nearest, with their lines in a colour nearer white. In neon the
+        // wet road mirrors them first, under the horizon.
         use(walls, wallsGL, p, r);
         const hot = p.shown.map((c) => (c + (255 - c) * 0.35) / 255);
         gl.uniform3f(wallsGL.u.uLight, p.shown[0] / 255, p.shown[1] / 255, p.shown[2] / 255);
         gl.uniform1f(wallsGL.u.uShade, 0.7);
         gl.uniform4f(wallsGL.u.uEdge, hot[0], hot[1], hot[2], Math.min(1.2, p.glow));
-        gl.uniform1f(wallsGL.u.uDepth, 1);
-        gl.colorMask(false, false, false, false);
-        gl.drawArrays(gl.TRIANGLES, 0, walls.n);
-        gl.colorMask(true, true, true, true);
-        gl.uniform1f(wallsGL.u.uDepth, 0);
-        gl.depthMask(false);
-        gl.enable(gl.BLEND);
+        gl.uniform1f(wallsGL.u.uNeon, p.neon);
+        gl.uniform1f(wallsGL.u.uShimmer, p.time % 3600);
+        gl.uniform2f(wallsGL.u.uScreen, canvas.width, canvas.height);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-        gl.drawArrays(gl.TRIANGLES, 0, walls.n);
+        for (const mirror of p.neon > 0.01 ? [1, 0] : [0]) {
+          gl.depthMask(true);
+          gl.clear(gl.DEPTH_BUFFER_BIT);
+          gl.uniform1f(wallsGL.u.uMirror, mirror);
+          gl.uniform1f(wallsGL.u.uReflect, mirror * 0.35 * p.neon);
+          gl.uniform1f(wallsGL.u.uDepth, 1);
+          gl.colorMask(false, false, false, false);
+          gl.drawArrays(gl.TRIANGLES, 0, walls.n);
+          gl.colorMask(true, true, true, true);
+          gl.uniform1f(wallsGL.u.uDepth, 0);
+          gl.depthMask(false);
+          gl.enable(gl.BLEND);
+          gl.drawArrays(gl.TRIANGLES, 0, walls.n);
+          gl.disable(gl.BLEND);
+        }
         gl.depthMask(true);
-        gl.disable(gl.BLEND);
         gl.disable(gl.DEPTH_TEST);
         for (let i = 1; i < walls.sizes.length; i++) gl.disableVertexAttribArray(i);
       },
     };
   }
 
-  // Without WebGL: the same scene in screen space, two soft beams for the lines.
+  // Without WebGL: the same scene in screen space, two soft beams for the lines;
+  // in neon a magenta sky and yellow beams.
   function canvasPicture(canvas) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
@@ -683,13 +854,15 @@ void main() {
       draw(p) {
         const w = canvas.width;
         const h = canvas.height;
+        const glow = p.neon > 0.5 ? [255, 60, 170] : p.rgb;
+        const lines = p.neon > 0.5 ? NEON_LINE : p.rgb;
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = `rgb(${p.rgb.map((c) => Math.round(4 + c * 0.012)).join(',')})`;
+        ctx.fillStyle = `rgb(${glow.map((c) => Math.round(4 + c * 0.012)).join(',')})`;
         ctx.fillRect(0, 0, w, h);
         ctx.globalCompositeOperation = 'lighter';
         const sky = ctx.createRadialGradient(w / 2, h * 0.3, 0, w / 2, h * 0.3, Math.max(w, h) * 0.4);
-        sky.addColorStop(0, rgba(p, 0.42 + 0.06 * p.breath));
-        sky.addColorStop(1, rgba(p, 0));
+        sky.addColorStop(0, rgba(p, 0.42 + 0.06 * p.breath, glow));
+        sky.addColorStop(1, rgba(p, 0, glow));
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, w, h);
         for (const side of [-1, 1]) {
@@ -697,8 +870,8 @@ void main() {
           const far = point(p, side, 0);
           const near = point(p, side, 1);
           const grad = ctx.createLinearGradient(far.x, far.y, near.x, near.y);
-          grad.addColorStop(0, rgba(p, 0));
-          grad.addColorStop(1, rgba(p, 0.5 * (1 + blink)));
+          grad.addColorStop(0, rgba(p, 0, lines));
+          grad.addColorStop(1, rgba(p, 0.5 * (1 + blink), lines));
           ctx.fillStyle = grad;
           ctx.beginPath();
           for (let i = 0; i <= 24; i++) {
@@ -712,7 +885,7 @@ void main() {
           ctx.fill();
         }
         if (p.arrive > 0.01) {
-          ctx.strokeStyle = rgba(p, 0.7 * p.arrive, p.rgb.map((c) => c + (255 - c) * 0.6));
+          ctx.strokeStyle = rgba(p, 0.7 * p.arrive, lines.map((c) => c + (255 - c) * 0.6));
           ctx.lineWidth = Math.max(1, w * 0.002);
           ctx.beginPath();
           ctx.ellipse(w / 2, h * 0.66, w * 0.09, h * 0.022, 0, 0, Math.PI * 2);
@@ -773,6 +946,7 @@ void main() {
     if (state) awake = Math.min(awake + dt, 60);
     const wake = smooth(0, 1.6, awake);
     look = Math.abs(lookGoal - look) < 0.002 ? lookGoal : look + (lookGoal - look) * Math.min(1, dt / 0.7);
+    neon = Math.abs(neonGoal - neon) < 0.002 ? neonGoal : neon + (neonGoal - neon) * Math.min(1, dt / 0.7);
     // Colour and brightness fade over like the lights do.
     wash = Math.min(1, wash + dt / 1.8);
     if (light && light.join() !== rgb.join()) {
@@ -782,7 +956,9 @@ void main() {
     if (wash >= 1) washFrom = rgb;
     const washed = smooth(0, 1, wash);
     const shown = rgb.map((v, i) => washFrom[i] + (v - washFrom[i]) * washed);
-    if (shown.map(Math.round).join() !== painted) paintStyles(shown);
+    // In neon the page's own light is the lines' yellow.
+    const accent = shown.map((v, i) => v + (NEON_LINE[i] - v) * neon);
+    if (accent.map(Math.round).join() !== painted) paintStyles(accent);
     glow = Math.abs(glowGoal - glow) < 0.004 ? glowGoal : glow + (glowGoal - glow) * Math.min(1, dt / 0.8);
     let left = 0;
     let right = 0;
@@ -793,6 +969,7 @@ void main() {
       if (state.signal !== 'left') right = b;
     }
     follow(dt, now);
+    if (cam) heading = cam.h;
     const showing = hasBuildings && options.buildings && cam && cam.o === buildingsOrigin;
     buildingsFade += ((showing ? 1 : 0) - buildingsFade) * Math.min(1, dt / 1.5);
     buildingsRise = clamp(buildingsRise + (showing ? dt : -dt) / 2.2, 0, 1);
@@ -800,8 +977,8 @@ void main() {
       creditShown = !creditShown;
       $('credit').hidden = !creditShown;
     }
-    picture.draw({ rgb, old: washFrom, wave: washed, shown, look, reach: smooth(0.35, 2.2, awake), glow: glow * wake, curv,
-      travel, streaks: options.pulses, left, right, arrive,
+    picture.draw({ rgb, old: washFrom, wave: washed, shown, look, neon, heading, reach: smooth(0.35, 2.2, awake),
+      glow: glow * wake, curv, travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, cam: showing || buildingsFade > 0.01 ? cam : null,
       buildings: buildingsFade, rise: smooth(0, 1, buildingsRise) });
     if (++measured === 90) {
@@ -972,8 +1149,9 @@ void main() {
   function applyOptions(o) {
     options = { eta: !!o.eta, speed: !!o.speed, turns: !!o.turns, pulses: !!o.pulses,
       bright: o.bright in BRIGHT ? o.bright : 'auto', buildings: o.buildings !== false,
-      look: o.look === 'soft' ? 'soft' : 'fine' };
+      look: o.look === 'soft' ? 'soft' : 'fine', style: o.style === 'neon' ? 'neon' : 'ambient' };
     lookGoal = options.look === 'soft' ? 1 : 0;
+    neonGoal = options.style === 'neon' ? 1 : 0;
     if (state) {
       glowGoal = glowFor(state);
       target = targetFor(state);
@@ -1012,6 +1190,7 @@ void main() {
       rgb = washFrom = c;
       glow = glowGoal;
       look = lookGoal;
+      neon = neonGoal;
       paintStyles(c);
     }
   }
@@ -1144,6 +1323,7 @@ void main() {
     for (const b of menu.querySelectorAll('[data-option]')) b.setAttribute('aria-pressed', String(!!options[b.dataset.option]));
     for (const b of menu.querySelectorAll('[data-bright]')) b.setAttribute('aria-pressed', String(options.bright === b.dataset.bright));
     for (const b of menu.querySelectorAll('[data-look]')) b.setAttribute('aria-pressed', String(options.look === b.dataset.look));
+    for (const b of menu.querySelectorAll('[data-style]')) b.setAttribute('aria-pressed', String(options.style === b.dataset.style));
   }
 
   function openMenu() {
@@ -1161,7 +1341,7 @@ void main() {
         method: 'POST',
         headers: { 'X-Quiet': '1', 'Content-Type': 'application/json' },
         body: JSON.stringify({ eta: options.eta, speed: options.speed, turns: options.turns, pulses: options.pulses,
-          bright: options.bright, buildings: options.buildings, look: options.look }),
+          bright: options.bright, buildings: options.buildings, look: options.look, style: options.style }),
       });
       if (!res.ok) throw new Error(String(res.status));
     } catch {
@@ -1183,9 +1363,11 @@ void main() {
     const option = e.target.closest('[data-option]');
     const bright = e.target.closest('[data-bright]');
     const lookChoice = e.target.closest('[data-look]');
+    const styleChoice = e.target.closest('[data-style]');
     if (option) choose({ ...options, [option.dataset.option]: !options[option.dataset.option] });
     else if (bright) choose({ ...options, bright: bright.dataset.bright });
     else if (lookChoice) choose({ ...options, look: lookChoice.dataset.look });
+    else if (styleChoice) choose({ ...options, style: styleChoice.dataset.style });
     else if (e.target.closest('#done') || e.target === menu) menu.hidden = true;
   });
 

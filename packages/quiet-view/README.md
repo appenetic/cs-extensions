@@ -21,6 +21,17 @@ angestrahlt, mit feinen, glatten Lichtlinien an Dachkanten und Ecken. Beim
 Öffnen wachsen die Häuser aus dem Boden. Sie blenden ab 40 m
 ein und lösen sich gegen 400 m im Dunst auf.
 
+Im Stil **Neon** wird daraus eine Retro-Neonstadt in der Dämmerung, unabhängig
+von der Farbe des Ambientelichts. Der Himmel geht von tiefem Violett über
+Magenta in einen rosa Dunst am Horizont über, mit Sternen, die beim Abbiegen an
+ihrem Platz am Himmel bleiben. Am Fluchtpunkt geht die Sonne unter, so tief,
+dass sie unter der Ankunftszeit bleibt. Die Häuser stehen deckend im Dunst und
+nehmen mit der Entfernung seine Farbe an. Manche tragen türkise Lichtbänder an
+jeder Etage, manche sind Türme voller warm erleuchteter Fenster, die übrigen
+dunkel, mit Dachkanten in Pink oder Türkis. Die Linien sind golden, die
+weichen Lichtbahnen ein rosa Schein. Die nasse Straße spiegelt Sonne und Stadt
+gewellt.
+
 Ruhig darüber, in Teslas eigener Schrift: oben links der Tacho und daneben die
 nächste Abbiegung als Pfeil mit Entfernung („200 m“, darunter „rechts“), über
 dem Horizont wie im Original die Ankunftszeit, darunter eine feine Linie mit
@@ -51,9 +62,10 @@ Zeitzone als die Anzeige im Auto.
 Pakete aus einem Repository bekommen in CoilShift keine Einstellungen. Ein
 langer Druck in der App öffnet deshalb ein Menü: Ankunftszeit und Fortschritt,
 Abbiegehinweise, Tacho, Lichtstreifen und Gebäude an oder aus, die Lichtbahn
-Fein oder Weich, Helligkeit Auto, Hell oder Gedämpft. Der Dienst hebt die Wahl
-in `CSDK_STATE/options.json` auf; was eine ältere Version dort ablegte, gilt
-weiter, Neues beginnt mit seinem Standard (Lichtbahn Fein).
+Fein oder Weich, der Stil Ambiente oder Neon, Helligkeit Auto, Hell oder
+Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf; was eine
+ältere Version dort ablegte, gilt weiter, Neues beginnt mit seinem Standard
+(Lichtbahn Fein, Stil Ambiente).
 
 ## Gebäude
 

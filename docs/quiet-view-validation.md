@@ -386,6 +386,52 @@ Verglichen wurde am selben Blick: das Rendering mit den OSM-Gebäuden und die
 Demo-Szene bei 0:25. Die Shader-Prüfung verbindet jetzt auch das Wandprogramm,
 mit und ohne Ableitungen.
 
+## Neon (alpha.23)
+
+Gewünscht war ein Neon-Stil wie in einem Video, das mit einem Auto durch eine
+Retro-Neonstadt fährt. Zu sehen sind dort ein magenta Himmel mit Sternen, eine
+große blasse Sonne am Fluchtpunkt, violette Hochhäuser mit türkisen
+Lichtbändern und warmen Fensterrastern, gelbe Fahrbahnlinien und eine nasse
+Straße, die alles spiegelt. Das Menü hat dafür die Zeile **Stil** mit Ambiente
+(Standard) und Neon. Der Dienst nimmt das Feld `style` mit `ambient` oder
+`neon` an, also acht Felder statt sieben. Ältere `options.json` bekommen
+Ambiente.
+
+So ist der Stil gebaut:
+
+- **Himmel:** Er ersetzt den Schein und hängt nicht von der Ambientefarbe ab.
+  Der Verlauf geht von Indigo über Magenta bis Pink am Horizont, mit einem
+  Dunstband. Die Sterne liegen nach Richtung und Höhe am Himmel (200 Zellen auf
+  eine volle Drehung) und bleiben beim Abbiegen stehen.
+- **Sonne:** Sie hat einen Radius von 0,095 der Höhe, ihr Mittelpunkt liegt auf
+  dem Horizont. Damit bleibt sie zwischen 0,485 und 0,58 der Höhe, unter
+  Ankunftszeit und Restzeile (die enden bei etwa 0,475).
+- **Straße:** Sie ist dunkelviolett und spiegelt Sonne und Dunst als Säule,
+  deren Wellen zum Horizont dichter werden.
+- **Spiegelung der Häuser:** Die Wände werden ein zweites Mal gespiegelt
+  gezeichnet, mit eigener Tiefe. Davon kommt nur das Licht, mit Wellen, nach
+  oben schwächer und mit etwas Abdunkelung. Diesen Durchgang gibt es nur im
+  Neon-Stil.
+- **Häuser:** Jedes Gebäude bekommt eine eigene Zahl, nicht jede Wand. Daraus
+  wird eine von drei Arten: türkise Bänder an jeder Etage, ein Turm mit vielen
+  warm erleuchteten Fenstern, oder dunkel mit Dachkante in Pink oder Türkis.
+- **Dunst:** Im Neon-Stil bleiben die Wände deckend und nehmen mit der
+  Entfernung die Farbe von Himmel und Dunst vor ihnen an. Sonst schien die
+  Sonne durch ferne Häuser wie durch Glas.
+- **Linien:** Die feinen Linien sind golden. Die weichen Bahnen sind ein rosa
+  Schein und um 40 % schwächer, denn Gelb in dieser Breite überstrahlte das
+  Bild und wurde gedimmt oliv.
+- **Akzente:** Fortschrittslinie, Pfeil und Schalter auf der Seite nehmen das
+  Gelb der Linien an.
+- **Ohne WebGL:** Der Ersatz zeigt einen magenta Schein mit gelben Bahnen.
+
+Die ganze Himmelsarbeit läuft nur, solange Neon eingeblendet ist; Ambiente
+zahlt nichts dafür. Die Shader-Prüfung kennt den gemeinsamen Himmelsbaustein,
+und ein Test prüft, dass die Seite jedes Feld der Optionen an den Dienst
+schickt: Fehlt eines, antwortet er 400, und die Wahl springt zurück. Ambiente
+blieb gegenüber alpha.22 gleich; verglichen wurde am selben Blick, bis auf das
+zeitabhängige Atmen des Scheins und das Korn.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
