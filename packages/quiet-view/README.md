@@ -14,10 +14,11 @@ gelenkt eine sanfte Kurve, voll eingeschlagen ein enger Bogen zur Seite. Blinkst
 Statt der feinen Linien kann die Bahn auch aussehen wie auf den Fotos des
 Originals: zwei breite, weiche Lichtbahnen auf dem Boden, durch deren Herz die
 Lichtstreifen als weiche Pulse laufen. Die nasse Straße spiegelt den Schein.
-Dahinter stehen schematisch die Gebäude rund um das Auto, aus OpenStreetMap:
-dunkles Glas mit weichen Lichtkanten in der Farbe des Scheins, das zum Boden
-hin im Dunst verschwimmt. Sie blenden ab 40 m ein und lösen sich gegen 400 m
-im Dunst auf.
+Dahinter steht die Stadt rund um das Auto, aus OpenStreetMap, wie bei Nacht:
+dunkle Silhouetten vor dem Schein, mit Etagen und Fenstern, von denen etwa jedes
+sechste in der Farbe des Lichts leuchtet, am Fuß vom Licht der Straße
+angestrahlt. Beim Öffnen wachsen die Häuser aus dem Boden. Sie blenden ab 40 m
+ein und lösen sich gegen 400 m im Dunst auf.
 
 Ruhig darüber, in Teslas eigener Schrift: oben links der Tacho und daneben die
 nächste Abbiegung als Pfeil mit Entfernung („200 m“, darunter „rechts“), über
@@ -176,12 +177,18 @@ die Breite in Metern auf dem Boden gilt, verengt die Perspektive es von selbst.
 Die weichen Bahnen verblassen früher als die Linien, damit sich ihr Licht dort,
 wo die Straße nur noch wenige Pixel breit ist, nicht zu einem hellen Fleck
 staut. Die Gebäude zeichnet ein zweiter Durchgang aus derselben
-Kamera: Wände wie dunkles Glas, erst nur in die Tiefe, dann abgedunkelt, wo
-jeweils die vorderste steht, damit hintereinander stehende Häuser nicht doppelt
-dunkeln; Wände, die zur Kamera zeigen, etwas mehr als schräg gesehene, und zum
-Boden hin heller im Dunst. Darüber Dachkanten und Ecken als schmale Bänder mit
-weichem Profil, an jeder Neigung glatt statt pixelig, die Ecken zum Boden hin
-schwächer. Alles blendet ab 40 m ein und ist vor dem Rand der Auswahl (450 m,
+Kamera: dunkle Wände, erst nur in die Tiefe, dann abgedunkelt, wo jeweils die
+vorderste steht, damit hintereinander stehende Häuser nicht doppelt dunkeln;
+zum Boden hin heller im Dunst und vom Licht der Straße angestrahlt. Auf den
+Wänden liegen Fenster in Etagen von 3,3 m, alle 2,6 m eines, mittig auf jeder
+Wand, über dem Erdgeschoss und unter der Brüstung von Häusern über 6 m; etwa
+jedes sechste leuchtet, mal wärmer, mal mehr in der Lichtfarbe, mit einem
+weichen Schein um die Scheibe. Welche leuchten, hängt nur an ganzen Zahlen
+(Fenster, Etage, Wand), damit es stabil bleibt; wo Fenster enger stehen, als
+Pixel sie zeigen können, bleibt nur ihr schwacher Mittelwert, damit nichts
+flimmert. Darüber Dachkanten als schmale Bänder mit weichem Profil, an jeder
+Neigung glatt statt pixelig, die Ecken viel schwächer. Wenn die Gebäude zum
+ersten Mal erscheinen, wachsen sie in 2,2 s aus dem Boden. Alles blendet ab 40 m ein und ist vor dem Rand der Auswahl (450 m,
 alle 60 m neu) verschwunden, damit dort nichts aufpoppt. Das Canvas-Bild zeigt
 keine Gebäude.
 

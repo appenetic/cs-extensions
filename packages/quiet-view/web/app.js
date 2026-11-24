@@ -326,17 +326,22 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-  // The buildings around the car, from the same camera, after the road. Their
-  // walls are dark glass: each pixel darkens once, for the nearest wall, however
-  // many stand in a row; less towards the ground, where they stand in the haze,
-  // and more where a wall faces the camera than where it is seen edge-on, so
-  // the blocks read as blocks. Their roof edges and corners are fine lines of
-  // the light, drawn as narrow bands that stay smooth at any angle, the corners
-  // fading towards the ground. All fade in from 40 m, so those beside the car
-  // stay out of the way, thin out into the haze and are gone before the edge
-  // of what the service picked (450 m around the car, picked again every
-  // 60 m). Points are metres east and north in the service's frame, and up,
-  // each with how far up its wall it lies (0 to 1).
+  // The buildings around the car, from the same camera, after the road: a
+  // city at night. Their walls are dark silhouettes against the glow, each
+  // pixel darkened once, for the nearest wall, however many stand in a row;
+  // lighter towards the ground, where they stand in the haze and the street's
+  // light rises up their feet, and darker where a wall faces the camera than
+  // where it is seen edge-on, so the blocks read as blocks. Their windows lie
+  // in floors of 3.3 m, one every 2.6 m along a wall; about one in six is lit,
+  // in the light's colour, warmer. Where the windows come closer together
+  // than the pixels can show, only their faint mean remains, so nothing
+  // shimmers. Their roof edges are fine lines of the light, the corners
+  // fainter, drawn as narrow bands that stay smooth at any angle. All fade in
+  // from 40 m, so those beside the car stay out of the way, thin out into the
+  // haze and are gone before the edge of what the service picked (450 m around
+  // the car, picked again every 60 m); when they first appear, they grow out
+  // of the ground. Points are metres east and north in the service's frame,
+  // and up, each with how far up its wall it lies (0 to 1).
   const BUILDING_CAMERA = `
 uniform vec2 uCam;
 uniform vec2 uDir;
@@ -354,23 +359,39 @@ vec4 project(vec3 p) {
 }`;
 
   const BUILDING_SEEN = `
+#ifdef GL_OES_standard_derivatives
+#extension GL_OES_standard_derivatives : enable
+#endif
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 uniform float uFade;
 float seen(float d) {
   return uFade * smoothstep(40.0, 140.0, d) * exp(-d / 260.0) * (1.0 - smoothstep(310.0, 390.0, d));
 }`;
 
+  // aWall is the wall's run on the ground; aFace its metres along from its
+  // start, a whole number of its own (0 to 96) for its windows, and its
+  // building's height.
   const WALL_VERTEX = BUILDING_CAMERA + `
 attribute vec4 aPos;
 attribute vec2 aWall;
+attribute vec3 aFace;
+uniform float uRise;
 varying vec2 vRel;
 varying vec2 vNormal;
 varying float vHeight;
+varying vec3 vFace;
+varying float vLength;
 void main() {
-  gl_Position = project(aPos.xyz);
+  gl_Position = project(vec3(aPos.xy, aPos.z * uRise));
   vRel = aPos.xy - uCam;
   vNormal = vec2(aWall.y, -aWall.x) / max(length(aWall), 0.001);
   vHeight = aPos.z;
+  vFace = aFace;
+  vLength = length(aWall);
 }`;
 
   const WALL_FRAGMENT = BUILDING_SEEN + `
@@ -379,14 +400,51 @@ uniform float uShade;
 varying vec2 vRel;
 varying vec2 vNormal;
 varying float vHeight;
+varying vec3 vFace;
+varying float vLength;
+// A number from 0 to 1 for whole numbers, the same for the same ones.
+float hash(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
 void main() {
   float d = length(vRel);
   float face = abs(dot(vNormal, vRel)) / max(d, 0.001);
-  float a = uShade * seen(d) * (0.75 + 0.25 * face) * mix(0.4, 1.0, smoothstep(0.0, 9.0, vHeight));
+  float fog = seen(d);
+  float a = uShade * fog * (0.8 + 0.2 * face) * mix(0.35, 1.0, smoothstep(0.0, 10.0, vHeight));
   // A wall too faint to see hides nothing either.
   if (a < 0.004) discard;
-  // A wall facing the camera catches a trace of the light.
-  gl_FragColor = vec4(uLight * 0.06 * face, a);
+  // The windows, centred on the wall, above the ground floor and below the
+  // parapet of a building over 6 m.
+  float cells = floor(vLength / 2.6);
+  vec2 g = vec2((vFace.x - 0.5 * (vLength - cells * 2.6)) / 2.6, (vHeight - 0.8) / 3.3);
+  vec2 cell = floor(g);
+  vec2 f = g - cell;
+  // The wall's number is whole at its corners; rounded, it stays so between
+  // them, or the hash would turn the smallest wobble into stripes.
+  float n = hash(cell + vec2(13.0, 7.0) * floor(vFace.y + 0.5));
+  float lit = step(0.83, n) * (0.45 + 0.55 * fract(n * 7.13));
+#ifdef GL_OES_standard_derivatives
+  vec2 fw = max(vec2(fwidth(g.x), fwidth(g.y)), vec2(1e-4));
+#else
+  vec2 fw = vec2(1.0);
+#endif
+  float pane = (smoothstep(0.25 - fw.x, 0.25 + fw.x, f.x) - smoothstep(0.75 - fw.x, 0.75 + fw.x, f.x))
+    * (smoothstep(0.22 - fw.y, 0.22 + fw.y, f.y) - smoothstep(0.78 - fw.y, 0.78 + fw.y, f.y));
+  // A lit pane glows a little onto the wall around it.
+  vec2 beyond = max(abs(f - 0.5) - vec2(0.25, 0.28), 0.0);
+  float halo = exp(-dot(beyond, beyond) / 0.006) * 0.35;
+  float onWall = step(0.0, g.x) * step(g.x, cells) * step(1.0, g.y) * step(vHeight, vFace.z - 1.2) * step(6.0, vFace.z);
+  float windows = onWall * mix(0.045, (pane + halo) * lit, smoothstep(2.5, 6.0, 1.0 / max(fw.x, fw.y)));
+  // Some rooms are lit warmer, some more in the light's colour.
+  vec3 room = mix(uLight, vec3(1.0, 0.9, 0.78), 0.25 + 0.5 * fract(n * 3.7));
+  // Light from below: the street's glow on the feet of the walls, more on
+  // those that face the road.
+  float foot = exp(-vHeight / 4.0) * (0.4 + 0.6 * face);
+  vec3 glow = room * windows * 0.6 + uLight * foot * 0.06;
+  // Dark glass, tinted by the light, and what shines from it, premultiplied.
+  gl_FragColor = vec4(uLight * 0.025 * a + glow * fog, a);
 }`;
 
   const EDGE_VERTEX = BUILDING_CAMERA + `
@@ -394,12 +452,13 @@ attribute vec4 aPos;
 attribute vec4 aOther;
 attribute float aSide;
 uniform float uWidth;
+uniform float uRise;
 varying vec2 vRel;
 varying float vUp;
 varying float vAcross;
 void main() {
-  vec4 a = project(aPos.xyz);
-  vec4 b = project(aOther.xyz);
+  vec4 a = project(vec3(aPos.xy, aPos.z * uRise));
+  vec4 b = project(vec3(aOther.xy, aOther.z * uRise));
   // An end behind the near plane moves along the edge onto it.
   float t = a.w < 5.0 ? (5.0 - a.w) / (b.w - a.w) : 0.0;
   if (a.w < 5.0 && b.w < 5.0) {
@@ -432,19 +491,26 @@ void main() {
   gl_FragColor = vec4(uTint.rgb, a);
 }`;
 
-  // The service's lines as walls and edges: per line its height, its base,
-  // 1 when closed, then its points. Corners are where an outline turns by more
-  // than 25°; an open line's ends lie on a tile's border and are none. A wall
-  // vertex carries its point and the wall's direction on the ground; an edge
-  // is a band of two triangles whose corners carry both ends and their side.
+  // The service's lines as walls, roof edges and corners: per line its
+  // height, its base, 1 when closed, then its points. Corners are where an
+  // outline turns by more than 25°; an open line's ends lie on a tile's border
+  // and are none. A wall vertex carries its point, the wall's direction on the
+  // ground and its face (metres along, a number from where it starts, the
+  // height); an edge is a band of two triangles whose corners carry both ends
+  // and their side.
   function buildingGeometry(lines) {
     const walls = [];
     const edges = [];
+    const corners = [];
     const bend = Math.cos((25 * Math.PI) / 180);
-    const edge = (a, b) => {
+    const edge = (to, a, b) => {
       for (const [end, side] of [[0, -1], [0, 1], [1, 1], [0, -1], [1, 1], [1, -1]]) {
-        edges.push(...(end ? b : a), ...(end ? a : b), end ? -side : side);
+        to.push(...(end ? b : a), ...(end ? a : b), end ? -side : side);
       }
+    };
+    const seed = (px, py) => {
+      const v = Math.sin(px * 12.9898 + py * 78.233) * 43758.5453;
+      return Math.floor((v - Math.floor(v)) * 97);
     };
     for (const row of lines) {
       if (!Array.isArray(row) || row.length < 7 || row.length % 2 === 0) continue;
@@ -457,10 +523,12 @@ void main() {
         const j = (i + 1) % n;
         const dx = x(j) - x(i);
         const dy = y(j) - y(i);
+        const len = Math.hypot(dx, dy);
+        const own = seed(x(i), y(i));
         for (const [k, up] of [[i, 0], [j, 0], [j, 1], [i, 0], [j, 1], [i, 1]]) {
-          walls.push(x(k), y(k), up ? top : base, up, dx, dy);
+          walls.push(x(k), y(k), up ? top : base, up, dx, dy, k === i ? 0 : len, own, top);
         }
-        edge([x(i), y(i), top, 1], [x(j), y(j), top, 1]);
+        edge(edges, [x(i), y(i), top, 1], [x(j), y(j), top, 1]);
       }
       for (let i = closed ? 0 : 1; i < (closed ? n : n - 1); i++) {
         const p = (i + n - 1) % n;
@@ -470,11 +538,11 @@ void main() {
         const vx = x(q) - x(i);
         const vy = y(q) - y(i);
         if ((ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1) < bend) {
-          edge([x(i), y(i), base, 0], [x(i), y(i), top, 1]);
+          edge(corners, [x(i), y(i), base, 0], [x(i), y(i), top, 1]);
         }
       }
     }
-    return { walls: new Float32Array(walls), edges: new Float32Array(edges) };
+    return { walls: new Float32Array(walls), edges: new Float32Array(edges), corners: new Float32Array(corners) };
   }
 
   function webglPicture(canvas) {
@@ -516,10 +584,11 @@ void main() {
     gl.enableVertexAttribArray(0);
     // The buildings: without their shaders the picture goes on without them.
     const camera = ['uCam', 'uDir', 'uView', 'uFade'];
-    const wallsGL = link(WALL_VERTEX, WALL_FRAGMENT, ['aPos', 'aWall'], [...camera, 'uLight', 'uShade']);
-    const edgesGL = link(EDGE_VERTEX, EDGE_FRAGMENT, ['aPos', 'aOther', 'aSide'], [...camera, 'uTint', 'uWidth']);
+    const wallsGL = link(WALL_VERTEX, WALL_FRAGMENT, ['aPos', 'aWall', 'aFace'], [...camera, 'uRise', 'uLight', 'uShade']);
+    const edgesGL = link(EDGE_VERTEX, EDGE_FRAGMENT, ['aPos', 'aOther', 'aSide'], [...camera, 'uRise', 'uTint', 'uWidth']);
     let walls = null;
     let edges = null;
+    let corners = null;
     // A buffer of vertices with their attributes' sizes, interleaved.
     const upload = (data, sizes) => {
       const stride = sizes.reduce((a, b) => a + b, 0);
@@ -535,6 +604,7 @@ void main() {
       gl.uniform2f(program.u.uDir, Math.sin(r), Math.cos(r));
       gl.uniform4f(program.u.uView, 0.78 * canvas.width, canvas.width, canvas.height, 0.58 * canvas.height);
       gl.uniform1f(program.u.uFade, p.buildings);
+      gl.uniform1f(program.u.uRise, p.rise);
       gl.bindBuffer(gl.ARRAY_BUFFER, x.b);
       let offset = 0;
       x.sizes.forEach((size, i) => {
@@ -553,12 +623,13 @@ void main() {
       },
       // Lines from the service, or null for none; true when there are some.
       setBuildings(lines) {
-        for (const x of [walls, edges]) if (x) gl.deleteBuffer(x.b);
-        walls = edges = null;
+        for (const x of [walls, edges, corners]) if (x) gl.deleteBuffer(x.b);
+        walls = edges = corners = null;
         if (!wallsGL || !edgesGL || !lines) return false;
         const g = buildingGeometry(lines);
-        walls = upload(g.walls, [4, 2]);
+        walls = upload(g.walls, [4, 2, 3]);
         edges = upload(g.edges, [4, 4, 1]);
+        corners = upload(g.corners, [4, 4, 1]);
         return !!walls;
       },
       draw(p) {
@@ -590,7 +661,7 @@ void main() {
         // their depth alone, then their shade where each is the nearest.
         use(walls, wallsGL, p, r);
         gl.uniform3f(wallsGL.u.uLight, p.shown[0] / 255, p.shown[1] / 255, p.shown[2] / 255);
-        gl.uniform1f(wallsGL.u.uShade, 0.42);
+        gl.uniform1f(wallsGL.u.uShade, 0.7);
         gl.enable(gl.POLYGON_OFFSET_FILL);
         gl.polygonOffset(1, 2);
         gl.colorMask(false, false, false, false);
@@ -598,17 +669,18 @@ void main() {
         gl.colorMask(true, true, true, true);
         gl.depthMask(false);
         gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         gl.drawArrays(gl.TRIANGLES, 0, walls.n);
         gl.disable(gl.POLYGON_OFFSET_FILL);
-        // The edges add light.
-        if (edges) {
-          use(edges, edgesGL, p, r);
-          const hot = p.shown.map((c) => (c + (255 - c) * 0.35) / 255);
-          gl.uniform4f(edgesGL.u.uTint, hot[0], hot[1], hot[2], 0.5 * Math.min(1.2, p.glow));
+        // The roof edges add light, the corners less.
+        const hot = p.shown.map((c) => (c + (255 - c) * 0.35) / 255);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+        for (const [x, strength] of [[edges, 0.55], [corners, 0.18]]) {
+          if (!x) continue;
+          use(x, edgesGL, p, r);
+          gl.uniform4f(edgesGL.u.uTint, hot[0], hot[1], hot[2], strength * Math.min(1.2, p.glow));
           gl.uniform1f(edgesGL.u.uWidth, 3);
-          gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-          gl.drawArrays(gl.TRIANGLES, 0, edges.n);
+          gl.drawArrays(gl.TRIANGLES, 0, x.n);
         }
         gl.depthMask(true);
         gl.disable(gl.BLEND);
@@ -749,6 +821,7 @@ void main() {
     follow(dt, now);
     const showing = hasBuildings && options.buildings && cam && cam.o === buildingsOrigin;
     buildingsFade += ((showing ? 1 : 0) - buildingsFade) * Math.min(1, dt / 1.5);
+    buildingsRise = clamp(buildingsRise + (showing ? dt : -dt) / 2.2, 0, 1);
     if ((buildingsFade > 0.05) !== creditShown) {
       creditShown = !creditShown;
       $('credit').hidden = !creditShown;
@@ -756,7 +829,7 @@ void main() {
     picture.draw({ rgb, old: washFrom, wave: washed, shown, look, reach: smooth(0.35, 2.2, awake), glow: glow * wake, curv,
       travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, cam: showing || buildingsFade > 0.01 ? cam : null,
-      buildings: buildingsFade });
+      buildings: buildingsFade, rise: smooth(0, 1, buildingsRise) });
     if (++measured === 90) {
       if ((now - measureStart) / measured > 26 && quality > 0.35) {
         quality = Math.max(0.35, quality * 0.75);
@@ -978,6 +1051,8 @@ void main() {
   let buildingsAt = -1;
   let buildingsOrigin = 0;
   let buildingsFade = 0;
+  // 0 to 1 over 2.2 s as the buildings first show: they grow out of the ground.
+  let buildingsRise = 0;
   let creditShown = false;
 
   const turnOf = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;

@@ -319,6 +319,26 @@ Der Dienst nimmt die neue Wahl `look` (`fine` oder `soft`) an. Eine
 `options.json` einer älteren Version lädt weiter; fehlende Wahlen bekommen ihren
 Standard.
 
+## Stadt bei Nacht (alpha.20)
+
+„Gebäude sehen noch nicht so cool aus“: Die Wände waren blasses Glas mit
+dünnen, wegen der vielen Knicke in OSM-Umrissen etwas zittrigen Linien, mehr
+Strichzeichnung als Stadt. Jetzt sind sie dunkle Silhouetten vor dem Schein
+(Deckkraft 0,7 statt 0,42), mit Fenstern in Etagen, von denen etwa jedes sechste
+leuchtet, Licht der Straße am Fuß der Wände, Dachkanten als Lichtlinie und viel
+schwächeren Ecken; beim ersten Erscheinen wachsen sie aus dem Boden.
+
+Zwei Fehler auf dem Weg, beide am Mac gefunden:
+
+- Viele Fenster zerfielen in senkrechte Streifen. Die Nummer der Wand war zwar
+  an jeder Ecke gleich, wackelte zwischen ihnen aber um Rundungsfehler, und die
+  Hash-Funktion machte daraus von Spalte zu Spalte ein anderes Fenster. Jetzt
+  ist die Nummer ganzzahlig und wird gerundet, die Hash-Funktion bekommt nur
+  ganze Zahlen.
+- Eine Variable hieß `out`, in GLSL ein reserviertes Wort: Der Wand-Shader
+  kompilierte nicht, und das Bild lief ohne Gebäude weiter. Alle Shader werden
+  jetzt vor jedem Stand in Chrome kompiliert.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
@@ -327,8 +347,9 @@ Standard.
    Uhrzeigersinn angenommen), und sich beim Fahren ruhig mitbewegen; wie oft
    Kurs und Position sich ändern (`turns.log`). Dass sie ankommen, ist mit
    alpha.17 geprüft (480 Umrisse im Stand).
-3. Wie Schrift und Layout von alpha.18 und die weiche Lichtbahn von alpha.19
-   auf dem Bildschirm im Auto wirken, auch in der Bildrate.
+3. Wie Schrift und Layout von alpha.18, die weiche Lichtbahn von alpha.19 und
+   die Stadt von alpha.20 auf dem Bildschirm im Auto wirken, auch in der
+   Bildrate.
 4. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
 5. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
