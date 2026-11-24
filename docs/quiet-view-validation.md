@@ -432,6 +432,35 @@ schickt: Fehlt eines, antwortet er 400, und die Wahl springt zurück. Ambiente
 blieb gegenüber alpha.22 gleich; verglichen wurde am selben Blick, bis auf das
 zeitabhängige Atmen des Scheins und das Korn.
 
+## Kurven (alpha.24)
+
+„In Kurven sieht das mit dem Sonnenuntergang und den Gebäuden komisch aus“, in
+der Demo: Die Sonne stand fest in der Bildmitte, während sich Stadt und Sterne
+mit dem Auto drehten. In der Linkskurve bog die Bahn ab, die Sonne aber blieb
+über leerem Land stehen, und ihre Spiegelsäule lief gerade durch die Kurve. In
+der Rechtskurve zogen die Häuser vor einer Sonne vorbei, die mitfuhr.
+
+Jetzt hat die Sonne eine eigene Richtung in der Welt. Solange das Auto abbiegt
+(über etwa 2 bis 6° pro Sekunde), bleibt sie stehen und wandert wie die Stadt
+über das Bild. Mit ihr wandern die Spiegelsäule, der Schein am Horizont und der
+Dunst, den die Häuser annehmen.
+
+Auf der Geraden dreht sie nach: im Bild höchstens 3° pro Sekunde, außerhalb des
+Bildes mit 12° pro Sekunde, denn dort sieht das Aufholen niemand. Nach einer
+90°-Kurve über 6 s steht sie 4 s später wieder am Bildrand (35°), nach 20 s
+15° neben der Mitte und nach 30 s bei 3°.
+
+Die Sterne hängen dagegen fest an der Welt, sonst rutschten sie beim Aufholen
+über den Himmel. Springt die Richtung um mehr als 30° auf einmal, etwa beim
+Szenenwechsel in der Demo, steht die Sonne gleich wieder vorn.
+
+Geprüft wurde mit Standbildern der Demo, vor denen der Himmel die 20 s Fahrt
+davor in Schritten von 50 ms durchlief, bei 0:17, 0:24 und 0:30.
+
+Das Update-Skript für das Auto legt seinen API-Helfer wieder hin, wenn `/tmp`
+nach einem Neustart leer ist. Es hört nur bei einem eindeutigen Ergebnis auf;
+eine abgerissene Verbindung führt zu einem neuen Versuch.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn

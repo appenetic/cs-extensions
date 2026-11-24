@@ -54,8 +54,14 @@
   // 0 in the ambient lights' colour, 1 the neon city at dusk; it crossfades.
   let neon = 0;
   let neonGoal = 0;
-  // The heading the stars last stood at, kept while the car has no fix.
+  // The neon sun's own heading in the world, and the view's: while the car
+  // turns the sun stays put, like the city and the stars; on the straight it
+  // comes round after the road, at most 3° a second while it is in the
+  // picture, 12° while it is out of it, so it soon sets ahead again. Without
+  // a fix both stay.
+  let sky = null;
   let heading = 0;
+  let turning = 0;
   let state = null;
   let lastState = 0;
   let lastFrame = 0;
@@ -124,10 +130,15 @@
   // ---- The picture ----
 
   // The neon style's sky, t of the way from the horizon (0) to the top (1),
-  // bx the share of the half width from the middle; and its band of pink haze
-  // along the horizon, dy pixels below it. The sky and the haze the city
-  // stands in share them. Colours are before the roll-off.
+  // bx the share of the half width from the sun; and its band of pink haze
+  // along the horizon, dy pixels below it. The sun stands where the view,
+  // turned sky radians from the sky's own heading, sees bearing 0; off the
+  // picture beyond 75°. The sky and the haze the city stands in share them.
+  // Colours are before the roll-off.
   const DUSK_SKY = `
+float sunAt(float sky, float w) {
+  return 0.5 * w - 0.78 * w * tan(clamp(sky, -1.3, 1.3));
+}
 vec3 duskSky(float t, float bx) {
   vec3 col = mix(vec3(0.60, 0.13, 0.34), vec3(0.34, 0.05, 0.30), smoothstep(0.0, 0.3, t));
   col = mix(col, vec3(0.13, 0.025, 0.19), smoothstep(0.2, 0.65, t));
@@ -171,7 +182,8 @@ uniform float uTime;
 uniform float uLook;
 uniform float uReach;
 uniform float uNeon;
-uniform float uHeading;
+uniform float uSky;
+uniform float uStars;
 
 float grain(vec2 p) {
   p = fract(p * vec2(443.897, 441.423));
@@ -197,21 +209,22 @@ float hash(vec2 p) {
 ` + DUSK_SKY + `
 
 // The neon style's sky at dusk and the wet road under it: deep indigo
-// overhead, through magenta to hot pink along the horizon; stars that keep
-// their place in the sky as the car turns, a few bright, most faint, slowly
-// twinkling; and a sun half set where the road meets the horizon, low enough
-// to stay below the arrival. The road mirrors the haze and the sun in a
-// rippled column.
+// overhead, through magenta to hot pink along the horizon; stars, a few
+// bright, most faint, slowly twinkling, fixed by bearing as the car turns
+// (uStars, its heading); and a sun half set on the horizon, low enough to
+// stay below the arrival, that keeps its place while the car turns (uSky).
+// The road mirrors the haze and the sun in a rippled column.
 vec3 dusk(vec2 px, float w, float h, float f) {
   float yH = 0.58 * h;
   float dy = px.y - yH;
-  float bx = (px.x - 0.5 * w) / (0.5 * w);
+  float sx0 = sunAt(uSky, w);
+  float bx = (px.x - sx0) / (0.5 * w);
   vec3 col;
   if (dy < 0.0) {
     float t = -dy / yH;
     col = duskSky(t, bx);
     // Stars by bearing and height, 200 cells to a full turn.
-    vec2 sky = vec2(uHeading + atan((px.x - 0.5 * w) / f), atan(-dy / f)) * (200.0 / 6.2831853);
+    vec2 sky = vec2(uStars + atan((px.x - 0.5 * w) / f), atan(-dy / f)) * (200.0 / 6.2831853);
     vec2 cell = floor(sky);
     float n = hash(vec2(mod(cell.x, 200.0), cell.y) + 17.0);
     if (n > 0.8) {
@@ -223,7 +236,7 @@ vec3 dusk(vec2 px, float w, float h, float f) {
     }
     // The sun: pale yellow on top, pink where it sets, and its glow.
     float R = 0.095 * h;
-    float r = length(vec2(px.x - 0.5 * w, dy));
+    float r = length(vec2(px.x - sx0, dy));
     vec3 sun = mix(vec3(1.6, 0.42, 0.55), vec3(1.7, 1.25, 0.6), smoothstep(0.0, 0.9, -dy / R));
     float disc = 1.0 - smoothstep(R - 1.0, R + 1.0, r);
     col = mix(col, sun, disc);
@@ -236,11 +249,11 @@ vec3 dusk(vec2 px, float w, float h, float f) {
     // and the haze's broader sheen.
     float wave = 30.0 * log(max(dy, 1.0) / h);
     float sway = sin(1.7 * wave + uTime * 0.7) * 0.012 * h;
-    float sx = (px.x - 0.5 * w + sway) / (0.065 * h);
+    float sx = (px.x - sx0 + sway) / (0.065 * h);
     float ripple = mix(0.7, 0.55 + 0.3 * sin(wave + uTime * 0.9) + 0.25 * sin(2.3 * wave - uTime * 1.3),
       smoothstep(8.0, 30.0, dy));
     col += vec3(1.0, 0.5, 0.5) * 0.42 * exp(-sx * sx) * exp(-dy / (0.22 * h)) * smoothstep(0.0, 0.02 * h, dy) * ripple;
-    float wx = (px.x - 0.5 * w) / (0.3 * w);
+    float wx = (px.x - sx0) / (0.3 * w);
     col += vec3(0.6, 0.14, 0.4) * 0.12 * exp(-wx * wx) * exp(-dy / (0.12 * h));
   }
   return col + duskHaze(dy, h, bx);
@@ -516,8 +529,10 @@ uniform float uNeon;
 // themselves; and the time, for its ripples.
 uniform float uReflect;
 uniform float uShimmer;
-// The picture's width and height in pixels.
+// The picture's width and height in pixels, and how far the view is turned
+// from the sky's heading, in radians.
 uniform vec2 uScreen;
+uniform float uSky;
 varying vec2 vRel;
 varying vec2 vNormal;
 varying float vHeight;
@@ -635,7 +650,7 @@ void main() {
   if (uNeon > 0.001) {
     vec2 at = vec2(gl_FragCoord.x, uScreen.y - gl_FragCoord.y);
     float dy = at.y - 0.58 * uScreen.y;
-    float bx = (at.x - 0.5 * uScreen.x) / (0.5 * uScreen.x);
+    float bx = (at.x - sunAt(uSky, uScreen.x)) / (0.5 * uScreen.x);
     vec3 haze = duskSky(max(-dy / (0.58 * uScreen.y), 0.0), bx) * exp(-max(dy, 0.0) / (0.08 * uScreen.y))
       + duskHaze(dy, uScreen.y, bx);
     vec3 violet = vec3(0.09, 0.03, 0.17) * (1.3 - 0.3 * face);
@@ -720,7 +735,7 @@ void main() {
     };
     const road = link('attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }', FRAGMENT, ['p'],
       ['uRes', 'uColor', 'uColorOld', 'uWave', 'uGlow', 'uCurv', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed',
-        'uArrive', 'uTime', 'uLook', 'uReach', 'uNeon', 'uHeading']);
+        'uArrive', 'uTime', 'uLook', 'uReach', 'uNeon', 'uSky', 'uStars']);
     if (!road) return null;
     const u = road.u;
     const quad = gl.createBuffer();
@@ -730,7 +745,8 @@ void main() {
     // The buildings: without their shaders the picture goes on without them.
     const camera = ['uCam', 'uDir', 'uView', 'uFade'];
     const wallsGL = link(WALL_VERTEX, WALL_FRAGMENT, ['aPos', 'aWall', 'aFace', 'aEnds'],
-      [...camera, 'uRise', 'uLight', 'uShade', 'uEdge', 'uDepth', 'uNeon', 'uMirror', 'uReflect', 'uShimmer', 'uScreen']);
+      [...camera, 'uRise', 'uLight', 'uShade', 'uEdge', 'uDepth', 'uNeon', 'uMirror', 'uReflect', 'uShimmer', 'uScreen',
+        'uSky']);
     let walls = null;
     // A buffer of vertices with their attributes' sizes, interleaved.
     const upload = (data, sizes) => {
@@ -782,7 +798,8 @@ void main() {
         gl.uniform1f(u.uWave, p.wave);
         gl.uniform1f(u.uLook, p.look);
         gl.uniform1f(u.uNeon, p.neon);
-        gl.uniform1f(u.uHeading, (p.heading * Math.PI) / 180);
+        gl.uniform1f(u.uSky, p.sky);
+        gl.uniform1f(u.uStars, ((p.heading % 360) * Math.PI) / 180);
         gl.uniform1f(u.uReach, p.reach);
         gl.uniform1f(u.uGlow, p.glow);
         gl.uniform1f(u.uCurv, p.curv);
@@ -809,6 +826,7 @@ void main() {
         gl.uniform1f(wallsGL.u.uNeon, p.neon);
         gl.uniform1f(wallsGL.u.uShimmer, p.time % 3600);
         gl.uniform2f(wallsGL.u.uScreen, canvas.width, canvas.height);
+        gl.uniform1f(wallsGL.u.uSky, p.sky);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         for (const mirror of p.neon > 0.01 ? [1, 0] : [0]) {
           gl.depthMask(true);
@@ -969,7 +987,7 @@ void main() {
       if (state.signal !== 'left') right = b;
     }
     follow(dt, now);
-    if (cam) heading = cam.h;
+    if (cam) followSky(cam.h, dt);
     const showing = hasBuildings && options.buildings && cam && cam.o === buildingsOrigin;
     buildingsFade += ((showing ? 1 : 0) - buildingsFade) * Math.min(1, dt / 1.5);
     buildingsRise = clamp(buildingsRise + (showing ? dt : -dt) / 2.2, 0, 1);
@@ -977,7 +995,8 @@ void main() {
       creditShown = !creditShown;
       $('credit').hidden = !creditShown;
     }
-    picture.draw({ rgb, old: washFrom, wave: washed, shown, look, neon, heading, reach: smooth(0.35, 2.2, awake),
+    picture.draw({ rgb, old: washFrom, wave: washed, shown, look, neon, reach: smooth(0.35, 2.2, awake),
+      sky: sky === null ? 0 : (turnOf(heading, sky) * Math.PI) / 180, heading,
       glow: glow * wake, curv, travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, cam: showing || buildingsFade > 0.01 ? cam : null,
       buildings: buildingsFade, rise: smooth(0, 1, buildingsRise) });
@@ -990,6 +1009,23 @@ void main() {
       measureStart = now;
     }
     requestAnimationFrame(frame);
+  }
+
+  function followSky(h, dt) {
+    const step = turnOf(h, heading);
+    heading = h;
+    // The first heading, or one that jumps rather than turns: the sun ahead.
+    if (sky === null || Math.abs(step) > 30) {
+      sky = h;
+      turning = 0;
+      return;
+    }
+    if (dt <= 0) return;
+    turning += (Math.abs(step) / dt - turning) * Math.min(1, dt / 0.5);
+    const off = turnOf(h, sky);
+    const out = smooth(40, 52, Math.abs(off));
+    const most = (3 * (1 - smooth(2, 6, turning)) * (1 - out) + 12 * out) * dt;
+    sky += clamp((off * dt) / (12 - 9 * out), -most, most);
   }
 
   // The light's colour for the page's styles: the progress line, the turn's

@@ -24,8 +24,10 @@ ein und lösen sich gegen 400 m im Dunst auf.
 Im Stil **Neon** wird daraus eine Retro-Neonstadt in der Dämmerung, unabhängig
 von der Farbe des Ambientelichts. Der Himmel geht von tiefem Violett über
 Magenta in einen rosa Dunst am Horizont über, mit Sternen, die beim Abbiegen an
-ihrem Platz am Himmel bleiben. Am Fluchtpunkt geht die Sonne unter, so tief,
-dass sie unter der Ankunftszeit bleibt. Die Häuser stehen deckend im Dunst und
+ihrem Platz am Himmel bleiben. Vorn geht die Sonne unter, so tief, dass sie
+unter der Ankunftszeit bleibt. In Kurven bleibt sie wie die Stadt an ihrem Platz
+in der Welt und wandert mit ihrer Spiegelung über das Bild; auf der Geraden
+kommt sie langsam wieder nach vorn. Die Häuser stehen deckend im Dunst und
 nehmen mit der Entfernung seine Farbe an. Manche tragen türkise Lichtbänder an
 jeder Etage, manche sind Türme voller warm erleuchteter Fenster, die übrigen
 dunkel, mit Dachkanten in Pink oder Türkis. Die Linien sind golden, die
