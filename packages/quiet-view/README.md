@@ -11,6 +11,9 @@ im Stand stehen sie.
 Die beiden Linien zeigen die Bahn, die das Auto beim gerade eingeschlagenen
 Lenkwinkel fahren würde, wie die Hilfslinien einer Rückfahrkamera: leicht
 gelenkt eine sanfte Kurve, voll eingeschlagen ein enger Bogen zur Seite. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
+Statt der feinen Linien kann die Bahn auch aussehen wie auf den Fotos des
+Originals: zwei breite, weiche Lichtbahnen auf dem Boden, durch deren Herz die
+Lichtstreifen als weiche Pulse laufen. Die nasse Straße spiegelt den Schein.
 Dahinter stehen schematisch die Gebäude rund um das Auto, aus OpenStreetMap:
 dunkles Glas mit weichen Lichtkanten in der Farbe des Scheins, das zum Boden
 hin im Dunst verschwimmt. Sie blenden ab 40 m ein und lösen sich gegen 400 m
@@ -21,8 +24,9 @@ nächste Abbiegung als Pfeil mit Entfernung („200 m“, darunter „rechts“)
 dem Horizont wie im Original die Ankunftszeit, darunter eine feine Linie mit
 einem Lichtpunkt für den Fortschritt der Route und Restzeit und Reststrecke.
 Was kommt und geht, blendet weich ein und aus; beim Öffnen erwacht das Bild aus
-dem Schwarz. Fest nach unten wischen schließt die App, lange drücken öffnet
-die Optionen.
+dem Schwarz und die Bahn wächst vom Auto zum Horizont. Eine neue Farbe, etwa
+beim nächsten Song, breitet sich als Welle vom Horizont her aus. Fest nach
+unten wischen schließt die App, lange drücken öffnet die Optionen.
 
 ## Angekommen
 
@@ -44,8 +48,10 @@ Zeitzone als die Anzeige im Auto.
 
 Pakete aus einem Repository bekommen in CoilShift keine Einstellungen. Ein
 langer Druck in der App öffnet deshalb ein Menü: Ankunftszeit und Fortschritt,
-Abbiegehinweise, Tacho, Lichtstreifen und Gebäude an oder aus, Helligkeit Auto,
-Hell oder Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf.
+Abbiegehinweise, Tacho, Lichtstreifen und Gebäude an oder aus, die Lichtbahn
+Fein oder Weich, Helligkeit Auto, Hell oder Gedämpft. Der Dienst hebt die Wahl
+in `CSDK_STATE/options.json` auf; was eine ältere Version dort ablegte, gilt
+weiter, Neues beginnt mit seinem Standard (Lichtbahn Fein).
 
 ## Gebäude
 
@@ -162,7 +168,14 @@ stehen ein filmisches Tonemapping und feines Rauschen, damit dunkle Verläufe
 keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder länger
 als etwa 26 ms, zeichnet die Seite weniger Pixel. Ohne WebGL steht ein
 schlichteres Canvas-Bild da. Farbe, Helligkeit, Bahn und Tempo gleiten weich
-in ihre neuen Werte. Die Gebäude zeichnet ein zweiter Durchgang aus derselben
+in ihre neuen Werte; eine neue Farbe, die weit von der alten liegt, wächst als
+Front vom Fluchtpunkt aus über 1,8 s, kleine Schritte wie beim Regenbogen
+gleiten einfach. In der weichen Lichtbahn ist jede Linie ein Band aus Licht auf
+dem Boden, 0,8 m breit (Standardabweichung) um ein 0,3 m schmales Herz; weil
+die Breite in Metern auf dem Boden gilt, verengt die Perspektive es von selbst.
+Die weichen Bahnen verblassen früher als die Linien, damit sich ihr Licht dort,
+wo die Straße nur noch wenige Pixel breit ist, nicht zu einem hellen Fleck
+staut. Die Gebäude zeichnet ein zweiter Durchgang aus derselben
 Kamera: Wände wie dunkles Glas, erst nur in die Tiefe, dann abgedunkelt, wo
 jeweils die vorderste steht, damit hintereinander stehende Häuser nicht doppelt
 dunkeln; Wände, die zur Kamera zeigen, etwas mehr als schräg gesehene, und zum

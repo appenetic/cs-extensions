@@ -24,8 +24,14 @@
   // path's curvature (1/m, right positive) and the streaks' pace (m/s).
   // travel is the distance the streaks have run, so a new pace never makes
   // them jump.
+  // The light's colour: rgb eases towards the car's (light); a new colour far
+  // from it washes in from the horizon instead, over 1.8 s, the old one
+  // (washFrom) still outside the front while wash runs from 0 to 1.
   let rgb = [255, 255, 255];
   let light = null;
+  let washFrom = rgb;
+  let wash = 1;
+  let painted = '';
   let glow = 1;
   let glowGoal = 1;
   let curv = 0;
@@ -37,16 +43,24 @@
   // 0 on the road, 1 arrived; it eases in over a few seconds.
   let arrive = 0;
   let arriveGoal = 0;
-  // 0 to 1 over the first 1.6 s with data: the picture wakes from black.
-  let wake = 0;
+  // Seconds since the first data: the picture wakes from black over 1.6 s and
+  // the path grows out from the car.
+  let awake = 0;
+  // 0 the fine lines, 1 the soft beams of the original; it crossfades.
+  let look = 0;
+  let lookGoal = 0;
   let state = null;
   let lastState = 0;
   let lastFrame = 0;
-  let options = { eta: true, speed: true, turns: true, pulses: true, bright: 'auto', buildings: true };
+  let options = { eta: true, speed: true, turns: true, pulses: true, bright: 'auto', buildings: true, look: 'fine' };
   let source = null;
   let polling = null;
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const smooth = (a, b, v) => {
+    const t = clamp((v - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
 
   function parseColor(hex) {
     const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
@@ -109,6 +123,8 @@
   // path shows for about 60 m and no further than it turns back. Streaks of
   // light 24 m apart run down it. Line widths come from screen derivatives
   // where the GPU has them, so a line keeps its width whichever way it runs.
+  // In the soft look, as in the original, each line is a broad band of light
+  // on the ground instead, swelling as the streaks would pass.
   const FRAGMENT = `
 #ifdef GL_OES_standard_derivatives
 #extension GL_OES_standard_derivatives : enable
@@ -116,6 +132,8 @@
 precision highp float;
 uniform vec2 uRes;
 uniform vec3 uColor;
+uniform vec3 uColorOld;
+uniform float uWave;
 uniform float uGlow;
 uniform float uCurv;
 uniform float uTravel;
@@ -125,6 +143,8 @@ uniform float uBreath;
 uniform float uSeed;
 uniform float uArrive;
 uniform float uTime;
+uniform float uLook;
+uniform float uReach;
 
 float grain(vec2 p) {
   p = fract(p * vec2(443.897, 441.423));
@@ -174,13 +194,18 @@ void main() {
   vec2 px = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
   float w = uRes.x;
   float h = uRes.y;
-  vec3 col = uColor * 0.012;
+  // A new colour washes in from the horizon: the new one inside a front that
+  // grows from the vanishing point, the old one still outside it.
+  float far = length((px - vec2(0.5 * w, 0.58 * h)) / w * vec2(1.0, 1.4));
+  float front = uWave * 0.95;
+  vec3 C = mix(uColorOld, uColor, 1.0 - smoothstep(front - 0.18, front, far));
+  vec3 col = C * 0.012;
   vec2 g = (px - vec2(0.5 * w, 0.30 * h)) / vec2(0.62 * w, 0.30 * h);
-  col += uColor * exp(-dot(g, g) * 1.8) * (0.40 + 0.07 * uBreath + 0.10 * uArrive);
+  col += C * exp(-dot(g, g) * 1.8) * (0.40 + 0.07 * uBreath + 0.10 * uArrive);
   float yH = 0.58 * h;
   float by = (px.y - yH) / (0.010 * h);
   float bx = (px.x - 0.5 * w) / (0.32 * w);
-  col += uColor * exp(-by * by) * exp(-bx * bx) * 0.12;
+  col += C * exp(-by * by) * exp(-bx * bx) * 0.12;
   float dy = px.y - yH;
   float f = 0.78 * w;
   float z = f * 1.25 / max(dy, 0.25);
@@ -206,7 +231,9 @@ void main() {
   float ma = perPixel(along, mpp);
   if (dy > 0.0) {
     float fog = exp(-z / 70.0);
-    float path = (1.0 - smoothstep(45.0, 75.0, along)) * turn;
+    // The path grows out from the car as the picture wakes.
+    float reach = 75.0 * uReach;
+    float path = (1.0 - smoothstep(reach - 30.0, reach, along)) * turn;
     // On arrival the path ends 26 m ahead, in a ring of light.
     float aEnd = mix(600.0, 26.0, uArrive);
     float ends = 1.0 - uArrive * smoothstep(aEnd - 8.0, aEnd + 1.0, along);
@@ -214,6 +241,14 @@ void main() {
     // a half and no sharper than 1.2 m.
     float head = clamp(1.5 * ma / 24.0, 0.05, 0.2);
     float fade = uStreaks * (1.0 - uArrive);
+    float fine = 1.0 - uLook;
+    // The soft beams fade sooner, as in the original, or their light would
+    // crowd into a bright spot where the road narrows to a few pixels.
+    float soft = uLook * exp(-z / 38.0) * (1.0 - smoothstep(30.0, 62.0, along)) * ends * path;
+    // A wet road mirrors the sky's glow: a soft column under it that rises
+    // from nothing at the horizon and fades towards the car.
+    float sx = (px.x - 0.5 * w) / (0.26 * w);
+    col += C * 0.06 * exp(-sx * sx) * smoothstep(0.0, 0.03 * h, dy) * exp(-dy / (0.18 * h));
     for (int i = 0; i < 2; i++) {
       float side = i == 0 ? -1.0 : 1.0;
       vec3 ln = lineAt(side * 1.75, max(dy, 0.25), x, z, lateral, rad, f);
@@ -236,14 +271,30 @@ void main() {
       float wide = exp(-dl * dl / 18.0);
       float core = exp(-d * d / (coreW * coreW)) * min(1.0, wpx / 1.1 + 0.2);
       float blink = i == 0 ? uBlink.x : uBlink.y;
-      float gain = (1.0 + 1.5 * blink) * fog * ends * path;
-      vec3 hot = mix(uColor, vec3(1.0), 0.55 + 0.25 * blink);
+      float gain = (1.0 + 1.5 * blink) * fog * ends * path * fine;
+      vec3 hot = mix(C, vec3(1.0), 0.55 + 0.25 * blink);
       // The streak lights the line and its near halo; the wide halo stays
       // even, or the streak's edge would draw a line across the screen.
       col += hot * core * (0.34 + 1.3 * streak) * gain * close;
-      col += uColor * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * glint) * gain * close;
-      col += uColor * exp(-d / (0.045 * w)) * 0.034 * gain * wide;
+      col += C * exp(-d / (0.008 * w)) * 0.30 * (0.34 + 0.9 * glint) * gain * close;
+      col += C * exp(-d / (0.045 * w)) * 0.034 * gain * wide;
+      // The soft look, as in the original: a broad band of light on the
+      // ground about the line, its width in metres, so the perspective
+      // narrows it, round a brighter heart. The streaks run down the heart
+      // as long, soft pulses, so they do not light a bar across the road;
+      // where they come closer together than the pixels can show, only
+      // their mean remains.
+      float sb = dl / 0.8;
+      float sc = dl / 0.3;
+      float ps = fract((along + uTravel) / 24.0);
+      float pulse = fade * mix(0.3, smoothstep(0.0, 0.15, ps) * (1.0 - smoothstep(0.15, 0.65, ps)),
+        smoothstep(6.0, 20.0, 24.0 / ma));
+      float beam = 0.55 * exp(-0.5 * sb * sb) + exp(-0.5 * sc * sc) * (0.3 + 0.7 * pulse);
+      col += mix(C, vec3(1.0), 0.06 + 0.12 * blink) * beam * (1.0 + 0.9 * blink) * soft;
     }
+    // Between the beams the road holds a little of their light.
+    float mid = lateral / 1.6;
+    col += C * 0.035 * exp(-mid * mid * mid * mid) * soft;
     if (uArrive > 0.0) {
       // The ring lies on the path, breathing slowly; a wave of light leaves it
       // every 3.2 s, and a pool of light fills it.
@@ -262,10 +313,10 @@ void main() {
       float wave = exp(-wv * wv) * exp(-front * front / 2.0) * (1.0 - phase) * (1.0 - phase) * 0.5;
       float pr = len / r;
       float pool = exp(-pr * pr * 1.4) * 0.10;
-      vec3 hot = mix(uColor, vec3(1.0), 0.6);
+      vec3 hot = mix(C, vec3(1.0), 0.6);
       // The haze at the pixel's own distance, and nothing far beyond the ring.
       float near = fog * (1.0 - smoothstep(aEnd + 6.0, aEnd + 30.0, along));
-      col += (hot * ring + uColor * (halo + wave + pool)) * uArrive * near;
+      col += (hot * ring + C * (halo + wave + pool)) * uArrive * near;
     }
   }
   vec2 q = px / uRes - 0.5;
@@ -455,7 +506,8 @@ void main() {
       return { pr, u };
     };
     const road = link('attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }', FRAGMENT, ['p'],
-      ['uRes', 'uColor', 'uGlow', 'uCurv', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed', 'uArrive', 'uTime']);
+      ['uRes', 'uColor', 'uColorOld', 'uWave', 'uGlow', 'uCurv', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed',
+        'uArrive', 'uTime', 'uLook', 'uReach']);
     if (!road) return null;
     const u = road.u;
     const quad = gl.createBuffer();
@@ -515,6 +567,10 @@ void main() {
         gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
         gl.uniform2f(u.uRes, canvas.width, canvas.height);
         gl.uniform3f(u.uColor, p.rgb[0] / 255, p.rgb[1] / 255, p.rgb[2] / 255);
+        gl.uniform3f(u.uColorOld, p.old[0] / 255, p.old[1] / 255, p.old[2] / 255);
+        gl.uniform1f(u.uWave, p.wave);
+        gl.uniform1f(u.uLook, p.look);
+        gl.uniform1f(u.uReach, p.reach);
         gl.uniform1f(u.uGlow, p.glow);
         gl.uniform1f(u.uCurv, p.curv);
         gl.uniform1f(u.uTravel, p.travel % 2400);
@@ -533,7 +589,7 @@ void main() {
         // The walls, set back a little so their own edges still show: first
         // their depth alone, then their shade where each is the nearest.
         use(walls, wallsGL, p, r);
-        gl.uniform3f(wallsGL.u.uLight, p.rgb[0] / 255, p.rgb[1] / 255, p.rgb[2] / 255);
+        gl.uniform3f(wallsGL.u.uLight, p.shown[0] / 255, p.shown[1] / 255, p.shown[2] / 255);
         gl.uniform1f(wallsGL.u.uShade, 0.42);
         gl.enable(gl.POLYGON_OFFSET_FILL);
         gl.polygonOffset(1, 2);
@@ -548,7 +604,7 @@ void main() {
         // The edges add light.
         if (edges) {
           use(edges, edgesGL, p, r);
-          const hot = p.rgb.map((c) => (c + (255 - c) * 0.35) / 255);
+          const hot = p.shown.map((c) => (c + (255 - c) * 0.35) / 255);
           gl.uniform4f(edgesGL.u.uTint, hot[0], hot[1], hot[2], 0.5 * Math.min(1.2, p.glow));
           gl.uniform1f(edgesGL.u.uWidth, 3);
           gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
@@ -668,13 +724,19 @@ void main() {
     pace = Math.abs(paceTo - pace) <= paceStep ? paceTo : pace + Math.sign(paceTo - pace) * paceStep;
     travel += dt * pace;
     arrive += (arriveGoal - arrive) * Math.min(1, dt / 2.2);
-    if (state) wake = Math.min(1, wake + dt / 1.6);
+    if (state) awake = Math.min(awake + dt, 60);
+    const wake = smooth(0, 1.6, awake);
+    look = Math.abs(lookGoal - look) < 0.002 ? lookGoal : look + (lookGoal - look) * Math.min(1, dt / 0.7);
     // Colour and brightness fade over like the lights do.
+    wash = Math.min(1, wash + dt / 1.8);
     if (light && light.join() !== rgb.join()) {
       const k = Math.min(1, dt / 0.6);
       rgb = rgb.map((v, i) => (Math.abs(light[i] - v) < 1 ? light[i] : v + (light[i] - v) * k));
-      paintStyles();
     }
+    if (wash >= 1) washFrom = rgb;
+    const washed = smooth(0, 1, wash);
+    const shown = rgb.map((v, i) => washFrom[i] + (v - washFrom[i]) * washed);
+    if (shown.map(Math.round).join() !== painted) paintStyles(shown);
     glow = Math.abs(glowGoal - glow) < 0.004 ? glowGoal : glow + (glowGoal - glow) * Math.min(1, dt / 0.8);
     let left = 0;
     let right = 0;
@@ -691,7 +753,8 @@ void main() {
       creditShown = !creditShown;
       $('credit').hidden = !creditShown;
     }
-    picture.draw({ rgb, glow: glow * wake * wake * (3 - 2 * wake), curv, travel, streaks: options.pulses, left, right, arrive,
+    picture.draw({ rgb, old: washFrom, wave: washed, shown, look, reach: smooth(0.35, 2.2, awake), glow: glow * wake, curv,
+      travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, cam: showing || buildingsFade > 0.01 ? cam : null,
       buildings: buildingsFade });
     if (++measured === 90) {
@@ -707,8 +770,9 @@ void main() {
 
   // The light's colour for the page's styles: the progress line, the turn's
   // arrow, the menu's switches, whose knob turns dark on a pale light.
-  function paintStyles() {
-    const c = rgb.map(Math.round);
+  function paintStyles(shown) {
+    const c = shown.map(Math.round);
+    painted = c.join();
     const s = document.documentElement.style;
     s.setProperty('--light', `rgb(${c.join(',')})`);
     s.setProperty('--light-rgb', c.join(' '));
@@ -825,12 +889,12 @@ void main() {
     const done = v.arrived && typeof v.arrived === 'object' ? v.arrived : null;
     const block = $('arrivedBlock');
     if (done && block.hidden) {
-      // The summary rises in each time it appears.
+      // The summary rises in each time it appears, and fades when it goes.
       block.classList.remove('rise');
       void block.offsetWidth;
       block.classList.add('rise');
     }
-    block.hidden = !done;
+    reveal(block, done);
     if (done) {
       const what = done.dist && done.min ? `${done.dist} in ${done.min} min` : done.min ? `${done.min} min` : '';
       $('arrivedSum').textContent = [what, done.time].filter(Boolean).join(' · ');
@@ -860,7 +924,9 @@ void main() {
 
   function applyOptions(o) {
     options = { eta: !!o.eta, speed: !!o.speed, turns: !!o.turns, pulses: !!o.pulses,
-      bright: o.bright in BRIGHT ? o.bright : 'auto', buildings: o.buildings !== false };
+      bright: o.bright in BRIGHT ? o.bright : 'auto', buildings: o.buildings !== false,
+      look: o.look === 'soft' ? 'soft' : 'fine' };
+    lookGoal = options.look === 'soft' ? 1 : 0;
     if (state) {
       glowGoal = glowFor(state);
       target = targetFor(state);
@@ -875,6 +941,13 @@ void main() {
     lastState = performance.now();
     const c = parseColor(v.color);
     const first = c && !light;
+    // A new colour far from the one shown washes in from the horizon; while
+    // one washes in, or for small steps, it eases.
+    if (c && light && wash >= 1 && Math.hypot(c[0] - rgb[0], c[1] - rgb[1], c[2] - rgb[2]) > 90) {
+      washFrom = rgb;
+      rgb = c;
+      wash = 0;
+    }
     if (c) light = c;
     paceGoal = paceFor(v.kmh);
     arriveGoal = v.arrived ? 1 : 0;
@@ -887,10 +960,12 @@ void main() {
     // A choice still on its way to the service is not undone by an older view.
     applyOptions(v.options && !pending ? v.options : options);
     if (first) {
-      // The first colour and brightness are there at once, as the picture wakes.
-      rgb = c;
+      // The first colour, brightness and look are there at once, as the
+      // picture wakes.
+      rgb = washFrom = c;
       glow = glowGoal;
-      paintStyles();
+      look = lookGoal;
+      paintStyles(c);
     }
   }
 
@@ -1019,6 +1094,7 @@ void main() {
   function renderMenu() {
     for (const b of menu.querySelectorAll('[data-option]')) b.setAttribute('aria-pressed', String(!!options[b.dataset.option]));
     for (const b of menu.querySelectorAll('[data-bright]')) b.setAttribute('aria-pressed', String(options.bright === b.dataset.bright));
+    for (const b of menu.querySelectorAll('[data-look]')) b.setAttribute('aria-pressed', String(options.look === b.dataset.look));
   }
 
   function openMenu() {
@@ -1036,7 +1112,7 @@ void main() {
         method: 'POST',
         headers: { 'X-Quiet': '1', 'Content-Type': 'application/json' },
         body: JSON.stringify({ eta: options.eta, speed: options.speed, turns: options.turns, pulses: options.pulses,
-          bright: options.bright, buildings: options.buildings }),
+          bright: options.bright, buildings: options.buildings, look: options.look }),
       });
       if (!res.ok) throw new Error(String(res.status));
     } catch {
@@ -1057,8 +1133,10 @@ void main() {
     }
     const option = e.target.closest('[data-option]');
     const bright = e.target.closest('[data-bright]');
+    const lookChoice = e.target.closest('[data-look]');
     if (option) choose({ ...options, [option.dataset.option]: !options[option.dataset.option] });
     else if (bright) choose({ ...options, bright: bright.dataset.bright });
+    else if (lookChoice) choose({ ...options, look: lookChoice.dataset.look });
     else if (e.target.closest('#done') || e.target === menu) menu.hidden = true;
   });
 

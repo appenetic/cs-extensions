@@ -293,6 +293,32 @@ zählt dafür je Zeile die neuen Kurse und Positionen seit der vorigen.
 Am Mac mit den Schriften des Autos gerendert; auf dem Bildschirm im Auto noch
 nicht gesehen.
 
+## Lichtbahn wie im Original (alpha.19)
+
+Die Fotos des Originals zeigen keine feinen Linien, sondern zwei breite, weiche
+Lichtbahnen auf dem Boden mit dunkler Mitte. Das gibt es jetzt als Wahl
+„Lichtbahn: Weich“ im Menü; Standard bleibt „Fein“, das bisher abgestimmte
+Bild. Erster Versuch: die Lichtstreifen als Kosinus-Schwellen über die ganze
+Breite der Bahn. Das zog helle Querbänder über beide Bahnen, und am fernen Ende
+sahen sie aus wie Scheinwerfer. Jetzt laufen die Pulse nur durch das Herz jeder
+Bahn, und die weichen Bahnen verblassen ab 30 m, statt sich am Horizont auf
+wenige Pixel zu drängen. Am Mac gerendert bei mehreren Wegstellungen, bei
+−40° und +25° Lenkwinkel, mit Blinker und bei der Ankunft.
+
+Dazu: Eine neue Farbe weit weg von der alten (Abstand über 90 in RGB, etwa
+Orange zu Blau beim nächsten Song) breitet sich über 1,8 s als Front vom
+Fluchtpunkt aus; kleine Schritte und Wechsel während einer Welle gleiten wie
+bisher, damit ein Regenbogen nicht flackert. Beim Öffnen wächst die Bahn vom
+Auto zum Horizont. Die nasse Straße spiegelt den Schein als weiche Säule unter
+dem Horizont, die dort aus dem Nichts beginnt, damit keine Kante entsteht.
+
+Bewusst nicht gebaut: schwebende Lichtpunkte in der Luft. Sie würden im
+Augenwinkel unruhig wirken, und die Ansicht soll ruhig bleiben.
+
+Der Dienst nimmt die neue Wahl `look` (`fine` oder `soft`) an. Eine
+`options.json` einer älteren Version lädt weiter; fehlende Wahlen bekommen ihren
+Standard.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
@@ -301,7 +327,8 @@ nicht gesehen.
    Uhrzeigersinn angenommen), und sich beim Fahren ruhig mitbewegen; wie oft
    Kurs und Position sich ändern (`turns.log`). Dass sie ankommen, ist mit
    alpha.17 geprüft (480 Umrisse im Stand).
-3. Wie Schrift und Layout von alpha.18 auf dem Bildschirm im Auto wirken.
+3. Wie Schrift und Layout von alpha.18 und die weiche Lichtbahn von alpha.19
+   auf dem Bildschirm im Auto wirken, auch in der Bildrate.
 4. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
 5. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
