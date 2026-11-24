@@ -482,6 +482,30 @@ auch Tiefe, damit Häuser dahinter nicht durchscheinen.
 Geprüft bei 0:39 mit vorgelaufenem Himmel: Die Sonne steht ganz hinter den
 Häusern, der ferne Turm ist eine dunstige Silhouette.
 
+## Häuser im Stand (alpha.26)
+
+Im Auto, in P: „Die Gebäude werden nur kurz angezeigt und verschwinden dann
+wieder.“ Der Dienst las die Position zweimal pro Sekunde, nahm sie aber nur,
+wenn sie sich geändert hatte. Im Stand änderte sie sich nur, wenn das GPS
+zufällig rauschte. Nach 5 s ohne Änderung galt die Position als alt: Die Ansicht
+bekam keine Pose mehr, nach 10 s meldete die Auswahl „nofix“.
+
+Die Seite verlor jedes Mal die Kamera, die Häuser sanken in den Boden und
+wuchsen mit der nächsten Änderung wieder heraus. 15 s des Ereignisstroms im
+stehenden Auto (alpha.25, App offen) zeigten genau das: Die Pose kam und ging,
+die Auswahl sprang zwischen „ok“ und „nofix“. An jeder roten Ampel über 5 s wäre
+es genauso gewesen.
+
+Jetzt hält der Dienst die Position frisch, wenn das Auto beim Lesen dieselbe
+Position meldet und steht (Anzeige unter 2 oder keine Geschwindigkeit). Beim
+Fahren altert dieselbe Antwort weiter: Ein Tunnel ohne GPS soll die Stadt nicht
+mitfahren lassen.
+
+Auch die Seite behält ihre letzte Position, wenn die Pose fehlt, solange das
+Auto steht. Ein Test im Dienst prüft beides, über drei Mal 6 s im Stand und
+einmal beim Fahren. Ohne die Korrektur schlägt er fehl, mit dem Race-Detector
+läuft er sauber.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn

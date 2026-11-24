@@ -1248,6 +1248,8 @@ void main() {
   // Where the car is, for the buildings: its last fix in the service's frame
   // and its heading, carried on between fixes by the speed and by how fast the
   // heading turned lately, and eased over about 0.35 s, so a fix never jumps.
+  // A view without a fix keeps the last one while the car stands; moving, the
+  // city would drive along with it.
   let fix = null;
   let cam = null;
   let hasBuildings = false;
@@ -1262,7 +1264,7 @@ void main() {
 
   function takeFix(p) {
     if (!p || typeof p.x !== 'number' || typeof p.y !== 'number' || typeof p.h !== 'number') {
-      fix = null;
+      if ((Number.parseFloat(state && state.kmh) || 0) >= 2) fix = null;
       return;
     }
     const now = performance.now();
