@@ -336,7 +336,11 @@ void main() {
   // in the light's colour, warmer. Where the windows come closer together
   // than the pixels can show, only their faint mean remains, so nothing
   // shimmers. Their roof edges are fine lines of the light, the corners
-  // fainter, drawn as narrow bands that stay smooth at any angle. All fade in
+  // fainter, drawn on the nearest wall's own pixels: nothing behind shows
+  // through, and two walls' lines meet at their corner without overlapping.
+  // Each wall fades out over its last pixel at the top and the foot, so the
+  // outlines stay smooth at any angle without the GPU's antialiasing, which
+  // would cost every pixel of the road too. All fade in
   // from 40 m, so those beside the car stay out of the way, thin out into the
   // haze and are gone before the edge of what the service picked (450 m around
   // the car, picked again every 60 m); when they first appear, they grow out
@@ -374,34 +378,45 @@ float seen(float d) {
 
   // aWall is the wall's run on the ground; aFace its metres along from its
   // start, a whole number of its own (0 to 96) for its windows, and its
-  // building's height.
+  // building's height; aEnds 1 for each end of it that is a corner.
   const WALL_VERTEX = BUILDING_CAMERA + `
 attribute vec4 aPos;
 attribute vec2 aWall;
 attribute vec3 aFace;
+attribute vec2 aEnds;
 uniform float uRise;
 varying vec2 vRel;
 varying vec2 vNormal;
 varying float vHeight;
+varying float vUp;
 varying vec3 vFace;
 varying float vLength;
+varying vec2 vEnds;
 void main() {
   gl_Position = project(vec3(aPos.xy, aPos.z * uRise));
   vRel = aPos.xy - uCam;
   vNormal = vec2(aWall.y, -aWall.x) / max(length(aWall), 0.001);
   vHeight = aPos.z;
+  vUp = aPos.w;
   vFace = aFace;
   vLength = length(aWall);
+  vEnds = aEnds;
 }`;
 
   const WALL_FRAGMENT = BUILDING_SEEN + `
 uniform vec3 uLight;
 uniform float uShade;
+// The lines' colour, and their strength.
+uniform vec4 uEdge;
+// 1 while only the walls' depth is drawn.
+uniform float uDepth;
 varying vec2 vRel;
 varying vec2 vNormal;
 varying float vHeight;
+varying float vUp;
 varying vec3 vFace;
 varying float vLength;
+varying vec2 vEnds;
 // A number from 0 to 1 for whole numbers, the same for the same ones.
 float hash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -415,6 +430,21 @@ void main() {
   float a = uShade * fog * (0.8 + 0.2 * face) * mix(0.35, 1.0, smoothstep(0.0, 10.0, vHeight));
   // A wall too faint to see hides nothing either.
   if (a < 0.004) discard;
+#ifdef GL_OES_standard_derivatives
+  // The wall's height on the screen, and a metre along it, in pixels.
+  float tall = 1.0 / max(length(vec2(dFdx(vUp), dFdy(vUp))), 1e-5);
+  float metre = 1.0 / max(length(vec2(dFdx(vFace.x), dFdy(vFace.x))), 1e-5);
+#else
+  // Without screen derivatives: hard outlines and no lines.
+  float tall = 1e5;
+  float metre = 0.0;
+#endif
+  // How many pixels this one lies below the wall's top; over the last one,
+  // and over the first above its foot, the wall fades out.
+  float top = (1.0 - vUp) * tall;
+  float cover = clamp(top, 0.0, 1.0) * clamp(vUp * tall, 0.0, 1.0);
+  // Only a pixel mostly covered hides what lies behind it.
+  if (uDepth > 0.5 && cover < 0.5) discard;
   // The windows, centred on the wall, above the ground floor and below the
   // parapet of a building over 6 m.
   float cells = floor(vLength / 2.6);
@@ -443,71 +473,28 @@ void main() {
   // those that face the road.
   float foot = exp(-vHeight / 4.0) * (0.4 + 0.6 * face);
   vec3 glow = room * windows * 0.6 + uLight * foot * 0.06;
+  // The roof edge, a line along the wall's top pixels, and the corners, half
+  // on each wall that meets there and fainter towards the ground. On a wall
+  // only a few pixels high or wide they would fill it, so they leave it.
+  float roof = exp(-(top - 0.6) * (top - 0.6) / 0.7) * smoothstep(2.5, 6.0, tall);
+  float start = vFace.x * metre;
+  float end = (vLength - vFace.x) * metre;
+  float corner = max(vEnds.x * exp(-start * start / 0.7), vEnds.y * exp(-end * end / 0.7))
+    * mix(0.2, 1.0, vUp) * smoothstep(3.0, 8.0, vLength * metre);
+  vec3 edge = uEdge.rgb * uEdge.a * fog * max(1.1 * roof, 0.3 * corner);
   // Dark glass, tinted by the light, and what shines from it, premultiplied.
-  gl_FragColor = vec4(uLight * 0.025 * a + glow * fog, a);
+  gl_FragColor = vec4(uLight * 0.025 * a + glow * fog + edge, a) * cover;
 }`;
 
-  const EDGE_VERTEX = BUILDING_CAMERA + `
-attribute vec4 aPos;
-attribute vec4 aOther;
-attribute float aSide;
-uniform float uWidth;
-uniform float uRise;
-varying vec2 vRel;
-varying float vUp;
-varying float vAcross;
-void main() {
-  vec4 a = project(vec3(aPos.xy, aPos.z * uRise));
-  vec4 b = project(vec3(aOther.xy, aOther.z * uRise));
-  // An end behind the near plane moves along the edge onto it.
-  float t = a.w < 5.0 ? (5.0 - a.w) / (b.w - a.w) : 0.0;
-  if (a.w < 5.0 && b.w < 5.0) {
-    gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
-    return;
-  }
-  a = mix(a, b, t);
-  vec4 p = mix(aPos, aOther, t);
-  if (b.w < 5.0) b = mix(b, a, (5.0 - b.w) / (a.w - b.w));
-  // Across the edge on the screen, a few pixels to this corner's side.
-  vec2 along = (b.xy / b.w - a.xy / a.w) * uView.yz;
-  along = length(along) > 1e-4 ? normalize(along) : vec2(1.0, 0.0);
-  vec2 off = vec2(-along.y, along.x) * aSide * uWidth * 2.0 / uView.yz;
-  gl_Position = vec4(a.xy + off * a.w, a.z, a.w);
-  vRel = p.xy - uCam;
-  vUp = p.w;
-  vAcross = aSide * uWidth;
-}`;
-
-  const EDGE_FRAGMENT = BUILDING_SEEN + `
-uniform vec4 uTint;
-varying vec2 vRel;
-varying float vUp;
-varying float vAcross;
-void main() {
-  // A core about a pixel and a half wide in a faint glow of its own.
-  float line = exp(-vAcross * vAcross / 0.8) + 0.18 * exp(-abs(vAcross) / 1.2);
-  float a = uTint.a * seen(length(vRel)) * line * mix(0.2, 1.0, vUp);
-  if (a < 0.003) discard;
-  gl_FragColor = vec4(uTint.rgb, a);
-}`;
-
-  // The service's lines as walls, roof edges and corners: per line its
-  // height, its base, 1 when closed, then its points. Corners are where an
-  // outline turns by more than 25°; an open line's ends lie on a tile's border
-  // and are none. A wall vertex carries its point, the wall's direction on the
-  // ground and its face (metres along, a number from where it starts, the
-  // height); an edge is a band of two triangles whose corners carry both ends
-  // and their side.
+  // The service's lines as walls: per line its height, its base, 1 when
+  // closed, then its points. A wall vertex carries its point and how far up
+  // the wall it lies, the wall's direction on the ground, its face (metres
+  // along, a number from where it starts, the height) and its corners: those
+  // of its ends where the outline turns by more than 25°. An open line's ends
+  // lie on a tile's border and are none.
   function buildingGeometry(lines) {
     const walls = [];
-    const edges = [];
-    const corners = [];
     const bend = Math.cos((25 * Math.PI) / 180);
-    const edge = (to, a, b) => {
-      for (const [end, side] of [[0, -1], [0, 1], [1, 1], [0, -1], [1, 1], [1, -1]]) {
-        to.push(...(end ? b : a), ...(end ? a : b), end ? -side : side);
-      }
-    };
     const seed = (px, py) => {
       const v = Math.sin(px * 12.9898 + py * 78.233) * 43758.5453;
       return Math.floor((v - Math.floor(v)) * 97);
@@ -519,6 +506,17 @@ void main() {
       const n = (row.length - 3) / 2;
       const x = (i) => row[3 + 2 * i];
       const y = (i) => row[4 + 2 * i];
+      const corner = [];
+      for (let i = 0; i < n; i++) {
+        const p = (i + n - 1) % n;
+        const q = (i + 1) % n;
+        const ux = x(i) - x(p);
+        const uy = y(i) - y(p);
+        const vx = x(q) - x(i);
+        const vy = y(q) - y(i);
+        const turns = (ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1) < bend;
+        corner.push(turns && (closed || (i > 0 && i < n - 1)) ? 1 : 0);
+      }
       for (let i = 0; i < (closed ? n : n - 1); i++) {
         const j = (i + 1) % n;
         const dx = x(j) - x(i);
@@ -526,23 +524,11 @@ void main() {
         const len = Math.hypot(dx, dy);
         const own = seed(x(i), y(i));
         for (const [k, up] of [[i, 0], [j, 0], [j, 1], [i, 0], [j, 1], [i, 1]]) {
-          walls.push(x(k), y(k), up ? top : base, up, dx, dy, k === i ? 0 : len, own, top);
-        }
-        edge(edges, [x(i), y(i), top, 1], [x(j), y(j), top, 1]);
-      }
-      for (let i = closed ? 0 : 1; i < (closed ? n : n - 1); i++) {
-        const p = (i + n - 1) % n;
-        const q = (i + 1) % n;
-        const ux = x(i) - x(p);
-        const uy = y(i) - y(p);
-        const vx = x(q) - x(i);
-        const vy = y(q) - y(i);
-        if ((ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1) < bend) {
-          edge(corners, [x(i), y(i), base, 0], [x(i), y(i), top, 1]);
+          walls.push(x(k), y(k), up ? top : base, up, dx, dy, k === i ? 0 : len, own, top, corner[i], corner[j]);
         }
       }
     }
-    return { walls: new Float32Array(walls), edges: new Float32Array(edges), corners: new Float32Array(corners) };
+    return new Float32Array(walls);
   }
 
   function webglPicture(canvas) {
@@ -584,11 +570,9 @@ void main() {
     gl.enableVertexAttribArray(0);
     // The buildings: without their shaders the picture goes on without them.
     const camera = ['uCam', 'uDir', 'uView', 'uFade'];
-    const wallsGL = link(WALL_VERTEX, WALL_FRAGMENT, ['aPos', 'aWall', 'aFace'], [...camera, 'uRise', 'uLight', 'uShade']);
-    const edgesGL = link(EDGE_VERTEX, EDGE_FRAGMENT, ['aPos', 'aOther', 'aSide'], [...camera, 'uRise', 'uTint', 'uWidth']);
+    const wallsGL = link(WALL_VERTEX, WALL_FRAGMENT, ['aPos', 'aWall', 'aFace', 'aEnds'],
+      [...camera, 'uRise', 'uLight', 'uShade', 'uEdge', 'uDepth']);
     let walls = null;
-    let edges = null;
-    let corners = null;
     // A buffer of vertices with their attributes' sizes, interleaved.
     const upload = (data, sizes) => {
       const stride = sizes.reduce((a, b) => a + b, 0);
@@ -623,13 +607,10 @@ void main() {
       },
       // Lines from the service, or null for none; true when there are some.
       setBuildings(lines) {
-        for (const x of [walls, edges, corners]) if (x) gl.deleteBuffer(x.b);
-        walls = edges = corners = null;
-        if (!wallsGL || !edgesGL || !lines) return false;
-        const g = buildingGeometry(lines);
-        walls = upload(g.walls, [4, 2, 3]);
-        edges = upload(g.edges, [4, 4, 1]);
-        corners = upload(g.corners, [4, 4, 1]);
+        if (walls) gl.deleteBuffer(walls.b);
+        walls = null;
+        if (!wallsGL || !lines) return false;
+        walls = upload(buildingGeometry(lines), [4, 2, 3, 2]);
         return !!walls;
       },
       draw(p) {
@@ -657,36 +638,26 @@ void main() {
         gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
-        // The walls, set back a little so their own edges still show: first
-        // their depth alone, then their shade where each is the nearest.
+        // The walls: first their depth alone, then their shade where each is
+        // the nearest, with their lines in a colour nearer white.
         use(walls, wallsGL, p, r);
+        const hot = p.shown.map((c) => (c + (255 - c) * 0.35) / 255);
         gl.uniform3f(wallsGL.u.uLight, p.shown[0] / 255, p.shown[1] / 255, p.shown[2] / 255);
         gl.uniform1f(wallsGL.u.uShade, 0.7);
-        gl.enable(gl.POLYGON_OFFSET_FILL);
-        gl.polygonOffset(1, 2);
+        gl.uniform4f(wallsGL.u.uEdge, hot[0], hot[1], hot[2], Math.min(1.2, p.glow));
+        gl.uniform1f(wallsGL.u.uDepth, 1);
         gl.colorMask(false, false, false, false);
         gl.drawArrays(gl.TRIANGLES, 0, walls.n);
         gl.colorMask(true, true, true, true);
+        gl.uniform1f(wallsGL.u.uDepth, 0);
         gl.depthMask(false);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         gl.drawArrays(gl.TRIANGLES, 0, walls.n);
-        gl.disable(gl.POLYGON_OFFSET_FILL);
-        // The roof edges add light, the corners less.
-        const hot = p.shown.map((c) => (c + (255 - c) * 0.35) / 255);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-        for (const [x, strength] of [[edges, 0.55], [corners, 0.18]]) {
-          if (!x) continue;
-          use(x, edgesGL, p, r);
-          gl.uniform4f(edgesGL.u.uTint, hot[0], hot[1], hot[2], strength * Math.min(1.2, p.glow));
-          gl.uniform1f(edgesGL.u.uWidth, 3);
-          gl.drawArrays(gl.TRIANGLES, 0, x.n);
-        }
         gl.depthMask(true);
         gl.disable(gl.BLEND);
         gl.disable(gl.DEPTH_TEST);
-        gl.disableVertexAttribArray(1);
-        gl.disableVertexAttribArray(2);
+        for (let i = 1; i < walls.sizes.length; i++) gl.disableVertexAttribArray(i);
       },
     };
   }

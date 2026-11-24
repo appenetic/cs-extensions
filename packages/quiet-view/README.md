@@ -17,7 +17,8 @@ Lichtstreifen als weiche Pulse laufen. Die nasse Straße spiegelt den Schein.
 Dahinter steht die Stadt rund um das Auto, aus OpenStreetMap, wie bei Nacht:
 dunkle Silhouetten vor dem Schein, mit Etagen und Fenstern, von denen etwa jedes
 sechste in der Farbe des Lichts leuchtet, am Fuß vom Licht der Straße
-angestrahlt. Beim Öffnen wachsen die Häuser aus dem Boden. Sie blenden ab 40 m
+angestrahlt, mit feinen, glatten Lichtlinien an Dachkanten und Ecken. Beim
+Öffnen wachsen die Häuser aus dem Boden. Sie blenden ab 40 m
 ein und lösen sich gegen 400 m im Dunst auf.
 
 Ruhig darüber, in Teslas eigener Schrift: oben links der Tacho und daneben die

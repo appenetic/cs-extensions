@@ -167,28 +167,35 @@ class QuietViewFiles(unittest.TestCase):
     def test_shaders_compile(self):
         # A shader the GPU refuses leaves its part out of the picture without a
         # word (a variable named `out` once took the buildings away), so each
-        # one is compiled here, as WebGL with the derivatives extension does.
+        # one is compiled here, and the walls' pair linked, as WebGL does with
+        # the derivatives extension and without it.
         js = (PACKAGE / 'web/app.js').read_text()
-        names = ['FRAGMENT', 'BUILDING_CAMERA', 'BUILDING_SEEN', 'WALL_VERTEX', 'WALL_FRAGMENT', 'EDGE_VERTEX',
-                 'EDGE_FRAGMENT']
+        names = ['FRAGMENT', 'BUILDING_CAMERA', 'BUILDING_SEEN', 'WALL_VERTEX', 'WALL_FRAGMENT']
         consts = ''
         for name in names:
             m = re.search(r'const ' + name + r' = (.*?`);\n', js, re.S)
             self.assertIsNotNone(m, name)
             self.assertNotIn('${', m.group(1), name)
             consts += f'const {name} = {m.group(1)};\n'
-        page = '''<!doctype html><canvas id=c></canvas><script>
+        page = '''<!doctype html><script>
 %s
-const gl = document.getElementById('c').getContext('webgl');
-gl.getExtension('OES_standard_derivatives');
 const failed = [];
-for (const [name, type, text] of [['road', gl.FRAGMENT_SHADER, FRAGMENT], ['walls', gl.VERTEX_SHADER, WALL_VERTEX],
-    ['walls', gl.FRAGMENT_SHADER, WALL_FRAGMENT], ['edges', gl.VERTEX_SHADER, EDGE_VERTEX],
-    ['edges', gl.FRAGMENT_SHADER, EDGE_FRAGMENT]]) {
-  const s = gl.createShader(type);
-  gl.shaderSource(s, text);
-  gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) failed.push(name + ': ' + gl.getShaderInfoLog(s));
+for (const derivatives of [true, false]) {
+  const gl = document.createElement('canvas').getContext('webgl');
+  if (derivatives && !gl.getExtension('OES_standard_derivatives')) failed.push('no derivatives');
+  const compile = (name, type, text) => {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, text);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) failed.push(name + ': ' + gl.getShaderInfoLog(s));
+    return s;
+  };
+  compile('road', gl.FRAGMENT_SHADER, FRAGMENT);
+  const pr = gl.createProgram();
+  gl.attachShader(pr, compile('walls', gl.VERTEX_SHADER, WALL_VERTEX));
+  gl.attachShader(pr, compile('walls', gl.FRAGMENT_SHADER, WALL_FRAGMENT));
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) failed.push('walls: ' + gl.getProgramInfoLog(pr));
 }
 document.title = failed.length ? 'FAILED ' + failed.join(' / ') : 'compiled';
 </script>''' % consts

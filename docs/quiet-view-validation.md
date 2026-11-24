@@ -352,6 +352,40 @@ Jetzt werden die ersten 90 Bilder nach dem Start und nach jeder Pause über
 0,5 s nicht bewertet. alpha.20 lief seit 05:02 UTC am 24.11. im Auto,
 installiert in P, die Seite war bis dahin nicht geöffnet.
 
+## Saubere Kanten (alpha.22)
+
+„Die Kanten von den Gebäuden sehen noch etwas kaputt aus“ (Bildschirmfoto aus
+der Demo). Dachkanten und Ecken waren eigene Lichtbänder: jedes Kantenstück auf
+dem Bildschirm 3 Pixel zu jeder Seite verbreitert und gegen die Wände nur über
+die Tiefe geprüft. Daher kamen drei Fehler:
+
+- Die Bänder verdeckter Kanten, auch die der Rückseiten, ragten bis zu 3 Pixel
+  über die Silhouette davor: kurze schräge Striche über den Dächern, doppelte
+  Linien.
+- An jeder Ecke überlappten sich die Bänder zweier Kanten und der Ecklinie
+  (heller Punkt) oder ließen außen eine Kerbe: Haken an den Ecken, bei
+  niedrigen Häusern am Horizont ein Gewirr aus Strichen und Punkten.
+- Die Wände selbst hatten ohne Kantenglättung treppige Oberkanten, die nicht
+  unter der glatten Linie lagen.
+
+Jetzt zeichnet jede Wand ihre Linien selbst. Die Dachkante liegt auf ihren
+obersten Pixeln, die Ecke zur Hälfte auf jeder der beiden Wände, die sich dort
+treffen. So verdeckt die vorderste Wand alles dahinter, und an den Ecken
+überlappt nichts. Oben und am Fuß blendet jede Wand über ihren letzten Pixel
+aus; den Abstand in Pixeln liefern die Bildschirmableitungen. Die Umrisse
+bleiben dadurch glatt, ohne die Kantenglättung der GPU, die auch jeden Pixel
+der Straße kosten würde. Tiefe schreibt nur ein Pixel, den die Wand mindestens
+zur Hälfte bedeckt.
+
+Die Linien sind etwa doppelt so stark wie vorher, weil sie nicht mehr zur
+Hälfte auf dem hellen Himmel liegen. Der eigene Kantenshader und seine
+Geometrie fallen weg, ebenso der Tiefenversatz der Wände: ein Durchgang
+weniger.
+
+Verglichen wurde am selben Blick: das Rendering mit den OSM-Gebäuden und die
+Demo-Szene bei 0:25. Die Shader-Prüfung verbindet jetzt auch das Wandprogramm,
+mit und ohne Ableitungen.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
