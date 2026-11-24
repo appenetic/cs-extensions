@@ -8,25 +8,31 @@
 </head>
 <body>
 <canvas id="glow"></canvas>
-<div id="speed" class="speed" hidden><span id="speedValue"></span><span id="speedUnit" class="unit"></span></div>
+<div class="top">
+  <div id="speed" class="speed" hidden><span id="speedValue" class="num"></span><span id="speedUnit" class="unit"></span></div>
+  <div id="turn" class="turn" hidden>
+    <svg id="turnGlyph" class="glyph" viewBox="0 0 48 48" aria-hidden="true"><path id="turnAlso" class="also" d=""/><path id="turnPath" d=""/></svg>
+    <div><p id="turnDist" class="dist"></p><p id="turnWords" class="words"></p></div>
+  </div>
+</div>
 <main id="center" hidden>
   <div id="arrivedBlock" hidden>
     <p class="arrived">Angekommen</p>
     <p id="arrivedSum" class="rest"></p>
   </div>
-  <div id="arrival" hidden>
+  <div id="arrival" class="arrival" hidden>
     <p class="label">Ankunft</p>
-    <p id="eta" class="eta"></p>
+    <p id="eta" class="eta num"></p>
+    <div id="progress" class="progress" hidden><div id="progressFill" class="fill"></div></div>
     <p id="rest" class="rest"></p>
   </div>
-  <p id="turn" class="turn" hidden></p>
 </main>
-<div id="progress" class="progress" hidden><div id="progressFill" class="fill"></div></div>
 <p id="hint" class="hint">Nach unten wischen zum Schließen · lange drücken für Optionen</p>
 <p id="credit" class="credit" hidden>Gebäude: OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende</p>
 <div id="menu" class="menu" hidden>
   <div class="panel" role="dialog" aria-label="Optionen">
     <h2>Quiet</h2>
+    <p class="sub">Was die Ansicht zeigt</p>
     <button class="row" data-option="eta" type="button"><span>Ankunftszeit und Fortschritt</span><i></i></button>
     <button class="row" data-option="turns" type="button"><span>Abbiegehinweise</span><i></i></button>
     <button class="row" data-option="speed" type="button"><span>Tacho</span><i></i></button>

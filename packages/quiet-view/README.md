@@ -12,13 +12,17 @@ Die beiden Linien zeigen die Bahn, die das Auto beim gerade eingeschlagenen
 Lenkwinkel fahren würde, wie die Hilfslinien einer Rückfahrkamera: leicht
 gelenkt eine sanfte Kurve, voll eingeschlagen ein enger Bogen zur Seite. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
 Dahinter stehen schematisch die Gebäude rund um das Auto, aus OpenStreetMap:
-dunkle, halbdurchsichtige Körper mit feinen Lichtkanten in der Farbe des
-Scheins. Sie blenden ab 30 m ein und verlieren sich gegen 500 m im Dunst.
+dunkles Glas mit weichen Lichtkanten in der Farbe des Scheins, das zum Boden
+hin im Dunst verschwimmt. Sie blenden ab 40 m ein und lösen sich gegen 400 m
+im Dunst auf.
 
-Ruhig darüber: oben links der Tacho, in der Mitte Ankunftszeit, Restzeit,
-Reststrecke und die nächste Abbiegung („in 200 m rechts“), unten eine Linie für
-den Fortschritt der Route. Fest nach unten wischen schließt die App,
-lange drücken öffnet die Optionen.
+Ruhig darüber, in Teslas eigener Schrift: oben links der Tacho und daneben die
+nächste Abbiegung als Pfeil mit Entfernung („200 m“, darunter „rechts“), über
+dem Horizont wie im Original die Ankunftszeit, darunter eine feine Linie mit
+einem Lichtpunkt für den Fortschritt der Route und Restzeit und Reststrecke.
+Was kommt und geht, blendet weich ein und aus; beim Öffnen erwacht das Bild aus
+dem Schwarz. Fest nach unten wischen schließt die App, lange drücken öffnet
+die Optionen.
 
 ## Angekommen
 
@@ -159,8 +163,22 @@ keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder länger
 als etwa 26 ms, zeichnet die Seite weniger Pixel. Ohne WebGL steht ein
 schlichteres Canvas-Bild da. Farbe, Helligkeit, Bahn und Tempo gleiten weich
 in ihre neuen Werte. Die Gebäude zeichnet ein zweiter Durchgang aus derselben
-Kamera: Wände, die wenig abdunkeln, aber verdecken, was hinter ihnen steht, und
-darüber Dachkanten und Ecken als feine Linien. Das Canvas-Bild zeigt keine.
+Kamera: Wände wie dunkles Glas, erst nur in die Tiefe, dann abgedunkelt, wo
+jeweils die vorderste steht, damit hintereinander stehende Häuser nicht doppelt
+dunkeln; Wände, die zur Kamera zeigen, etwas mehr als schräg gesehene, und zum
+Boden hin heller im Dunst. Darüber Dachkanten und Ecken als schmale Bänder mit
+weichem Profil, an jeder Neigung glatt statt pixelig, die Ecken zum Boden hin
+schwächer. Alles blendet ab 40 m ein und ist vor dem Rand der Auswahl (450 m,
+alle 60 m neu) verschwunden, damit dort nichts aufpoppt. Das Canvas-Bild zeigt
+keine Gebäude.
+
+Die Schrift ist die des Autos, Universal Sans in 300 und 500, Tacho und
+Ankunftszeit mit gleich breiten Ziffern, damit nichts springt, wenn eine Zahl
+wechselt; anderswo die Systemschrift. Der Pfeil der Abbiegung wird aus den
+Worten des Dienstes gezeichnet: leicht, normal, scharf, wenden, Ausfahrt (mit
+der weiterführenden Straße blass daneben), einfädeln, geradeaus, und im
+Kreisverkehr der gefahrene Bogen um einen blassen Ring. Je näher die
+Abbiegung, desto heller.
 
 ## Entwicklung und Validierungsstand
 

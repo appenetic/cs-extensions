@@ -264,21 +264,53 @@ Erst bei einer Fahrt zu sehen: wie oft `LOC_estimatedHdg` und die Position
 sich wirklich ändern und ob sich die Gebäude damit ruhig bewegen. `turns.log`
 zählt dafür je Zeile die neuen Kurse und Positionen seit der vorigen.
 
+## Feinschliff (alpha.18)
+
+- **Schrift:** Am Auto liegen in `/usr/share/fonts/universal-sans` „Universal
+  Sans Text“ und „Universal Sans Mono Numerals Text“ in 330, 530 und 630; für
+  den Browser sind das die Gewichte 300, 500 und 600 (fontconfig 50, 100, 180).
+  Bisher fiel normaler Text (400) wie die große Ankunftszeit (500) auf 500.
+  Jetzt stehen die Gewichte bewusst, Tacho und Ankunftszeit mit gleich breiten
+  Ziffern.
+- **Layout nach den Fotos des Originals:** die Ankunftszeit über dem Horizont,
+  ihr Fortschritt als feine Linie mit Lichtpunkt direkt darunter statt am
+  unteren Rand; die Abbiegung als gezeichneter Pfeil neben dem Tacho, wie in
+  Teslas eigener Anzeige. Was kommt und geht, blendet ein und aus.
+- **Gebäude:** Die Wände wurden in der Reihenfolge der Daten gemischt und
+  schrieben dabei Tiefe; wo zwei hintereinander standen, dunkelte es je nach
+  Reihenfolge einmal oder zweimal. Jetzt erst ein Durchgang nur für die Tiefe,
+  dann der Schatten der vordersten Wand, einmal je Pixel. Die Kanten waren
+  1-Pixel-Linien ohne Kantenglättung und flimmerten; jetzt schmale Bänder mit
+  weichem Profil. Die Entfernung wird je Pixel gemessen statt zwischen den
+  Ecken gemittelt, damit lange Wände neben dem Auto richtig ausblenden. Am
+  Rand der Auswahl (450 m) standen die Gebäude noch mit 8 % Deckkraft und
+  poppten beim Neuwählen auf; jetzt sind sie bis 390 m ausgeblendet.
+- **Öffnen:** Bis die erste Farbe kam, zeichnete die Seite den Schein in Weiß.
+  Jetzt erwacht das Bild über 1,6 s aus dem Schwarz.
+- **Menü:** dunkles Glas, die Schalter in der Lichtfarbe, bei hellem Licht mit
+  dunklem Knopf.
+
+Am Mac mit den Schriften des Autos gerendert; auf dem Bildschirm im Auto noch
+nicht gesehen.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
    (alpha.14 und 15 bisher nur in der Demo und im Rendering gesehen).
-2. Ob die Gebäude im Auto ankommen und sich beim Fahren ruhig mitbewegen; wie
-   oft Kurs und Position sich ändern (`turns.log`).
-3. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
+2. Ob die Gebäude dort stehen, wo sie draußen stehen (Kurs ab Norden im
+   Uhrzeigersinn angenommen), und sich beim Fahren ruhig mitbewegen; wie oft
+   Kurs und Position sich ändern (`turns.log`). Dass sie ankommen, ist mit
+   alpha.17 geprüft (480 Umrisse im Stand).
+3. Wie Schrift und Layout von alpha.18 auf dem Bildschirm im Auto wirken.
+4. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
-4. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
+5. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
    Farben aussieht, auch tagsüber.
-5. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
-6. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
+6. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
+7. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
    Paketlog.
-7. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
+8. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
    Auslöser stehen mit ihrem Wert im Paketlog.
-8. Die Einheit von `VAPI_yawRate`.
-9. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation die
-   Route beendet.
+9. Die Einheit von `VAPI_yawRate`.
+10. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation
+    die Route beendet.

@@ -2,14 +2,17 @@
 // road at night, its two lane lines fine filaments of light that run into the
 // haze, with streaks of light flowing down them towards the driver at the pace
 // of the car. The lines mark the path the car would drive at the steering
-// wheel's angle; the line on the signalled side brightens with the indicator. The speedometer, the arrival, the next
-// turn and the route's progress sit quietly on top; on arriving, the road ends
-// in a ring of light with the drive's summary. A long press offers what to
-// show. A WebGL shader draws the picture in true perspective, with a filmic
-// roll-off and a little grain so the dark gradients do not band; on a slow GPU
-// it draws fewer pixels, and without WebGL a plainer canvas picture stands in.
-// The service streams what the car shows (events), and answers /state while
-// the stream is down.
+// wheel's angle; the line on the signalled side brightens with the indicator.
+// The buildings around the car stand in the haze behind. The speedometer with
+// the next turn's arrow beside it, and the arrival with the route's progress
+// under it, sit quietly on top and fade as they come and go; on arriving, the
+// road ends in a ring of light with the drive's summary. The picture wakes
+// from black when the page opens. A long press offers what to show. A WebGL
+// shader draws the picture in true perspective, with a filmic roll-off and a
+// little grain so the dark gradients do not band; on a slow GPU it draws fewer
+// pixels, and without WebGL a plainer canvas picture stands in. The service
+// streams what the car shows (events), and answers /state while the stream is
+// down.
 (() => {
   'use strict';
 
@@ -34,6 +37,8 @@
   // 0 on the road, 1 arrived; it eases in over a few seconds.
   let arrive = 0;
   let arriveGoal = 0;
+  // 0 to 1 over the first 1.6 s with data: the picture wakes from black.
+  let wake = 0;
   let state = null;
   let lastState = 0;
   let lastFrame = 0;
@@ -270,48 +275,126 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-  // The buildings around the car, from the same camera, after the road: walls
-  // that only darken a little but hide what stands behind them, and their roof
-  // edges and corners as fine lines in the light's colour. They fade in from
-  // 30 m and out towards 500 m, so those beside the car stay out of the way.
-  // Points are metres east and north in the service's frame, and up.
-  const BUILDING_VERTEX = `
-attribute vec3 aPos;
+  // The buildings around the car, from the same camera, after the road. Their
+  // walls are dark glass: each pixel darkens once, for the nearest wall, however
+  // many stand in a row; less towards the ground, where they stand in the haze,
+  // and more where a wall faces the camera than where it is seen edge-on, so
+  // the blocks read as blocks. Their roof edges and corners are fine lines of
+  // the light, drawn as narrow bands that stay smooth at any angle, the corners
+  // fading towards the ground. All fade in from 40 m, so those beside the car
+  // stay out of the way, thin out into the haze and are gone before the edge
+  // of what the service picked (450 m around the car, picked again every
+  // 60 m). Points are metres east and north in the service's frame, and up,
+  // each with how far up its wall it lies (0 to 1).
+  const BUILDING_CAMERA = `
 uniform vec2 uCam;
 uniform vec2 uDir;
 uniform vec4 uView;
-varying float vDist;
-void main() {
-  vec2 d = aPos.xy - uCam;
+// A point on the screen. uView: focal length, width, height and horizon, in
+// pixels; depth runs from 5 m to 3 km.
+vec4 project(vec3 p) {
+  vec2 d = p.xy - uCam;
   float ahead = dot(d, uDir);
   float right = d.x * uDir.y - d.y * uDir.x;
-  float up = aPos.z - 1.25;
-  // uView: focal length, width, height and horizon, in pixels; depth from 5 m.
-  gl_Position = vec4(right * 2.0 * uView.x / uView.y,
+  float up = p.z - 1.25;
+  return vec4(right * 2.0 * uView.x / uView.y,
     (1.0 - 2.0 * uView.w / uView.z) * ahead + up * 2.0 * uView.x / uView.z,
     ahead * 3005.0 / 2995.0 - 30000.0 / 2995.0, ahead);
-  vDist = length(d);
 }`;
 
-  const BUILDING_FRAGMENT = `
+  const BUILDING_SEEN = `
 precision mediump float;
-uniform vec4 uTint;
 uniform float uFade;
-varying float vDist;
+float seen(float d) {
+  return uFade * smoothstep(40.0, 140.0, d) * exp(-d / 260.0) * (1.0 - smoothstep(310.0, 390.0, d));
+}`;
+
+  const WALL_VERTEX = BUILDING_CAMERA + `
+attribute vec4 aPos;
+attribute vec2 aWall;
+varying vec2 vRel;
+varying vec2 vNormal;
+varying float vHeight;
 void main() {
-  float a = uTint.a * uFade * smoothstep(30.0, 90.0, vDist) * exp(-vDist / 260.0);
+  gl_Position = project(aPos.xyz);
+  vRel = aPos.xy - uCam;
+  vNormal = vec2(aWall.y, -aWall.x) / max(length(aWall), 0.001);
+  vHeight = aPos.z;
+}`;
+
+  const WALL_FRAGMENT = BUILDING_SEEN + `
+uniform vec3 uLight;
+uniform float uShade;
+varying vec2 vRel;
+varying vec2 vNormal;
+varying float vHeight;
+void main() {
+  float d = length(vRel);
+  float face = abs(dot(vNormal, vRel)) / max(d, 0.001);
+  float a = uShade * seen(d) * (0.75 + 0.25 * face) * mix(0.4, 1.0, smoothstep(0.0, 9.0, vHeight));
   // A wall too faint to see hides nothing either.
   if (a < 0.004) discard;
+  // A wall facing the camera catches a trace of the light.
+  gl_FragColor = vec4(uLight * 0.06 * face, a);
+}`;
+
+  const EDGE_VERTEX = BUILDING_CAMERA + `
+attribute vec4 aPos;
+attribute vec4 aOther;
+attribute float aSide;
+uniform float uWidth;
+varying vec2 vRel;
+varying float vUp;
+varying float vAcross;
+void main() {
+  vec4 a = project(aPos.xyz);
+  vec4 b = project(aOther.xyz);
+  // An end behind the near plane moves along the edge onto it.
+  float t = a.w < 5.0 ? (5.0 - a.w) / (b.w - a.w) : 0.0;
+  if (a.w < 5.0 && b.w < 5.0) {
+    gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+    return;
+  }
+  a = mix(a, b, t);
+  vec4 p = mix(aPos, aOther, t);
+  if (b.w < 5.0) b = mix(b, a, (5.0 - b.w) / (a.w - b.w));
+  // Across the edge on the screen, a few pixels to this corner's side.
+  vec2 along = (b.xy / b.w - a.xy / a.w) * uView.yz;
+  along = length(along) > 1e-4 ? normalize(along) : vec2(1.0, 0.0);
+  vec2 off = vec2(-along.y, along.x) * aSide * uWidth * 2.0 / uView.yz;
+  gl_Position = vec4(a.xy + off * a.w, a.z, a.w);
+  vRel = p.xy - uCam;
+  vUp = p.w;
+  vAcross = aSide * uWidth;
+}`;
+
+  const EDGE_FRAGMENT = BUILDING_SEEN + `
+uniform vec4 uTint;
+varying vec2 vRel;
+varying float vUp;
+varying float vAcross;
+void main() {
+  // A core about a pixel and a half wide in a faint glow of its own.
+  float line = exp(-vAcross * vAcross / 0.8) + 0.18 * exp(-abs(vAcross) / 1.2);
+  float a = uTint.a * seen(length(vRel)) * line * mix(0.2, 1.0, vUp);
+  if (a < 0.003) discard;
   gl_FragColor = vec4(uTint.rgb, a);
 }`;
 
   // The service's lines as walls and edges: per line its height, its base,
   // 1 when closed, then its points. Corners are where an outline turns by more
-  // than 25°; an open line's ends lie on a tile's border and are none.
+  // than 25°; an open line's ends lie on a tile's border and are none. A wall
+  // vertex carries its point and the wall's direction on the ground; an edge
+  // is a band of two triangles whose corners carry both ends and their side.
   function buildingGeometry(lines) {
     const walls = [];
     const edges = [];
     const bend = Math.cos((25 * Math.PI) / 180);
+    const edge = (a, b) => {
+      for (const [end, side] of [[0, -1], [0, 1], [1, 1], [0, -1], [1, 1], [1, -1]]) {
+        edges.push(...(end ? b : a), ...(end ? a : b), end ? -side : side);
+      }
+    };
     for (const row of lines) {
       if (!Array.isArray(row) || row.length < 7 || row.length % 2 === 0) continue;
       const [top, base] = row;
@@ -321,8 +404,12 @@ void main() {
       const y = (i) => row[4 + 2 * i];
       for (let i = 0; i < (closed ? n : n - 1); i++) {
         const j = (i + 1) % n;
-        walls.push(x(i), y(i), base, x(j), y(j), base, x(j), y(j), top, x(i), y(i), base, x(j), y(j), top, x(i), y(i), top);
-        edges.push(x(i), y(i), top, x(j), y(j), top);
+        const dx = x(j) - x(i);
+        const dy = y(j) - y(i);
+        for (const [k, up] of [[i, 0], [j, 0], [j, 1], [i, 0], [j, 1], [i, 1]]) {
+          walls.push(x(k), y(k), up ? top : base, up, dx, dy);
+        }
+        edge([x(i), y(i), top, 1], [x(j), y(j), top, 1]);
       }
       for (let i = closed ? 0 : 1; i < (closed ? n : n - 1); i++) {
         const p = (i + n - 1) % n;
@@ -332,7 +419,7 @@ void main() {
         const vx = x(q) - x(i);
         const vy = y(q) - y(i);
         if ((ux * vx + uy * vy) / (Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1) < bend) {
-          edges.push(x(i), y(i), base, x(i), y(i), top);
+          edge([x(i), y(i), base, 0], [x(i), y(i), top, 1]);
         }
       }
     }
@@ -351,51 +438,58 @@ void main() {
       gl.compileShader(s);
       return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
     };
-    const vs = shader(gl.VERTEX_SHADER, 'attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }');
-    const fs = shader(gl.FRAGMENT_SHADER, FRAGMENT);
-    if (!vs || !fs) return null;
-    const link = (v, f) => {
+    // A program with its attributes at fixed places, the first at 0, and its
+    // uniforms; null when the GPU takes either shader or the link amiss.
+    const link = (vertex, fragment, attributes, uniforms) => {
+      const v = shader(gl.VERTEX_SHADER, vertex);
+      const f = shader(gl.FRAGMENT_SHADER, fragment);
+      if (!v || !f) return null;
       const pr = gl.createProgram();
       gl.attachShader(pr, v);
       gl.attachShader(pr, f);
+      attributes.forEach((name, i) => gl.bindAttribLocation(pr, i, name));
       gl.linkProgram(pr);
-      return gl.getProgramParameter(pr, gl.LINK_STATUS) ? pr : null;
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return null;
+      const u = {};
+      for (const name of uniforms) u[name] = gl.getUniformLocation(pr, name);
+      return { pr, u };
     };
-    const program = link(vs, fs);
-    if (!program) return null;
-    gl.useProgram(program);
+    const road = link('attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }', FRAGMENT, ['p'],
+      ['uRes', 'uColor', 'uGlow', 'uCurv', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed', 'uArrive', 'uTime']);
+    if (!road) return null;
+    const u = road.u;
     const quad = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, quad);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const at = gl.getAttribLocation(program, 'p');
-    gl.enableVertexAttribArray(at);
-    gl.vertexAttribPointer(at, 2, gl.FLOAT, false, 0, 0);
-    const u = {};
-    for (const name of ['uRes', 'uColor', 'uGlow', 'uCurv', 'uTravel', 'uStreaks', 'uBlink', 'uBreath', 'uSeed', 'uArrive', 'uTime']) {
-      u[name] = gl.getUniformLocation(program, name);
-    }
+    gl.enableVertexAttribArray(0);
     // The buildings: without their shaders the picture goes on without them.
-    const bvs = shader(gl.VERTEX_SHADER, BUILDING_VERTEX);
-    const bfs = shader(gl.FRAGMENT_SHADER, BUILDING_FRAGMENT);
-    const houses = bvs && bfs ? link(bvs, bfs) : null;
-    const bAt = houses ? gl.getAttribLocation(houses, 'aPos') : -1;
-    const bu = {};
-    for (const name of houses ? ['uCam', 'uDir', 'uView', 'uTint', 'uFade'] : []) {
-      bu[name] = gl.getUniformLocation(houses, name);
-    }
+    const camera = ['uCam', 'uDir', 'uView', 'uFade'];
+    const wallsGL = link(WALL_VERTEX, WALL_FRAGMENT, ['aPos', 'aWall'], [...camera, 'uLight', 'uShade']);
+    const edgesGL = link(EDGE_VERTEX, EDGE_FRAGMENT, ['aPos', 'aOther', 'aSide'], [...camera, 'uTint', 'uWidth']);
     let walls = null;
     let edges = null;
-    const upload = (data) => {
+    // A buffer of vertices with their attributes' sizes, interleaved.
+    const upload = (data, sizes) => {
+      const stride = sizes.reduce((a, b) => a + b, 0);
       if (!data.length) return null;
       const b = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, b);
       gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-      return { b, n: data.length / 3 };
+      return { b, n: data.length / stride, sizes, stride };
     };
-    const drawWith = (x, mode) => {
+    const use = (x, program, p, r) => {
+      gl.useProgram(program.pr);
+      gl.uniform2f(program.u.uCam, p.cam.x, p.cam.y);
+      gl.uniform2f(program.u.uDir, Math.sin(r), Math.cos(r));
+      gl.uniform4f(program.u.uView, 0.78 * canvas.width, canvas.width, canvas.height, 0.58 * canvas.height);
+      gl.uniform1f(program.u.uFade, p.buildings);
       gl.bindBuffer(gl.ARRAY_BUFFER, x.b);
-      gl.vertexAttribPointer(bAt, 3, gl.FLOAT, false, 0, 0);
-      gl.drawArrays(mode, 0, x.n);
+      let offset = 0;
+      x.sizes.forEach((size, i) => {
+        gl.enableVertexAttribArray(i);
+        gl.vertexAttribPointer(i, size, gl.FLOAT, false, x.stride * 4, offset * 4);
+        offset += size;
+      });
     };
     const info = gl.getExtension('WEBGL_debug_renderer_info');
     const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
@@ -409,17 +503,16 @@ void main() {
       setBuildings(lines) {
         for (const x of [walls, edges]) if (x) gl.deleteBuffer(x.b);
         walls = edges = null;
-        if (!houses || !lines) return false;
+        if (!wallsGL || !edgesGL || !lines) return false;
         const g = buildingGeometry(lines);
-        walls = upload(g.walls);
-        edges = upload(g.edges);
+        walls = upload(g.walls, [4, 2]);
+        edges = upload(g.edges, [4, 4, 1]);
         return !!walls;
       },
       draw(p) {
-        gl.useProgram(program);
+        gl.useProgram(road.pr);
         gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-        gl.enableVertexAttribArray(at);
-        gl.vertexAttribPointer(at, 2, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
         gl.uniform2f(u.uRes, canvas.width, canvas.height);
         gl.uniform3f(u.uColor, p.rgb[0] / 255, p.rgb[1] / 255, p.rgb[2] / 255);
         gl.uniform1f(u.uGlow, p.glow);
@@ -432,38 +525,40 @@ void main() {
         gl.uniform1f(u.uArrive, p.arrive);
         gl.uniform1f(u.uTime, p.time % 3600);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-        if (!houses || !walls || !p.cam || p.buildings < 0.01) return;
-        gl.useProgram(houses);
-        if (bAt !== at) gl.disableVertexAttribArray(at);
-        gl.enableVertexAttribArray(bAt);
+        if (!walls || !p.cam || p.buildings < 0.01) return;
         const r = (p.cam.h * Math.PI) / 180;
-        gl.uniform2f(bu.uCam, p.cam.x, p.cam.y);
-        gl.uniform2f(bu.uDir, Math.sin(r), Math.cos(r));
-        gl.uniform4f(bu.uView, 0.78 * canvas.width, canvas.width, canvas.height, 0.58 * canvas.height);
-        gl.uniform1f(bu.uFade, p.buildings);
         gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
-        gl.enable(gl.BLEND);
-        // Walls darken and write depth, set back a little so their own edges
-        // still show; the edges add light and write none.
+        // The walls, set back a little so their own edges still show: first
+        // their depth alone, then their shade where each is the nearest.
+        use(walls, wallsGL, p, r);
+        gl.uniform3f(wallsGL.u.uLight, p.rgb[0] / 255, p.rgb[1] / 255, p.rgb[2] / 255);
+        gl.uniform1f(wallsGL.u.uShade, 0.42);
         gl.enable(gl.POLYGON_OFFSET_FILL);
         gl.polygonOffset(1, 2);
+        gl.colorMask(false, false, false, false);
+        gl.drawArrays(gl.TRIANGLES, 0, walls.n);
+        gl.colorMask(true, true, true, true);
+        gl.depthMask(false);
+        gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.uniform4f(bu.uTint, 0, 0, 0, 0.45);
-        drawWith(walls, gl.TRIANGLES);
+        gl.drawArrays(gl.TRIANGLES, 0, walls.n);
         gl.disable(gl.POLYGON_OFFSET_FILL);
+        // The edges add light.
         if (edges) {
-          gl.depthMask(false);
-          gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+          use(edges, edgesGL, p, r);
           const hot = p.rgb.map((c) => (c + (255 - c) * 0.35) / 255);
-          gl.uniform4f(bu.uTint, hot[0], hot[1], hot[2], 0.34 * Math.min(1.2, p.glow));
-          drawWith(edges, gl.LINES);
-          gl.depthMask(true);
+          gl.uniform4f(edgesGL.u.uTint, hot[0], hot[1], hot[2], 0.5 * Math.min(1.2, p.glow));
+          gl.uniform1f(edgesGL.u.uWidth, 3);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+          gl.drawArrays(gl.TRIANGLES, 0, edges.n);
         }
+        gl.depthMask(true);
         gl.disable(gl.BLEND);
         gl.disable(gl.DEPTH_TEST);
-        if (bAt !== at) gl.disableVertexAttribArray(bAt);
+        gl.disableVertexAttribArray(1);
+        gl.disableVertexAttribArray(2);
       },
     };
   }
@@ -573,11 +668,12 @@ void main() {
     pace = Math.abs(paceTo - pace) <= paceStep ? paceTo : pace + Math.sign(paceTo - pace) * paceStep;
     travel += dt * pace;
     arrive += (arriveGoal - arrive) * Math.min(1, dt / 2.2);
+    if (state) wake = Math.min(1, wake + dt / 1.6);
     // Colour and brightness fade over like the lights do.
     if (light && light.join() !== rgb.join()) {
       const k = Math.min(1, dt / 0.6);
       rgb = rgb.map((v, i) => (Math.abs(light[i] - v) < 1 ? light[i] : v + (light[i] - v) * k));
-      document.documentElement.style.setProperty('--light', `rgb(${rgb.map(Math.round).join(',')})`);
+      paintStyles();
     }
     glow = Math.abs(glowGoal - glow) < 0.004 ? glowGoal : glow + (glowGoal - glow) * Math.min(1, dt / 0.8);
     let left = 0;
@@ -595,7 +691,7 @@ void main() {
       creditShown = !creditShown;
       $('credit').hidden = !creditShown;
     }
-    picture.draw({ rgb, glow, curv, travel, streaks: options.pulses, left, right, arrive,
+    picture.draw({ rgb, glow: glow * wake * wake * (3 - 2 * wake), curv, travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, cam: showing || buildingsFade > 0.01 ? cam : null,
       buildings: buildingsFade });
     if (++measured === 90) {
@@ -607,6 +703,121 @@ void main() {
       measureStart = now;
     }
     requestAnimationFrame(frame);
+  }
+
+  // The light's colour for the page's styles: the progress line, the turn's
+  // arrow, the menu's switches, whose knob turns dark on a pale light.
+  function paintStyles() {
+    const c = rgb.map(Math.round);
+    const s = document.documentElement.style;
+    s.setProperty('--light', `rgb(${c.join(',')})`);
+    s.setProperty('--light-rgb', c.join(' '));
+    const luminance = c.reduce((sum, v, i) => sum + [0.2126, 0.7152, 0.0722][i] * (v / 255) ** 2.2, 0);
+    s.setProperty('--knob', luminance > 0.5 ? '#161616' : '#fff');
+  }
+
+  // Shows or hides an element with a fade; once faded out it gives up its room.
+  const fading = new Map();
+  function reveal(el, on) {
+    if (on) {
+      clearTimeout(fading.get(el));
+      fading.delete(el);
+      if (el.hidden) {
+        el.classList.add('out');
+        el.hidden = false;
+        void el.offsetWidth;
+      }
+      el.classList.remove('out');
+    } else if (!el.hidden && !fading.has(el)) {
+      el.classList.add('out');
+      fading.set(el, setTimeout(() => {
+        fading.delete(el);
+        el.hidden = true;
+      }, 700));
+    }
+  }
+
+  // A turn's arrow as SVG path data in a 48 unit square: a stem up from the
+  // bottom that bends right by deg into a short straight with a head. Drawn as
+  // lines of points, then fitted into the square and mirrored for a left turn;
+  // an exit keeps the road on as a fainter line (also). In a roundabout the
+  // stem runs anticlockwise round a fainter ring for deg and leaves it.
+  function arrowPaths(deg, side, kind) {
+    const lines = [];
+    // A line ending in a head: two strokes back from its end, 43° either side.
+    const tipped = (line) => {
+      const [x, y] = line[line.length - 1];
+      const [px, py] = line[line.length - 2];
+      const l = Math.hypot(px - x, py - y) || 1;
+      const bx = (px - x) / l;
+      const by = (py - y) / l;
+      const wing = (a) => [x + 7 * (bx * Math.cos(a) - by * Math.sin(a)), y + 7 * (bx * Math.sin(a) + by * Math.cos(a))];
+      lines.push(line, [wing(0.75), [x, y], wing(-0.75)]);
+    };
+    let also = null;
+    if (kind === 'ring') {
+      const at = (f) => [7 * Math.sin(f), 7 * Math.cos(f)];
+      const th = (deg * Math.PI) / 180;
+      const line = [[0, 17]];
+      also = [];
+      for (let i = 0; i <= 24; i++) {
+        const f = (2 * Math.PI * i) / 24;
+        if (f <= th) line.push(at(f));
+        if (f >= th) also.push(at(f));
+      }
+      line.push(at(th), [10 * Math.sin(th), 10 * Math.cos(th)], [16 * Math.sin(th), 16 * Math.cos(th)]);
+      tipped(line);
+    } else {
+      const th = (deg * Math.PI) / 180;
+      const line = [[0, 0]];
+      for (let i = 0; i <= 12; i++) {
+        const f = (th * i) / 12;
+        line.push([8 - 8 * Math.cos(f), -12 - 8 * Math.sin(f)]);
+      }
+      const [ex, ey] = line[line.length - 1];
+      line.push([ex + 9 * Math.sin(th), ey - 9 * Math.cos(th)]);
+      tipped(line);
+      if (kind === 'exit') also = [[0, -12], [0, -28]];
+    }
+    const all = lines.flat().concat(also || []);
+    const xs = all.map((p) => p[0]);
+    const ys = all.map((p) => p[1]);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    const k = Math.min(36 / Math.max(x1 - x0, 1), 36 / Math.max(y1 - y0, 1), 2.2);
+    const fit = ([x, y]) => {
+      const fx = 24 + (x - (x0 + x1) / 2) * k;
+      const fy = 24 + (y - (y0 + y1) / 2) * k;
+      return `${(side < 0 ? 48 - fx : fx).toFixed(1)} ${fy.toFixed(1)}`;
+    };
+    const path = (line) => line.map((p, i) => `${i ? 'L' : 'M'}${fit(p)}`).join('');
+    return { d: lines.map(path).join(''), also: also ? path(also) : '' };
+  }
+
+  // The service words a turn as "in 150 m links" or, without its direction,
+  // "Abbiegen in 150 m": the distance shows large, the words under it, and the
+  // arrow for what they say beside them.
+  const KINDS = [[/wenden/, 180], [/Kreisverkehr/, 0, 'ring'], [/Ausfahrt/, 40, 'exit'], [/einfädeln/, 30],
+    [/leicht/, 45], [/scharf/, 135], [/geradeaus/, 0], [/links|rechts/, 90]];
+  function showTurn(t) {
+    const text = t && typeof t.text === 'string' ? t.text : '';
+    reveal($('turn'), !!text);
+    if (!text) return;
+    const m = /^in (\S+ \S+) (.+)$/.exec(text) || /^Abbiegen in (\S+ \S+)$/.exec(text);
+    const words = m ? (m[2] || 'Abbiegen') : '';
+    $('turnDist').textContent = m ? m[1] : text;
+    $('turnWords').textContent = words;
+    const kind = KINDS.find(([re]) => re.test(words));
+    $('turnGlyph').style.display = kind ? '' : 'none';
+    if (kind) {
+      // A roundabout's exit lies a quarter round for the right, three quarters
+      // for the left, half round without a side.
+      const exit = t.side > 0 ? 90 : t.side < 0 ? 270 : 180;
+      const glyph = kind[2] === 'ring' ? arrowPaths(exit, 1, 'ring')
+        : arrowPaths(kind[1], t.side || (kind[1] === 180 ? -1 : 1), kind[2]);
+      $('turnPath').setAttribute('d', glyph.d);
+      $('turnAlso').setAttribute('d', glyph.also);
+    }
+    $('turn').style.setProperty('--near', String(clamp(Number(t.near) || 0, 0, 1)));
   }
 
   function render(v) {
@@ -624,24 +835,27 @@ void main() {
       const what = done.dist && done.min ? `${done.dist} in ${done.min} min` : done.min ? `${done.min} min` : '';
       $('arrivedSum').textContent = [what, done.time].filter(Boolean).join(' · ');
     }
+    // What is shown keeps its words while it fades out.
     const arrival = !done && options.eta && v.trip && v.eta;
-    $('arrival').hidden = !arrival;
-    $('eta').textContent = v.eta || '';
-    const parts = [];
-    if (v.min) parts.push(`noch ${v.min} min`);
-    if (v.dist) parts.push(v.dist);
-    $('rest').textContent = parts.join(' · ');
-    const turnText = !done && options.turns && v.turn ? v.turn.text : '';
-    $('turn').hidden = !turnText;
-    $('turn').textContent = turnText;
-    $('center').hidden = !done && !arrival && !turnText;
+    reveal($('arrival'), arrival);
+    if (arrival) {
+      $('eta').textContent = v.eta;
+      const parts = [];
+      if (v.min) parts.push(`noch ${v.min} min`);
+      if (v.dist) parts.push(v.dist);
+      $('rest').textContent = parts.join(' · ');
+      const progress = typeof v.progress === 'number' && v.progress >= 0;
+      reveal($('progress'), progress);
+      if (progress) $('progressFill').style.width = `${Math.round(Math.min(1, v.progress) * 1000) / 10}%`;
+    }
+    reveal($('center'), done || arrival);
+    showTurn(!done && options.turns ? v.turn : null);
     const speed = options.speed && v.speed ? v.speed : '';
-    $('speed').hidden = !speed;
-    $('speedValue').textContent = speed;
-    $('speedUnit').textContent = v.unit || '';
-    const progress = !done && options.eta && v.trip && typeof v.progress === 'number' && v.progress >= 0;
-    $('progress').hidden = !progress;
-    $('progressFill').style.width = `${Math.round((progress ? v.progress : 0) * 1000) / 10}%`;
+    reveal($('speed'), !!speed);
+    if (speed) {
+      $('speedValue').textContent = speed;
+      $('speedUnit').textContent = v.unit || '';
+    }
   }
 
   function applyOptions(o) {
@@ -673,10 +887,10 @@ void main() {
     // A choice still on its way to the service is not undone by an older view.
     applyOptions(v.options && !pending ? v.options : options);
     if (first) {
-      // The first colour and brightness show at once, not as a fade.
+      // The first colour and brightness are there at once, as the picture wakes.
       rgb = c;
       glow = glowGoal;
-      document.documentElement.style.setProperty('--light', `rgb(${rgb.join(',')})`);
+      paintStyles();
     }
   }
 
