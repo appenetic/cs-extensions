@@ -13,6 +13,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
@@ -32,6 +33,19 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist/pages/cs-extensions
+      # GitHub lists a new artifact a little after its upload, at times later
+      # than deploy-pages looks for it, which then finds none and fails.
+      - name: Wait until the artifact is listed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 0 60); do
+            n=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=github-pages" --jq .total_count || echo 0)
+            if [ "${n:-0}" -gt 0 ]; then echo "listed after $((i * 5)) s"; exit 0; fi
+            sleep 5
+          done
+          echo "::error::The github-pages artifact is still not listed after 5 minutes."
+          exit 1
       - name: Publish feed
         id: deployment
         uses: actions/deploy-pages@v4
