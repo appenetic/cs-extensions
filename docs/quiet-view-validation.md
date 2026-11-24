@@ -339,6 +339,19 @@ Zwei Fehler auf dem Weg, beide am Mac gefunden:
   kompilierte nicht, und das Bild lief ohne Gebäude weiter. Alle Shader werden
   jetzt vor jedem Stand in Chrome kompiliert.
 
+## Scharf vom Start an (alpha.21)
+
+Beim Durchsehen gefunden, nicht im Auto beobachtet: Die Seite misst die Zeit
+von je 90 Bildern und zeichnet weniger Pixel, wenn ein Bild im Mittel länger als
+26 ms braucht. Das erste Fenster begann aber beim Laden der Seite und zählte
+Laden und Shader-Bau als langsame Bilder mit. Dauerte der Start länger als etwa
+0,8 s, fiel die Auflösung gleich auf 75 % und blieb dort bis zum Schließen:
+weichere Linien, und entfernte Fenster nur noch als gemittelter Schimmer. Eine
+Pause, etwa eine verborgene Seite, hätte im nächsten Fenster genauso gezählt.
+Jetzt werden die ersten 90 Bilder nach dem Start und nach jeder Pause über
+0,5 s nicht bewertet. alpha.20 lief seit 05:02 UTC am 24.11. im Auto,
+installiert in P, die Seite war bis dahin nicht geöffnet.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn

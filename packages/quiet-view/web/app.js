@@ -766,7 +766,9 @@ void main() {
   });
 
   // The share of the device's pixels drawn: lower on a renderer in software,
-  // and lower again while frames take longer than about 26 ms.
+  // and lower again while frames take longer than about 26 ms. The first 90
+  // frames, and the first 90 after a pause, are not judged: the page's start
+  // and the pause itself would count as slow frames.
   let quality = picture.soft ? 0.5 : 1;
   let measured = 0;
   let measureStart = 0;
@@ -780,6 +782,7 @@ void main() {
 
   function frame(now) {
     const s = now / 1000;
+    if (lastFrame && s - lastFrame > 0.5) measured = measureStart = 0;
     const dt = lastFrame ? Math.min(0.1, s - lastFrame) : 0;
     lastFrame = s;
     // Without fresh state the road straightens and the streaks slow down.
@@ -831,7 +834,7 @@ void main() {
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, cam: showing || buildingsFade > 0.01 ? cam : null,
       buildings: buildingsFade, rise: smooth(0, 1, buildingsRise) });
     if (++measured === 90) {
-      if ((now - measureStart) / measured > 26 && quality > 0.35) {
+      if (measureStart && (now - measureStart) / measured > 26 && quality > 0.35) {
         quality = Math.max(0.35, quality * 0.75);
         layout();
       }

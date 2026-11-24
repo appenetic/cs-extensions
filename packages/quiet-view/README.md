@@ -166,8 +166,9 @@ am Boden nur wenige Meter breit; ein Lichtstreifen leuchtet darin entlang der
 Linie und wird mit dem Abstand weicher. Die Bahn ist ein Kreisbogen, nahe der
 Geraden eine Parabel. Am Ende
 stehen ein filmisches Tonemapping und feines Rauschen, damit dunkle Verläufe
-keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder länger
-als etwa 26 ms, zeichnet die Seite weniger Pixel. Ohne WebGL steht ein
+keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder im
+Mittel länger als etwa 26 ms, zeichnet die Seite weniger Pixel; die ersten 90
+Bilder nach dem Start oder einer Pause zählen dabei nicht. Ohne WebGL steht ein
 schlichteres Canvas-Bild da. Farbe, Helligkeit, Bahn und Tempo gleiten weich
 in ihre neuen Werte; eine neue Farbe, die weit von der alten liegt, wächst als
 Front vom Fluchtpunkt aus über 1,8 s, kleine Schritte wie beim Regenbogen
