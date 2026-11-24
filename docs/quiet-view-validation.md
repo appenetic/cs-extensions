@@ -461,6 +461,27 @@ Das Update-Skript für das Auto legt seinen API-Helfer wieder hin, wenn `/tmp`
 nach einem Neustart leer ist. Es hört nur bei einem eindeutigen Ergebnis auf;
 eine abgerissene Verbindung führt zu einem neuen Versuch.
 
+## Sonne hinter den Häusern (alpha.25)
+
+„Die Sonne ist teilweise noch vor den Gebäuden“, in der Demo. Deckend waren
+die Häuser im Neon-Stil nur zwischen 140 und 310 m. Davor blendeten sie wie im
+Ambiente-Stil ab 40 m ein, dahinter bis 390 m aus. In beiden Bändern waren sie
+halb durchsichtig, und die helle Sonne schien durch: bei 0:39 durch einen
+fernen Turm. Seit die Sonne in Kurven zur Seite wandert, traf es auch die
+nahen Häuser.
+
+Jetzt verschwinden ferne Häuser nicht mehr durch Durchsichtigkeit. Sie nehmen
+bis 380 m ganz die Farbe von Himmel und Dunst an und sind davor vor dem Himmel
+unsichtbar. Erst auf den letzten 20 m vor dem Ende der geladenen Häuser blenden
+sie aus, damit vor der Sonne nichts aufspringt.
+
+Nahe Häuser blenden weiter ruhig ein, verdecken aber Scheibe und inneren Schein
+der Sonne ganz, sobald sie davor stehen, ab 25 bis 40 m. Sie schreiben dort
+auch Tiefe, damit Häuser dahinter nicht durchscheinen.
+
+Geprüft bei 0:39 mit vorgelaufenem Himmel: Die Sonne steht ganz hinter den
+Häusern, der ferne Turm ist eine dunstige Silhouette.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn

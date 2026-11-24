@@ -551,10 +551,25 @@ void main() {
   float face = abs(dot(vNormal, vRel)) / max(d, 0.001);
   float fog = seen(d);
   // In the neon city the walls stay solid into the distance and take on the
-  // colour of the haze before them instead, the sky's where they meet it, so
-  // they hide the sun; their feet stand deeper in it.
+  // colour of the haze before them instead, the sky's where they meet it,
+  // their feet deeper in it; only at the end of the buildings picked do they
+  // fade. So they hide the sun, as do those near the car that are still
+  // fading in, wherever they stand before it: its disc and the glow close
+  // round it.
   float low = smoothstep(0.0, 10.0, vHeight);
-  float a = mix(uShade * fog * (0.8 + 0.2 * face) * mix(0.35, 1.0, low), present(d), uNeon);
+  vec2 at = vec2(gl_FragCoord.x, uScreen.y - gl_FragCoord.y);
+  float dy = at.y - 0.58 * uScreen.y;
+  float sunX = 0.0;
+  float solid = 0.0;
+  if (uNeon > 0.001) {
+    sunX = sunAt(uSky, uScreen.x);
+    float R = 0.095 * uScreen.y;
+    float r = length(vec2(at.x - sunX, dy));
+    float sun = max(1.0 - smoothstep(R - 1.0, R + 1.0, r), 0.6 * exp(-max(r - R, 0.0) / (0.3 * R)))
+      * step(dy, 0.0) * smoothstep(25.0, 40.0, d);
+    solid = uFade * (1.0 - smoothstep(370.0, 390.0, d)) * max(smoothstep(40.0, 140.0, d), sun);
+  }
+  float a = mix(uShade * fog * (0.8 + 0.2 * face) * mix(0.35, 1.0, low), solid, uNeon);
   // A wall too faint to see hides nothing either.
   if (a < 0.004) discard;
 #ifdef GL_OES_standard_derivatives
@@ -648,13 +663,12 @@ void main() {
   // from it, premultiplied.
   vec3 tint = uLight * 0.025;
   if (uNeon > 0.001) {
-    vec2 at = vec2(gl_FragCoord.x, uScreen.y - gl_FragCoord.y);
-    float dy = at.y - 0.58 * uScreen.y;
-    float bx = (at.x - sunAt(uSky, uScreen.x)) / (0.5 * uScreen.x);
+    float bx = (at.x - sunX) / (0.5 * uScreen.x);
     vec3 haze = duskSky(max(-dy / (0.58 * uScreen.y), 0.0), bx) * exp(-max(dy, 0.0) / (0.08 * uScreen.y))
       + duskHaze(dy, uScreen.y, bx);
     vec3 violet = vec3(0.09, 0.03, 0.17) * (1.3 - 0.3 * face);
-    tint = mix(tint, mix(haze, violet, exp(-d / 260.0) * mix(0.5, 1.0, low)), uNeon);
+    float clear = exp(-d / 260.0) * mix(0.5, 1.0, low) * (1.0 - smoothstep(300.0, 380.0, d));
+    tint = mix(tint, mix(haze, violet, clear), uNeon);
   }
   gl_FragColor = vec4(tint * a + glow * fog + edge, a) * cover;
 }`;
