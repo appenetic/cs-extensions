@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.again.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
       - name: Validate and export compiled Home Assistant package
@@ -46,6 +46,16 @@ jobs:
           done
           echo "::error::The github-pages artifact is still not listed after 5 minutes."
           exit 1
+      # Even once it is listed, deploy-pages may find none a second later; it
+      # then fails before it deploys anything, and tries once more.
       - name: Publish feed
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Wait before publishing again
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - name: Publish feed again
+        id: again
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
