@@ -533,6 +533,8 @@ uniform float uShimmer;
 // from the sky's heading, in radians.
 uniform vec2 uScreen;
 uniform float uSky;
+// The picture's brightness, as the road's shader rolls its colours off.
+uniform float uGlow;
 varying vec2 vRel;
 varying vec2 vNormal;
 varying float vHeight;
@@ -553,9 +555,7 @@ void main() {
   // In the neon city the walls stay solid into the distance and take on the
   // colour of the haze before them instead, the sky's where they meet it,
   // their feet deeper in it; only at the end of the buildings picked do they
-  // fade. So they hide the sun, as do those near the car that are still
-  // fading in, wherever they stand before it: its disc and the glow close
-  // round it.
+  // fade. So they hide the sun.
   float low = smoothstep(0.0, 10.0, vHeight);
   vec2 at = vec2(gl_FragCoord.x, uScreen.y - gl_FragCoord.y);
   float dy = at.y - 0.58 * uScreen.y;
@@ -563,11 +563,7 @@ void main() {
   float solid = 0.0;
   if (uNeon > 0.001) {
     sunX = sunAt(uSky, uScreen.x);
-    float R = 0.095 * uScreen.y;
-    float r = length(vec2(at.x - sunX, dy));
-    float sun = max(1.0 - smoothstep(R - 1.0, R + 1.0, r), 0.6 * exp(-max(r - R, 0.0) / (0.3 * R)))
-      * step(dy, 0.0) * smoothstep(25.0, 40.0, d);
-    solid = uFade * (1.0 - smoothstep(370.0, 390.0, d)) * max(smoothstep(40.0, 140.0, d), sun);
+    solid = uFade * smoothstep(40.0, 140.0, d) * (1.0 - smoothstep(370.0, 390.0, d));
   }
   float a = mix(uShade * fog * (0.8 + 0.2 * face) * mix(0.35, 1.0, low), solid, uNeon);
   // A wall too faint to see hides nothing either.
@@ -662,6 +658,12 @@ void main() {
   // Dark glass, tinted by the light, or violet in the haze, and what shines
   // from it, premultiplied.
   vec3 tint = uLight * 0.025;
+  // A wall still fading in, near the car, shows the sky behind it; where the
+  // sun stands there, the sky without the sun's disc, so the wall hides the
+  // sun and looks the same over it as beside it. A wall that has only begun
+  // to show hides it in part.
+  vec3 behind = vec3(0.0);
+  float hide = 0.0;
   if (uNeon > 0.001) {
     float bx = (at.x - sunX) / (0.5 * uScreen.x);
     vec3 haze = duskSky(max(-dy / (0.58 * uScreen.y), 0.0), bx) * exp(-max(dy, 0.0) / (0.08 * uScreen.y))
@@ -669,8 +671,22 @@ void main() {
     vec3 violet = vec3(0.09, 0.03, 0.17) * (1.3 - 0.3 * face);
     float clear = exp(-d / 260.0) * mix(0.5, 1.0, low) * (1.0 - smoothstep(300.0, 380.0, d));
     tint = mix(tint, mix(haze, violet, clear), uNeon);
+    float R = 0.095 * uScreen.y;
+    float r = length(vec2(at.x - sunX, dy));
+    // Out to a little beyond the disc's soft edge, where the two skies agree.
+    hide = (1.0 - smoothstep(R + 1.0, R + 3.0, r)) * step(dy, 0.0) * smoothstep(0.0, 0.3, a) * uNeon;
+    if (hide > 0.0) {
+      // The sky there as the road's shader draws it but for the disc: its
+      // gradient, the haze and the sun's glow, then its vignette and roll-off.
+      vec3 sky = duskSky(-dy / (0.58 * uScreen.y), bx) + duskHaze(dy, uScreen.y, bx)
+        + vec3(1.0, 0.35, 0.5) * 0.45 * exp(-max(r - R, 0.0) / (0.3 * R))
+        + vec3(0.7, 0.16, 0.4) * 0.2 * exp(-r * r / (4.0 * R * R));
+      vec2 q = at / uScreen - 0.5;
+      sky *= 1.0 - 0.35 * smoothstep(0.35, 0.85, length(q * vec2(1.25, 1.0)));
+      behind = 1.0 - exp(-sky * 1.6 * uGlow);
+    }
   }
-  gl_FragColor = vec4(tint * a + glow * fog + edge, a) * cover;
+  gl_FragColor = vec4(tint * a + glow * fog + edge + hide * (1.0 - a) * behind, a + hide * (1.0 - a)) * cover;
 }`;
 
   // The service's lines as walls: per line its height, its base, 1 when
@@ -760,7 +776,7 @@ void main() {
     const camera = ['uCam', 'uDir', 'uView', 'uFade'];
     const wallsGL = link(WALL_VERTEX, WALL_FRAGMENT, ['aPos', 'aWall', 'aFace', 'aEnds'],
       [...camera, 'uRise', 'uLight', 'uShade', 'uEdge', 'uDepth', 'uNeon', 'uMirror', 'uReflect', 'uShimmer', 'uScreen',
-        'uSky']);
+        'uSky', 'uGlow']);
     let walls = null;
     // A buffer of vertices with their attributes' sizes, interleaved.
     const upload = (data, sizes) => {
@@ -841,6 +857,7 @@ void main() {
         gl.uniform1f(wallsGL.u.uShimmer, p.time % 3600);
         gl.uniform2f(wallsGL.u.uScreen, canvas.width, canvas.height);
         gl.uniform1f(wallsGL.u.uSky, p.sky);
+        gl.uniform1f(wallsGL.u.uGlow, p.glow);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         for (const mirror of p.neon > 0.01 ? [1, 0] : [0]) {
           gl.depthMask(true);

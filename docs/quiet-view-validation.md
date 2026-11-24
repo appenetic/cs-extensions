@@ -506,6 +506,27 @@ Auto steht. Ein Test im Dienst prüft beides, über drei Mal 6 s im Stand und
 einmal beim Fahren. Ohne die Korrektur schlägt er fehl, mit dem Race-Detector
 läuft er sauber.
 
+## Nahe Häuser vor der Sonne (alpha.27)
+
+Gefunden bei einer Durchsicht von Standbildern der Demo, beide Stile, acht
+Szenen. Seit alpha.25 wurde ein nahes Haus, das noch einblendet, nur im Kreis
+der Sonne und ihres inneren Scheins deckend. Daneben blieb es halb durchsichtig
+und hell vom Himmel dahinter. So zeichnete sich auf dem Haus eine dunkle
+Sonnenscheibe ab, bei 0:30 in der Demo auf einem langen, flachen Haus.
+
+Jetzt ist ein solches Haus überall gleich durchsichtig. Im Kreis der Sonne
+zeigt es dahinter den Himmel ohne ihre Scheibe, so wie der Shader der Straße
+ihn zeichnet, mit Verlauf, Dunst, Schein, Vignette und Abrollen. Damit verdeckt
+es die Sonne und sieht über ihr aus wie daneben, ihr Schein dringt weich durch.
+Ein Haus, das gerade erst sichtbar wird, verdeckt sie nur zum Teil, ab 30 %
+Deckkraft ganz. Der Kreis reicht 3 Pixel über den weichen Rand der Scheibe
+hinaus, dorthin, wo beide Himmel gleich sind. Sonst bliebe ein feiner Ring.
+
+Geprüft bei 0:30 mit vorgelaufenem Himmel: kein Fleck und kein Ring, die
+Sonne steht hinter dem Haus. Bei 0:52 verdeckt ein fernes, deckendes Haus die
+Sonne zur Hälfte, wie zuvor. Die übrigen Szenen unterscheiden sich nur in der
+Uhrzeit und den funkelnden Sternen.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn

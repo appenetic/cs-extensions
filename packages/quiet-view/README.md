@@ -29,8 +29,9 @@ unter der Ankunftszeit bleibt. In Kurven bleibt sie wie die Stadt an ihrem Platz
 in der Welt und wandert mit ihrer Spiegelung über das Bild; auf der Geraden
 kommt sie langsam wieder nach vorn. Die Häuser stehen deckend im Dunst und
 nehmen mit der Entfernung seine Farbe an, bis sie sich in der Ferne ganz darin
-auflösen. Vor der Sonne bleiben sie immer Silhouetten, auch die nahen, die
-gerade erst einblenden. Manche tragen türkise Lichtbänder an
+auflösen. Vor der Sonne bleiben sie immer Silhouetten. Die nahen, die gerade
+erst einblenden, verdecken ihre Scheibe und lassen nur ihren Schein weich
+durch. Manche tragen türkise Lichtbänder an
 jeder Etage, manche sind Türme voller warm erleuchteter Fenster, die übrigen
 dunkel, mit Dachkanten in Pink oder Türkis. Die Linien sind golden, die
 weichen Lichtbahnen ein rosa Schein. Die nasse Straße spiegelt Sonne und Stadt
