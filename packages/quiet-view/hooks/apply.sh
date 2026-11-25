@@ -11,11 +11,11 @@ if [ "$(readlink -f /var/run)" != /run ] && [ -e "/var/run/netns/$ns" ]; then
     api PUT "/binds/netns-$ns" "{\"source\":\"/var/run/netns/$ns\",\"target\":\"/run/netns/$ns\"}" >/dev/null 2>&1 || :
 fi
 if [ -z "$PORT" ]; then
-    status failed 'Kein Web-Port vom CoilShift-Dienst erhalten.'
+    status failed "$(say 'Kein Web-Port vom CoilShift-Dienst erhalten.' 'No web port from the CoilShift service.')"
     exit 1
 fi
 if ! quiet_tile; then
-    status failed 'Die Kachel ließ sich nicht installieren.'
+    status failed "$(say 'Die Kachel ließ sich nicht installieren.' 'The tile could not be installed.')"
     exit 1
 fi
 exit 0

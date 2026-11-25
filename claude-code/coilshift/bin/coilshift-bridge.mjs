@@ -24,7 +24,7 @@ import os from 'node:os'
 import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { VERSION, dataDir, ensureBridge, local, relaySocketPath, running, socketPath } from '../lib/common.mjs'
+import { VERSION, dataDir, ensureBridge, local, macLang, relaySocketPath, running, socketPath } from '../lib/common.mjs'
 import { ANSWER_LABEL, OFFER_LABEL, Relay, boxKey, boxKeys, carCode, carCodeFor, channel, rawPublic, relayBrokers, seal } from '../lib/relay.mjs'
 
 const MAX_MESSAGES = 60
@@ -50,9 +50,11 @@ const SLASH = /^\/[\w:-]+(\s|$)/
 // How long a new session without a word stays out of the car's list.
 const QUIET_START = 60 * 1000
 
-// An error the car shows as is: a status and a German message.
+// An error the car shows as is: a status and a message in the car's language.
 const fail = (status, message) => Object.assign(new Error(message), { status })
 const squash = (s) => String(s || '').replace(/\s+/g, ' ').replace(/…$/, '').trim()
+// What the commands print on the Mac is in the Mac's language.
+const toMac = (de, en) => (macLang() === 'en' ? en : de)
 
 // ---------------------------------------------------------------- text helpers
 
@@ -255,21 +257,22 @@ export async function shrinkImage(image, dir) {
 // ---------------------------------------------------------------- speech
 
 // speakable makes Claude's Markdown into text for a voice: code blocks and
-// tables are named, not read; marks, bullets and link targets go.
-export function speakable(text) {
+// tables are named, in the car's language, not read; marks, bullets and link
+// targets go.
+export function speakable(text, lang = 'de') {
   const out = []
   let code = false
   let table = false
   for (const raw of String(text || '').split('\n')) {
     const line = raw.trim()
     if (/^(```|~~~)/.test(line)) {
-      if (!code) out.push('Codeblock ausgelassen.')
+      if (!code) out.push(lang === 'en' ? 'Code block skipped.' : 'Codeblock ausgelassen.')
       code = !code
       continue
     }
     if (code) continue
     if (/^\|.*\|$/.test(line)) {
-      if (!table) out.push('Tabelle ausgelassen.')
+      if (!table) out.push(lang === 'en' ? 'Table skipped.' : 'Tabelle ausgelassen.')
       table = true
       continue
     }
@@ -294,14 +297,17 @@ export function speakable(text) {
   return out.join('\n')
 }
 
-// germanVoice is the voice say speaks German with: Anna, else the first one
-// for German, else say's own choice.
-export async function germanVoice() {
+// voiceFor is the voice say speaks the car's language with. German: Anna, else
+// the first one for German. English: the first of a few plain voices, never
+// the first one listed, which is a novelty voice such as Albert. Else say's
+// own choice.
+export async function voiceFor(lang) {
   const names = (await tool('say', ['-v', '?']))
     .split('\n')
-    .filter((line) => /\sde_[A-Z]{2}\s/.test(line))
+    .filter((line) => (lang === 'en' ? /\sen_[A-Z]{2}\s/ : /\sde_[A-Z]{2}\s/).test(line))
     .map((line) => line.split(' (')[0].trim())
     .filter(Boolean)
+  if (lang === 'en') return ['Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa'].find((n) => names.includes(n)) || ''
   return names.includes('Anna') ? 'Anna' : names[0] || ''
 }
 
@@ -443,9 +449,14 @@ export class Bridge {
     this.claude = options.claude || claudeBinary()
     this.shrink = options.shrink || shrinkImage
     this.speak = options.speak || speakText
-    this.pickVoice = options.voice || germanVoice
-    // Speech made for the car, by session and message.
+    this.pickVoice = options.voice || voiceFor
+    // The voice for each language, once looked up.
+    this.voices = new Map()
+    // Speech made for the car, by session, message and language.
     this.speeches = new Map()
+    // The language of the car's screen, as its long poll last said: what the
+    // bridge writes for the car is in it. German until a car says.
+    this.carLang = 'de'
     this.later = options.later || ((fn, ms) => setTimeout(fn, ms).unref())
     // Images made small for the car, by session, message and position.
     this.images = new Map()
@@ -469,6 +480,11 @@ export class Bridge {
     this.redeemed = new Map()
     this.mqtt = null
     this.brokers = []
+  }
+
+  // toCar picks the words for the car in its language.
+  toCar(de, en) {
+    return this.carLang === 'en' ? en : de
   }
 
   // -------------------------------------------------------------- relay
@@ -511,9 +527,16 @@ export class Bridge {
   // key, so the offer sealed to it opens only in that car, not for someone who
   // read the code off the screen. Hello and offer repeat until the car pairs.
   pairCar(input, fingerprint) {
-    if (!this.mqtt) throw fail(409, 'Das Internet-Relay ist ausgeschaltet (COILSHIFT_RELAY=off). Bitte über den QR-Code koppeln.')
+    // Asked by /coilshift:pair, so its errors are for the Mac.
+    if (!this.mqtt) {
+      throw fail(409, toMac('Das Internet-Relay ist ausgeschaltet (COILSHIFT_RELAY=off). Bitte über den QR-Code koppeln.',
+        'The internet relay is turned off (COILSHIFT_RELAY=off). Please pair with the QR code.'))
+    }
     const code = carCode(input)
-    if (!code) throw fail(400, 'Das ist kein Code aus dem Auto. Er hat 16 Zeichen, etwa K7QM-4ZP2-XR9T-HB3D.')
+    if (!code) {
+      throw fail(400, toMac('Das ist kein Code aus dem Auto. Er hat 16 Zeichen, etwa K7QM-4ZP2-XR9T-HB3D.',
+        'That is not a code from the car. It has 16 characters, like K7QM-4ZP2-XR9T-HB3D.'))
+    }
     const one = this.newCode()
     const ch = channel('car', code)
     const started = this.now()
@@ -730,7 +753,7 @@ export class Bridge {
     const p = s.pending
     return {
       id: s.id,
-      title: clip(s.title || s.name || path.basename(s.cwd || '') || 'Sitzung', 120),
+      title: clip(s.title || s.name || path.basename(s.cwd || '') || this.toCar('Sitzung', 'Session'), 120),
       cwd: s.cwd,
       kind: s.kind,
       status: s.pending ? 'waiting' : s.status,
@@ -748,7 +771,7 @@ export class Bridge {
   async image(session, message, n) {
     const s = this.sessions.get(session)
     const m = s && s.messages.find((x) => x.id === message && x.role === 'user')
-    if (!m || !Number.isInteger(n) || n < 0 || n >= (m.images || 0)) throw fail(404, 'Dieses Bild kennt der Mac nicht.')
+    if (!m || !Number.isInteger(n) || n < 0 || n >= (m.images || 0)) throw fail(404, this.toCar('Dieses Bild kennt der Mac nicht.', 'The Mac does not know this image.'))
     const key = `${s.id}\n${m.id}\n${n}`
     let job = this.images.get(key)
     if (job) {
@@ -757,13 +780,13 @@ export class Bridge {
       job = (async () => {
         if (!s.transcript) s.transcript = this.findTranscript(s.id)
         const image = (await transcriptImages(s.transcript, m))[n]
-        if (!image || image.data.length > MAX_IMAGE_SOURCE) throw fail(404, 'Das Bild ist nicht mehr im Verlauf.')
+        if (!image || image.data.length > MAX_IMAGE_SOURCE) throw fail(404, this.toCar('Das Bild ist nicht mehr im Verlauf.', 'The image is no longer in the history.'))
         try {
           return await this.shrink(image, this.dir)
         } catch {
           // Without sips a small original still goes.
           if (IMAGE_TYPES.has(image.type) && image.data.length <= MAX_MEDIA) return image
-          throw fail(422, 'Das Bild lässt sich nicht verkleinern.')
+          throw fail(422, this.toCar('Das Bild lässt sich nicht verkleinern.', 'The image cannot be made smaller.'))
         }
       })()
       job.catch(() => this.images.get(key) === job && this.images.delete(key))
@@ -771,26 +794,28 @@ export class Bridge {
     this.images.set(key, job)
     while (this.images.size > 16) this.images.delete(this.images.keys().next().value)
     const out = await job
-    if (!IMAGE_TYPES.has(out.type) || out.data.length > MAX_MEDIA) throw fail(413, 'Das Bild ist zu groß für das Auto.')
+    if (!IMAGE_TYPES.has(out.type) || out.data.length > MAX_MEDIA) throw fail(413, this.toCar('Das Bild ist zu groß für das Auto.', 'The image is too large for the car.'))
     return out
   }
 
   // speech is one of Claude's answers read aloud on the Mac, made once; the
-  // car plays it. The voice is config.voice, else German as say has it.
+  // car plays it. The voice is config.voice, else one for the car's language
+  // as say has it.
   async speech(session, message) {
     const s = this.sessions.get(session)
     const m = s && s.messages.find((x) => x.id === message && x.role === 'assistant')
-    if (!m) throw fail(404, 'Diese Antwort kennt der Mac nicht.')
-    const text = speakable(m.text)
-    if (!text) throw fail(404, 'In dieser Antwort gibt es nichts vorzulesen.')
-    const key = `${s.id}\n${m.id}`
+    if (!m) throw fail(404, this.toCar('Diese Antwort kennt der Mac nicht.', 'The Mac does not know this answer.'))
+    const lang = this.carLang
+    const text = speakable(m.text, lang)
+    if (!text) throw fail(404, this.toCar('In dieser Antwort gibt es nichts vorzulesen.', 'There is nothing to read aloud in this answer.'))
+    const key = `${s.id}\n${m.id}\n${lang}`
     let job = this.speeches.get(key)
     if (job) {
       this.speeches.delete(key)
     } else {
       job = (async () => {
-        if (!this.config.voice && this.voice === undefined) this.voice = await this.pickVoice().catch(() => '')
-        return this.speak(text, this.config.voice || this.voice, this.dir)
+        if (!this.config.voice && !this.voices.has(lang)) this.voices.set(lang, await this.pickVoice(lang).catch(() => ''))
+        return this.speak(text, this.config.voice || this.voices.get(lang), this.dir)
       })()
       job.catch(() => this.speeches.get(key) === job && this.speeches.delete(key))
     }
@@ -800,9 +825,9 @@ export class Bridge {
     try {
       out = await job
     } catch {
-      throw fail(422, 'Der Mac kann gerade nicht vorlesen.')
+      throw fail(422, this.toCar('Der Mac kann gerade nicht vorlesen.', 'The Mac cannot read aloud right now.'))
     }
-    if (out.type !== 'audio/mp4' || out.data.length > MAX_MEDIA) throw fail(413, 'Die Antwort ist zu lang zum Vorlesen.')
+    if (out.type !== 'audio/mp4' || out.data.length > MAX_MEDIA) throw fail(413, this.toCar('Die Antwort ist zu lang zum Vorlesen.', 'The answer is too long to read aloud.'))
     return out
   }
 
@@ -1038,7 +1063,7 @@ export class Bridge {
         if (input.tool_name !== 'AskUserQuestion') break
         const questions = (input.tool_input && Array.isArray(input.tool_input.questions) ? input.tool_input.questions : []).slice(0, 4)
         const prompt = this.newPrompt('question', {
-          title: 'Claude fragt',
+          title: this.toCar('Claude fragt', 'Claude asks'),
           text: questions.map((q) => q.question).join('\n'),
           questions: questions.map((q) => ({
             question: clip(q.question, 1000),
@@ -1058,11 +1083,12 @@ export class Bridge {
         // The dialog of AskUserQuestion is the question PreToolUse already
         // showed, not a permission; it must not replace it in the car.
         if (input.tool_name === 'AskUserQuestion') break
+        const toolName = clip(input.tool_name, 64)
         const prompt = this.newPrompt('permission', {
-          title: 'Freigabe',
-          tool: clip(input.tool_name, 64),
+          title: this.toCar('Freigabe', 'Approval'),
+          tool: toolName,
           detail: clip(toolSummary(input.tool_name, input.tool_input).replace(/^[^:]*:\s*/, ''), 1000),
-          text: `Claude möchte ${clip(input.tool_name, 64)} ausführen.`,
+          text: this.toCar(`Claude möchte ${toolName} ausführen.`, `Claude wants to run ${toolName}.`),
         })
         this.release(s)
         s.pending = prompt
@@ -1084,7 +1110,7 @@ export class Bridge {
         if (text) this.addMessage(s, 'assistant', text)
         s.status = 'idle'
         const question = closingQuestion(text)
-        if (question && !s.pending) s.pending = this.newPrompt('input', { title: 'Claude wartet auf dich', text: question })
+        if (question && !s.pending) s.pending = this.newPrompt('input', { title: this.toCar('Claude wartet auf dich', 'Claude is waiting for you'), text: question })
         break
       }
       case 'SessionEnd':
@@ -1113,16 +1139,20 @@ export class Bridge {
 
   async deliverInbox(s, text) {
     const relay = this.relays.get(s.socket)
-    if (!relay) throw fail(422, 'Diese Sitzung läuft ohne CoilShift-Relay, vermutlich seit vor der Plugin-Installation. Bitte die Sitzung neu starten.')
+    if (!relay) {
+      throw fail(422, this.toCar('Diese Sitzung läuft ohne CoilShift-Relay, vermutlich seit vor der Plugin-Installation. Bitte die Sitzung neu starten.',
+        'This session runs without the CoilShift relay, probably since before the plugin was installed. Please restart the session.'))
+    }
     const id = `d${++this.seq}`
     const result = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         relay.results.delete(id)
-        reject(fail(504, 'Die Sitzung hat die Nachricht nicht rechtzeitig angenommen.'))
+        reject(fail(504, this.toCar('Die Sitzung hat die Nachricht nicht rechtzeitig angenommen.', 'The session did not take the message in time.')))
       }, 8000)
       relay.results.set(id, (ok, error) => {
         clearTimeout(timer)
-        ok ? resolve() : reject(fail(502, 'Die Sitzung hat die Nachricht abgelehnt: ' + clip(error || 'unbekannt', 120)))
+        const why = clip(error || this.toCar('unbekannt', 'unknown'), 120)
+        ok ? resolve() : reject(fail(502, this.toCar('Die Sitzung hat die Nachricht abgelehnt: ', 'The session refused the message: ') + why))
       })
     })
     relay.socket.write(JSON.stringify({ type: 'deliver', id, text }) + '\n')
@@ -1144,30 +1174,35 @@ export class Bridge {
 
   runClaude(args, cwd) {
     return new Promise((resolve, reject) => {
-      if (!fs.existsSync(cwd)) return reject(fail(422, 'Der Projektordner existiert auf dem Mac nicht mehr: ' + clip(cwd, 200)))
+      if (!fs.existsSync(cwd)) return reject(fail(422, this.toCar('Der Projektordner existiert auf dem Mac nicht mehr: ', 'The project folder no longer exists on the Mac: ') + clip(cwd, 200)))
       execFile(this.claude, args, { cwd, timeout: 60000, maxBuffer: 1 << 20 }, (error, stdout, stderr) => {
         const out = `${stdout || ''}\n${stderr || ''}`
         const m = /backgrounded\s*·\s*([0-9a-f]{6,})/.exec(out)
         if (m) return resolve(m[1])
         const reason = clip(out.split('\n').find((l) => l.trim()) || (error && error.message) || 'claude failed', 300)
-        reject(fail(422, 'Claude Code auf dem Mac: ' + reason))
+        reject(fail(422, this.toCar('Claude Code auf dem Mac: ', 'Claude Code on the Mac: ') + reason))
       })
     })
   }
 
-  static fromCar(text, source) {
-    return `${source === 'voice' ? '[Aus dem Auto, per Sprache diktiert]' : '[Aus dem Auto]'} ${text}`
+  // fromCar marks text from the car for Claude, in the car's language: the
+  // driver wrote or spoke in it.
+  static fromCar(text, source, lang = 'de') {
+    const mark = lang === 'en'
+      ? (source === 'voice' ? '[From the car, dictated by voice]' : '[From the car]')
+      : (source === 'voice' ? '[Aus dem Auto, per Sprache diktiert]' : '[Aus dem Auto]')
+    return `${mark} ${text}`
   }
 
   // reply: {session, prompt?, text?, answers?, decision?, source}
   async reply(r) {
     const s = this.sessions.get(r.session)
-    if (!s) throw fail(404, 'Diese Sitzung kennt der Mac nicht mehr.')
+    if (!s) throw fail(404, this.toCar('Diese Sitzung kennt der Mac nicht mehr.', 'The Mac no longer knows this session.'))
     const text = clip(r.text)
     const answers = r.answers && typeof r.answers === 'object' ? r.answers : {}
     if (r.prompt) {
       const p = s.pending
-      if (!p || p.id !== r.prompt) throw fail(409, 'Die Frage ist bereits beantwortet oder abgelaufen.')
+      if (!p || p.id !== r.prompt) throw fail(409, this.toCar('Die Frage ist bereits beantwortet oder abgelaufen.', 'The question was already answered or has expired.'))
       if (p.waiter) {
         if (p.kind === 'question') {
           // Keys are the questions as the car shows them; the hook needs the originals.
@@ -1177,13 +1212,14 @@ export class Bridge {
             if (i >= 0 && typeof value === 'string' && value.trim()) out[p.originals[i]] = clip(value, 1000)
           }
           if (Object.keys(out).length === 0 && text && p.originals[0]) out[p.originals[0]] = text
-          if (Object.keys(out).length === 0) throw fail(400, 'Bitte eine Antwort wählen oder sprechen.')
+          if (Object.keys(out).length === 0) throw fail(400, this.toCar('Bitte eine Antwort wählen oder sprechen.', 'Please choose or speak an answer.'))
           this.addMessage(s, 'car', Object.entries(out).map(([q, a]) => `${q} → ${a}`).join('\n'))
           p.waiter(Bridge.questionOutput(p, out))
         } else if (p.kind === 'permission') {
           const allow = r.decision === 'allow'
-          const message = text || 'Im Auto abgelehnt.'
-          this.addMessage(s, 'car', allow ? `Freigegeben: ${p.tool}` : `Abgelehnt: ${p.tool}${text ? ' · ' + text : ''}`)
+          const message = text || this.toCar('Im Auto abgelehnt.', 'Denied in the car.')
+          const said = allow ? this.toCar('Freigegeben', 'Approved') : this.toCar('Abgelehnt', 'Denied')
+          this.addMessage(s, 'car', `${said}: ${p.tool}${!allow && text ? ' · ' + text : ''}`)
           p.waiter({
             hookSpecificOutput: {
               hookEventName: 'PermissionRequest',
@@ -1193,10 +1229,13 @@ export class Bridge {
         }
         return { ok: true, delivered: 'hook' }
       }
-      if (p.kind !== 'input') throw fail(422, 'Die Frage ist im Terminal offen. Mit eingeschaltetem Unterwegs-Modus lassen sich künftige Fragen im Auto beantworten.')
+      if (p.kind !== 'input') {
+        throw fail(422, this.toCar('Die Frage ist im Terminal offen. Mit eingeschaltetem Unterwegs-Modus lassen sich künftige Fragen im Auto beantworten.',
+          'The question is open in the terminal. With away mode on, future questions can be answered in the car.'))
+      }
     }
-    if (!text) throw fail(400, 'Bitte einen Text eingeben oder diktieren.')
-    const message = Bridge.fromCar(text, r.source)
+    if (!text) throw fail(400, this.toCar('Bitte einen Text eingeben oder diktieren.', 'Please type or dictate a text.'))
+    const message = Bridge.fromCar(text, r.source, this.carLang)
     if (this.delivery(s) === 'inbox') {
       await this.deliverInbox(s, message)
       if (s.pending && s.pending.kind === 'input') s.pending = null
@@ -1206,7 +1245,7 @@ export class Bridge {
       this.touch()
       return { ok: true, delivered: 'inbox' }
     }
-    if (!s.cwd) throw fail(422, 'Für diese Sitzung ist kein Projektordner bekannt.')
+    if (!s.cwd) throw fail(422, this.toCar('Für diese Sitzung ist kein Projektordner bekannt.', 'No project folder is known for this session.'))
     if (s.kind !== 'ended') {
       // The session keeps running in its terminal; a copy with its history
       // takes the text and works on in the background.
@@ -1231,9 +1270,9 @@ export class Bridge {
   async start(body) {
     const cwd = String(body.cwd || '')
     const text = clip(body.text)
-    if (!this.projects().some((p) => p.cwd === cwd) || !text) throw fail(400, 'Projekt oder Auftrag ungültig.')
-    const name = clip(`Auto · ${text.split('\n')[0]}`, 48)
-    const id = await this.spawnClaude(['--bg', '-n', name, ...this.permissionArgs(), Bridge.fromCar(text, body.source)], cwd)
+    if (!this.projects().some((p) => p.cwd === cwd) || !text) throw fail(400, this.toCar('Projekt oder Auftrag ungültig.', 'Invalid project or task.'))
+    const name = clip(`${this.toCar('Auto', 'Car')} · ${text.split('\n')[0]}`, 48)
+    const id = await this.spawnClaude(['--bg', '-n', name, ...this.permissionArgs(), Bridge.fromCar(text, body.source, this.carLang)], cwd)
     // The new session shows up through its hooks and the next discovery.
     setTimeout(() => this.discover().catch(() => {}), 1500)
     return { ok: true, id }
@@ -1254,7 +1293,7 @@ export class Bridge {
   // COILSHIFT_HOSTS (comma-separated) overrides the detected addresses, for a
   // MagicDNS name or a fixed address the car should use instead.
   pairingLink(fingerprint, hosts = envHosts() || bridgeHosts()) {
-    if (hosts.length === 0) throw new Error('no LAN or Tailscale address')
+    if (hosts.length === 0) throw new Error(toMac('keine LAN- oder Tailscale-Adresse', 'no LAN or Tailscale address'))
     const code = this.newCode()
     const params = new URLSearchParams({ c: code, f: fingerprint })
     if (hosts.length > 1) params.set('h', hosts.slice(1).join(','))
@@ -1351,12 +1390,19 @@ export class Bridge {
       if (method === 'POST' && url.pathname === '/v1/relay') {
         // A car paired before the relay existed asks for its key over HTTPS.
         const info = this.relayInfo(device)
-        return info ? reply(200, info) : reply(410, { error: 'relay_off', message: 'Das Internet-Relay ist auf dem Mac ausgeschaltet.' })
+        return info ? reply(200, info) : reply(410, { error: 'relay_off', message: this.toCar('Das Internet-Relay ist auf dem Mac ausgeschaltet.', 'The internet relay is turned off on the Mac.') })
       }
       if (method === 'GET' && url.pathname === '/v1/state') {
         const since = Number(url.searchParams.get('since'))
         const wait = Math.min(30, Math.max(0, Number(url.searchParams.get('wait')) || 0))
         const gear = url.searchParams.get('gear') || ''
+        // The car's language; one that changes is a new revision, so the car
+        // gets the words in it at once. A car that names none keeps the last.
+        const lang = url.searchParams.get('lang')
+        if ((lang === 'de' || lang === 'en') && lang !== this.carLang) {
+          this.carLang = lang
+          this.touch()
+        }
         this.lastPoll = this.now()
         const wasAway = this.away()
         if (['D', 'R', 'N'].includes(gear)) this.lastDriving = this.now()
@@ -1399,7 +1445,7 @@ export class Bridge {
       }
       if (method === 'POST' && url.pathname === '/v1/hide') {
         const id = typeof body.session === 'string' ? body.session : ''
-        if (!this.sessions.has(id)) return reply(404, { error: 'unknown', message: 'Diese Sitzung kennt der Mac nicht mehr.' })
+        if (!this.sessions.has(id)) return reply(404, { error: 'unknown', message: this.toCar('Diese Sitzung kennt der Mac nicht mehr.', 'The Mac no longer knows this session.') })
         for (const [old, at] of Object.entries(this.config.hidden)) {
           if (!this.sessions.has(old) && this.now() - at > 7 * 24 * 3600 * 1000) delete this.config.hidden[old]
         }
@@ -1419,7 +1465,7 @@ export class Bridge {
         return reply(200, { ok: true })
       }
     } catch (error) {
-      return reply(error.status || 500, { error: 'failed', message: error.status ? clip(error.message, 300) : 'Interner Fehler der Bridge.' })
+      return reply(error.status || 500, { error: 'failed', message: error.status ? clip(error.message, 300) : this.toCar('Interner Fehler der Bridge.', 'Internal error of the bridge.') })
     }
     return reply(404, { error: 'not_found' })
   }
@@ -1640,103 +1686,139 @@ async function serve(dir) {
 
 // ---------------------------------------------------------------- CLI
 
-const RELAY_STATE = { up: 'verbunden', connecting: 'verbindet', down: 'getrennt', idle: 'wartet' }
+const RELAY_STATE = {
+  de: { up: 'verbunden', connecting: 'verbindet', down: 'getrennt', idle: 'wartet' },
+  en: { up: 'connected', connecting: 'connecting', down: 'disconnected', idle: 'waiting' },
+}
 
 // pairCar sends the pairing to the car that shows code and waits until it has
 // paired (the car keeps its pairing window open for ten minutes).
 async function pairCar(dir, code) {
   const before = new Set(((await local(dir, 'GET', '/status')).body.devices || []).map((d) => d.id))
   const answer = await local(dir, 'POST', '/pair/car', { code })
-  if (answer.status !== 200) return console.log('Keine Kopplung: ' + ((answer.body && answer.body.message) || 'unbekannter Fehler'))
-  console.log('Die Kopplung geht über das Internet-Relay ans Auto, Ende-zu-Ende-verschlüsselt. Warte auf das Auto …')
+  if (answer.status !== 200) return console.log(toMac('Keine Kopplung: ', 'No pairing: ') + ((answer.body && answer.body.message) || toMac('unbekannter Fehler', 'unknown error')))
+  console.log(toMac('Die Kopplung geht über das Internet-Relay ans Auto, Ende-zu-Ende-verschlüsselt. Warte auf das Auto …',
+    'The pairing goes to the car through the internet relay, end-to-end encrypted. Waiting for the car …'))
   const deadline = Date.now() + 90 * 1000
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 1500))
     const { body } = await local(dir, 'GET', '/status')
     const added = (body.devices || []).find((d) => !before.has(d.id))
-    if (added) return console.log(`Gekoppelt mit ${added.name}. Die Claude-App im Auto zeigt jetzt deine Sitzungen.`)
+    if (added) return console.log(toMac(`Gekoppelt mit ${added.name}. Die Claude-App im Auto zeigt jetzt deine Sitzungen.`, `Paired with ${added.name}. The Claude app in the car now shows your sessions.`))
   }
   console.log(
-    [
-      'Das Auto hat sich noch nicht gemeldet. Das Angebot gilt noch drei Minuten.',
-      'Bitte prüfen: Ist die Claude-App im Auto mit dem Kopplungscode offen, stimmt der Code, und hat das Auto Internet?',
-      'Danach mit /coilshift:status nachsehen, ob das Auto gekoppelt ist.',
-    ].join('\n'),
+    toMac(
+      [
+        'Das Auto hat sich noch nicht gemeldet. Das Angebot gilt noch drei Minuten.',
+        'Bitte prüfen: Ist die Claude-App im Auto mit dem Kopplungscode offen, stimmt der Code, und hat das Auto Internet?',
+        'Danach mit /coilshift:status nachsehen, ob das Auto gekoppelt ist.',
+      ],
+      [
+        'The car has not answered yet. The offer stays open for three more minutes.',
+        'Please check: is the Claude app open in the car with the pairing code, is the code right, and does the car have internet?',
+        'Then check with /coilshift:status whether the car is paired.',
+      ],
+    ).join('\n'),
   )
 }
 
 async function cli() {
   const [command, ...args] = process.argv.slice(2).filter((a, i, all) => a !== '--data' && all[i - 1] !== '--data')
   const dir = dataDir()
+  const lang = macLang()
+  // Dates as the Mac writes them: German ones in German, else the Mac's own.
+  const locale = lang === 'de' ? 'de-DE' : undefined
   switch (command) {
     case 'serve':
       return serve(dir)
     case 'pair': {
-      if (!(await ensureBridge(dir))) return console.log('Die Bridge startet nicht. Details: ' + path.join(dir, 'bridge.log'))
+      if (!(await ensureBridge(dir))) return console.log(toMac('Die Bridge startet nicht. Details: ', 'The bridge does not start. Details: ') + path.join(dir, 'bridge.log'))
       if (args.join('').trim()) return pairCar(dir, args.join(''))
       const answer = await local(dir, 'POST', '/pair/new', {})
-      if (answer.status !== 200) return console.log('Kein Kopplungslink: ' + ((answer.body && answer.body.message) || 'unbekannter Fehler'))
+      if (answer.status !== 200) return console.log(toMac('Kein Kopplungslink: ', 'No pairing link: ') + ((answer.body && answer.body.message) || toMac('unbekannter Fehler', 'unknown error')))
       let copied = false
       try {
         execFileSync('/usr/bin/pbcopy', { input: answer.body.link })
         copied = true
       } catch {}
+      const hosts = answer.body.hosts.join(', ')
+      const relay = answer.body.link.includes('&r=')
       console.log(
-        [
-          'Kopplungslink (gültig 10 Minuten, nur einmal verwendbar):',
-          '',
-          answer.body.link,
-          '',
-          copied ? 'Der Link ist in der Zwischenablage, per Universal Clipboard auch auf dem iPhone.' : '',
-          'So geht es weiter:',
-          '1. Im Auto die Claude-App öffnen und den QR-Code mit dem Handy scannen.',
-          '2. Auf der Handy-Seite den Link einfügen und »Koppeln« tippen.',
-          `Das Auto versucht zuerst ${answer.body.hosts.join(', ')} (Tailscale vor WLAN)${answer.body.link.includes('&r=') ? ', sonst das Internet-Relay' : ''}.`,
-          'Ohne gemeinsames WLAN: den Code aus der Claude-App im Auto hier angeben, also /coilshift:pair <Code>.',
-        ]
+        toMac(
+          [
+            'Kopplungslink (gültig 10 Minuten, nur einmal verwendbar):',
+            '',
+            answer.body.link,
+            '',
+            copied ? 'Der Link ist in der Zwischenablage, per Universal Clipboard auch auf dem iPhone.' : '',
+            'So geht es weiter:',
+            '1. Im Auto die Claude-App öffnen und den QR-Code mit dem Handy scannen.',
+            '2. Auf der Handy-Seite den Link einfügen und »Koppeln« tippen.',
+            `Das Auto versucht zuerst ${hosts} (Tailscale vor WLAN)${relay ? ', sonst das Internet-Relay' : ''}.`,
+            'Ohne gemeinsames WLAN: den Code aus der Claude-App im Auto hier angeben, also /coilshift:pair <Code>.',
+          ],
+          [
+            'Pairing link (valid for 10 minutes, usable once):',
+            '',
+            answer.body.link,
+            '',
+            copied ? 'The link is on the clipboard, and through Universal Clipboard on the iPhone too.' : '',
+            'Next:',
+            '1. Open the Claude app in the car and scan the QR code with your phone.',
+            '2. Paste the link on the phone page and tap “Pair”.',
+            `The car tries ${hosts} first (Tailscale before Wi-Fi)${relay ? ', then the internet relay' : ''}.`,
+            'Without a shared Wi-Fi: give the code from the Claude app in the car here, as /coilshift:pair <code>.',
+          ],
+        )
           .filter((l) => l !== null)
           .join('\n'),
       )
       return
     }
     case 'status': {
-      if (!(await running(dir))) return console.log('Die Bridge läuft nicht. Sie startet mit der nächsten Claude-Code-Sitzung.')
+      if (!(await running(dir))) return console.log(toMac('Die Bridge läuft nicht. Sie startet mit der nächsten Claude-Code-Sitzung.', 'The bridge is not running. It starts with the next Claude Code session.'))
       const { body } = await local(dir, 'GET', '/status')
+      const states = RELAY_STATE[lang]
+      const relays = (body.mqtt || []).map((b) => `${b.broker} ${states[b.state] || b.state}${b.error && b.state !== 'up' ? ' (' + b.error + ')' : ''}`).join(', ')
+      const cars = body.devices
+        .map((d) => `${d.name} (${toMac('zuletzt', 'last seen')} ${new Date(d.seen).toLocaleString(locale)}${d.relay ? toMac(', mit Internet-Relay', ', with internet relay') : ''})`)
+        .join(', ')
       const lines = [
-        `CoilShift-Bridge ${body.version} auf ${body.name}, Port ${body.port}`,
-        `Adressen: ${body.hosts.join(', ') || 'keine LAN-/Tailscale-Adresse'}`,
-        `Internet-Relay: ${(body.mqtt || []).length ? body.mqtt.map((b) => `${b.broker} ${RELAY_STATE[b.state] || b.state}${b.error && b.state !== 'up' ? ' (' + b.error + ')' : ''}`).join(', ') : 'aus'}`,
-        `Unterwegs-Modus: ${body.away}${body.awayNow ? ' (gerade aktiv)' : ''}`,
-        `Gekoppelte Autos: ${body.devices.length ? body.devices.map((d) => `${d.name} (zuletzt ${new Date(d.seen).toLocaleString('de-DE')}${d.relay ? ', mit Internet-Relay' : ''})`).join(', ') : 'keine'}`,
-        `Letzte Abfrage des Autos: ${body.lastPoll ? new Date(body.lastPoll).toLocaleString('de-DE') : 'noch keine'}`,
-        `Sitzungen mit Relay: ${body.relays}`,
+        toMac(`CoilShift-Bridge ${body.version} auf ${body.name}, Port ${body.port}`, `CoilShift bridge ${body.version} on ${body.name}, port ${body.port}`),
+        `${toMac('Adressen', 'Addresses')}: ${body.hosts.join(', ') || toMac('keine LAN-/Tailscale-Adresse', 'no LAN or Tailscale address')}`,
+        `${toMac('Internet-Relay', 'Internet relay')}: ${relays || toMac('aus', 'off')}`,
+        `${toMac('Unterwegs-Modus', 'Away mode')}: ${body.away}${body.awayNow ? toMac(' (gerade aktiv)', ' (active now)') : ''}`,
+        `${toMac('Gekoppelte Autos', 'Paired cars')}: ${cars || toMac('keine', 'none')}`,
+        `${toMac('Letzte Abfrage des Autos', "The car's last poll")}: ${body.lastPoll ? new Date(body.lastPoll).toLocaleString(locale) : toMac('noch keine', 'none yet')}`,
+        `${toMac('Sitzungen mit Relay', 'Sessions with relay')}: ${body.relays}`,
         ...body.devices
           .filter((d) => d.diag)
           .flatMap((d) => [
-            `Diagnose von ${d.name} (${d.diag.version || '?'}, ${new Date(d.diag.at).toLocaleTimeString('de-DE')}):`,
+            `${toMac('Diagnose von', 'Diagnostics from')} ${d.name} (${d.diag.version || '?'}, ${new Date(d.diag.at).toLocaleTimeString(locale)}):`,
             ...Object.entries(d.diag.values).map(([k, v]) => `  ${k}: ${v}`),
           ]),
-        ...body.sessions.slice(0, 10).map((s) => `  · ${s.title} — ${s.kind}, ${s.status}${s.delivery ? ', Antwort per ' + s.delivery : ''}`),
+        ...body.sessions.slice(0, 10).map((s) => `  · ${s.title} — ${s.kind}, ${s.status}${s.delivery ? toMac(', Antwort per ', ', answer by ') + s.delivery : ''}`),
       ]
       return console.log(lines.join('\n'))
     }
     case 'away': {
       const mode = args[0]
-      if (!['on', 'off', 'auto'].includes(mode)) return console.log('Aufruf: away on|off|auto')
-      if (!(await ensureBridge(dir))) return console.log('Die Bridge startet nicht.')
+      if (!['on', 'off', 'auto'].includes(mode)) return console.log(toMac('Aufruf: away on|off|auto', 'Usage: away on|off|auto'))
+      if (!(await ensureBridge(dir))) return console.log(toMac('Die Bridge startet nicht.', 'The bridge does not start.'))
       await local(dir, 'POST', '/away', { mode })
-      return console.log(`Unterwegs-Modus: ${mode}`)
+      return console.log(`${toMac('Unterwegs-Modus', 'Away mode')}: ${mode}`)
     }
     case 'unpair':
-      if (!(await running(dir))) return console.log('Die Bridge läuft nicht.')
+      if (!(await running(dir))) return console.log(toMac('Die Bridge läuft nicht.', 'The bridge is not running.'))
       await local(dir, 'POST', '/unpair', {})
-      return console.log('Alle Autos entkoppelt.')
+      return console.log(toMac('Alle Autos entkoppelt.', 'All cars unpaired.'))
     case 'stop':
-      if (!(await running(dir))) return console.log('Die Bridge läuft nicht.')
+      if (!(await running(dir))) return console.log(toMac('Die Bridge läuft nicht.', 'The bridge is not running.'))
       await local(dir, 'POST', '/stop', {}).catch(() => {})
-      return console.log('Bridge gestoppt.')
+      return console.log(toMac('Bridge gestoppt.', 'Bridge stopped.'))
     default:
-      console.log('Aufruf: coilshift-bridge.mjs serve|pair [Code]|status|away on|off|auto|unpair|stop [--data DIR]')
+      console.log(toMac('Aufruf: coilshift-bridge.mjs serve|pair [Code]|status|away on|off|auto|unpair|stop [--data DIR]',
+        'Usage: coilshift-bridge.mjs serve|pair [code]|status|away on|off|auto|unpair|stop [--data DIR]'))
   }
 }
 

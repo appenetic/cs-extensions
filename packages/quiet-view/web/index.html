@@ -17,47 +17,47 @@
 </div>
 <main id="center" hidden>
   <div id="arrivedBlock" hidden>
-    <p class="arrived">Angekommen</p>
+    <p class="arrived" data-t="arrived">Angekommen</p>
     <p id="arrivedSum" class="rest"></p>
   </div>
   <div id="arrival" class="arrival" hidden>
-    <p class="label">Ankunft</p>
+    <p class="label" data-t="arrival">Ankunft</p>
     <p id="eta" class="eta num"></p>
     <div id="progress" class="progress" hidden><div id="progressFill" class="fill"></div></div>
     <p id="rest" class="rest"></p>
   </div>
 </main>
-<p id="hint" class="hint">Nach unten wischen zum Schließen · lange drücken für Optionen</p>
-<p id="credit" class="credit" hidden>Gebäude: OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende</p>
+<p id="hint" class="hint" data-t="hint">Nach unten wischen zum Schließen · lange drücken für Optionen</p>
+<p id="credit" class="credit" data-t="credit" hidden>Gebäude: OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende</p>
 <div id="menu" class="menu" hidden>
-  <div class="panel" role="dialog" aria-label="Optionen">
+  <div class="panel" role="dialog" aria-label="Optionen" data-t-label="options">
     <h2>Quiet</h2>
-    <p class="sub">Was die Ansicht zeigt</p>
-    <button class="row" data-option="eta" type="button"><span>Ankunftszeit und Fortschritt</span><i></i></button>
-    <button class="row" data-option="turns" type="button"><span>Abbiegehinweise</span><i></i></button>
-    <button class="row" data-option="speed" type="button"><span>Tacho</span><i></i></button>
-    <button class="row" data-option="pulses" type="button"><span>Lichtstreifen</span><i></i></button>
-    <button class="row" data-option="buildings" type="button"><span>Gebäude</span><i></i></button>
-    <div class="row"><span>Lichtbahn</span>
+    <p class="sub" data-t="shows">Was die Ansicht zeigt</p>
+    <button class="row" data-option="eta" type="button"><span data-t="eta">Ankunftszeit und Fortschritt</span><i></i></button>
+    <button class="row" data-option="turns" type="button"><span data-t="turns">Abbiegehinweise</span><i></i></button>
+    <button class="row" data-option="speed" type="button"><span data-t="speed">Tacho</span><i></i></button>
+    <button class="row" data-option="pulses" type="button"><span data-t="pulses">Lichtstreifen</span><i></i></button>
+    <button class="row" data-option="buildings" type="button"><span data-t="buildings">Gebäude</span><i></i></button>
+    <div class="row"><span data-t="look">Lichtbahn</span>
       <div class="choices">
-        <button type="button" data-look="fine">Fein</button>
-        <button type="button" data-look="soft">Weich</button>
+        <button type="button" data-look="fine" data-t="fine">Fein</button>
+        <button type="button" data-look="soft" data-t="soft">Weich</button>
       </div>
     </div>
-    <div class="row"><span>Stil</span>
+    <div class="row"><span data-t="style">Stil</span>
       <div class="choices">
-        <button type="button" data-style="ambient">Ambiente</button>
+        <button type="button" data-style="ambient" data-t="ambient">Ambiente</button>
         <button type="button" data-style="neon">Neon</button>
       </div>
     </div>
-    <div class="row bright"><span>Helligkeit</span>
+    <div class="row bright"><span data-t="bright">Helligkeit</span>
       <div class="choices">
         <button type="button" data-bright="auto">Auto</button>
-        <button type="button" data-bright="high">Hell</button>
-        <button type="button" data-bright="low">Gedämpft</button>
+        <button type="button" data-bright="high" data-t="high">Hell</button>
+        <button type="button" data-bright="low" data-t="low">Gedämpft</button>
       </div>
     </div>
-    <button id="done" class="done" type="button">Fertig</button>
+    <button id="done" class="done" type="button" data-t="done">Fertig</button>
   </div>
 </div>
 <script src="app.js"></script>

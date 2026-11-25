@@ -409,6 +409,46 @@ test('narrow screens: an open question opens its session, back shows the list', 
   assert.match(el(h, 'messages').children[0].textContent, /Neueste Antwort/, 'newest first');
 });
 
+test('a car set to English gets the app in English; without lang it stays German', async () => {
+  const calls = [];
+  const h = await setup({ fetchState: { view: view({ lang: 'en' }) }, calls });
+  assert.equal(h.document.documentElement.getAttribute('lang'), 'en');
+  assert.equal(el(h, 'link-state').textContent, 'Connected · Testmac');
+  assert.equal(el(h, 'away').textContent, 'Away mode on');
+  assert.equal(el(h, 'composer').getAttribute('lang'), 'en', 'the keyboard dictates in English');
+  assert.equal(el(h, 'composer').getAttribute('aria-label'), 'Message to Claude');
+  assert.match(el(h, 'prompt').textContent, /Answer by tapping, with the keyboard's microphone or with the voice button/);
+  assert.match(root(h).byLabel('lb-connect').textContent, /working · Background · 17 min ago$/);
+  assert.match(el(h, 'diag').textContent, /Route to the Mac.*Card over the map/);
+  assert.doesNotMatch(root(h).textContent, /Sitzung|Unterwegs|Verbunden|Technik/, 'no German left');
+  root(h).byLabel('Blau').click();
+  await h.settle(25);
+  assert.equal(el(h, 'flash').textContent, 'Answer sent · to the waiting question.');
+
+  const german = await setup({ fetchState: { view: view() }, calls: [] });
+  assert.notEqual(german.document.documentElement.getAttribute('lang'), 'en');
+  assert.equal(el(german, 'link-state').textContent, 'Verbunden · Testmac');
+  assert.equal(el(german, 'composer').getAttribute('lang'), 'de');
+  const other = await setup({ fetchState: { view: view({ lang: 'fr' }) }, calls: [] });
+  assert.equal(el(other, 'away').textContent, 'Unterwegs-Modus an', 'only "en" switches');
+});
+
+test('the language changing keeps what was typed', async () => {
+  const state = { view: view() };
+  const h = await setup({ fetchState: state, calls: [] });
+  root(h).byLabel('lb-connect').click();
+  await h.settle();
+  el(h, 'composer').type('Bitte die Tests ausführen');
+  el(h, 'task').type('Lies die README');
+  state.view = view({ rev: 8, lang: 'en' });
+  await poll(h);
+  assert.equal(el(h, 'send').textContent, 'Send');
+  assert.equal(el(h, 'composer').value, 'Bitte die Tests ausführen');
+  assert.equal(el(h, 'task').value, 'Lies die README');
+  assert.match(el(h, 'composer-hint').textContent, /^Goes straight into the running session/);
+  assert.equal(el(h, 'back').textContent, '‹ All sessions');
+});
+
 test('a working session gets a small pulsing green dot, in step across updates', async () => {
   const calls = [];
   const state = { view: view() };

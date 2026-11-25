@@ -72,6 +72,13 @@ Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf; was eine
 ältere Version dort ablegte, gilt weiter, Neues beginnt mit seinem Standard
 (Lichtbahn Fein, Stil Ambiente).
 
+## Sprache
+
+Die App spricht die Sprache des Autos (`GUI_locale`): Deutsch, wenn das Auto
+auf Deutsch steht, sonst Englisch. Die Ankunftszeit folgt der 12- oder
+24-Stunden-Uhr des Autos (`GUI_24hourTime`). Im Feed heißt das Paket
+„Quiet View“.
+
 ## Gebäude
 
 Die Gebäude kommen als Vektorkacheln von [OpenFreeMap](https://openfreemap.org)

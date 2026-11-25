@@ -21,7 +21,9 @@ dem Mac. Es ist öffentlich, auch für Kollegen:
 `claude plugin install coilshift@appenetic`.
 [Einrichtung und Grenzen](packages/claude/README.md) ·
 [Validierung](docs/claude-validation.md). Läuft seit alpha.8 am Auto
-(Model Y, Firmware 2026.32.7).
+(Model Y, Firmware 2026.32.7). Seit alpha.24 und Plugin 0.2.11 auf Deutsch
+oder Englisch: im Auto nach der Sprache des Autos, auf dem Mac nach der des
+Macs.
 
 ## Welcome-Animation (neu, experimentell)
 
@@ -44,7 +46,8 @@ Tempo darauf, und die Linie leuchtet mit dem Blinker. Dahinter stehen schematisc
 OpenStreetMap. Darüber ruhig Tacho, Ankunft, nächste Abbiegung und
 Fortschritt, am Ziel ein eigener Ankunftsbildschirm; bei Warnungen schließt sie
 sich selbst. Fest nach unten wischen
-schließt sie, lange drücken öffnet die Optionen.
+schließt sie, lange drücken öffnet die Optionen. Sie spricht Deutsch oder
+Englisch, je nach Sprache des Autos; im Feed heißt sie „Quiet View“.
 [Funktionsweise](packages/quiet-view/README.md) ·
 [Validierung](docs/quiet-view-validation.md).
 

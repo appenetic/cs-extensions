@@ -192,3 +192,30 @@ nimmt das `finish`-Skript einen Dienst nach Exit 0 ganz herunter (`sv d`, am
 Auto gelesen); nach Exit 3 startet er nach 2 s neu, aus dem `run`-Skript der
 neuen Version. Auf dem Mac geprüft: neuer Token → Exit 3 nach etwa 2,5 s,
 SIGTERM → sofort Exit 0. Am Auto prüfbar erst beim Update nach alpha.23.
+
+## Deutsch und Englisch (alpha.24, Plugin 0.2.11)
+
+Wunsch des Nutzers: das Claude-Plugin zweisprachig, wie die Quiet-Ansicht.
+- **Im Auto:** Der `link`-Dienst liest `GUI_locale` vor allem anderen und dann
+  einmal pro Minute, der `web`-Dienst ebenso. Deutsch, wenn die Sprache `de`
+  ist, sonst Englisch; unbekannt bleibt Deutsch. Der View trägt `lang`, die App
+  tauscht ihre Texte danach und baut die Seite neu, ohne Getipptes zu
+  verlieren. Karte über der Navi: Titel, Hinweis und die Beschriftungen
+  Erlauben/Ablehnen/Schließen kommen aus dem Modell (`{card.lallow}`,
+  `{card.ldeny}`, `{card.lclose}`). Kopplungsseite am Handy, Diagnose und
+  Statusmeldungen folgen ebenfalls. Sprachantworten verstehen Deutsch und
+  Englisch („Variante zwei“, „option two“, „ja“, „yes“).
+- **Zur Bridge:** Der Long-Poll schickt `lang=de|en` mit. Die Bridge merkt sich
+  die Sprache des Autos und formuliert danach, was ins Auto geht: Fragen,
+  Freigaben, Fehlermeldungen, den Hinweis „[Aus dem Auto]“ an Claude und die
+  Stimme beim Vorlesen (Englisch: Samantha und andere, Deutsch: Anna). Ohne
+  `lang`, also bei einem älteren Paket, bleibt alles Deutsch.
+- **Auf dem Mac:** Die Ausgaben der Befehle (`pair`, `status`, `away`, `stop`)
+  folgen der Sprache des Macs. Plugin- und Marktplatz-Beschreibungen sind
+  Englisch, die READMEs bleiben Deutsch.
+- **Geprüft:** Go-Tests (Sprachregel, Karte auf Englisch samt Abgleich mit
+  `card.uiml`, `lang` im View und in der Anfrage, Kopplungsseite, Sprachantworten),
+  App-Tests in beiden Sprachen und beim Wechsel, Plugin-Tests für die Sprache
+  des Autos und des Macs. Am Auto offen: ob die drei neuen Beschriftungen der
+  Karte erscheinen. Die geänderte Vorlage meldet der UI-Host wie bisher erst
+  nach einem Neustart der Oberfläche an.

@@ -1,5 +1,5 @@
 ---
-description: Unterwegs-Modus der CoilShift-Bridge (on, off oder auto); im Unterwegs-Modus warten Fragen und Freigaben auf die Antwort aus dem Auto
+description: Away mode of the CoilShift bridge (on, off or auto); in away mode, questions and approvals wait for the answer from the car
 argument-hint: on|off|auto
 ---
 !`node "${CLAUDE_PLUGIN_ROOT}/bin/coilshift-bridge.mjs" away $ARGUMENTS --data "${CLAUDE_PLUGIN_DATA}"`

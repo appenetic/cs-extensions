@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.claude",
-      "version": "0.1.0-alpha.23",
+      "version": "0.1.0-alpha.24",
       "sdk": ">=1.0 <2",
       "title": "Claude Code (experimental)",
       "published_unix": 1794614400,
@@ -106,10 +106,10 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.claude",
-        "version": "0.1.0-alpha.23",
+        "version": "0.1.0-alpha.24",
         "sdk": ">=1.0 <2",
         "title": "Claude Code (experimental)",
-        "summary": "Deine Claude-Code-Sitzungen vom Mac auf der MCU: Liste, Verlauf, Fragen als Karte über der Navi, Antworten per Touch, Diktat oder Sprachtaste. Kopplung per Code oder QR-Code, auch ohne Tailscale.",
+        "summary": "Your Mac's Claude Code sessions on the MCU: list, history, questions as a card over the map, answers by touch, dictation or voice button. Pairing by code or QR code, also without Tailscale. In German or English, as your car is set.",
         "authors": [
           {
             "name": "Appenetic",
@@ -213,11 +213,11 @@
           ]
         }
       },
-      "manifest_sha256": "0d27819c039457b0c10a78bc8bd1f55573b1d29477b4e5102a001a549804327f",
+      "manifest_sha256": "83b05a686c6ad2cee075a84ee8ae78f8dd8d45d349488c48dc1ceb3c3e187bf2",
       "archive": {
-        "url": "pool/91afbfe1832308a295e7b1df2e64e1304ea6b14fd02471e54f9ed6063dacec8e",
-        "sha256": "91afbfe1832308a295e7b1df2e64e1304ea6b14fd02471e54f9ed6063dacec8e",
-        "bytes": 8601600
+        "url": "pool/e08c629aa7b1f2012de60801799932c4242162c00593bfb8bdc331a9e200e646",
+        "sha256": "e08c629aa7b1f2012de60801799932c4242162c00593bfb8bdc331a9e200e646",
+        "bytes": 8642560
       }
     },
     {
@@ -415,18 +415,18 @@
     },
     {
       "id": "com.appenetic.quiet-view",
-      "version": "0.1.0-alpha.28",
+      "version": "0.1.0-alpha.29",
       "sdk": ">=1.0 <2",
-      "title": "Quiet-Ansicht (experimental)",
+      "title": "Quiet View (experimental)",
       "published_unix": 1794614400,
       "withdrawn": false,
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.quiet-view",
-        "version": "0.1.0-alpha.28",
+        "version": "0.1.0-alpha.29",
         "sdk": ">=1.0 <2",
-        "title": "Quiet-Ansicht (experimental)",
-        "summary": "Eine App nach dem Quiet Mode von FSD v15: ein ruhiger, animierter Lichtschein in der Farbe deines Ambientelichts oder als Neonstadt, mit Tacho, Ankunftszeit, Abbiegehinweisen und den Gebäuden der Umgebung, direkt im Vollbild. Nach unten wischen schließt sie.",
+        "title": "Quiet View (experimental)",
+        "summary": "A calm full-screen app after FSD v15's Quiet Mode: a glow in your ambient light color or a neon city, with speedometer, arrival time, turn hints and the buildings around you. Swipe down to close. In German or English, as your car is set.",
         "authors": [
           {
             "name": "Appenetic",
@@ -466,10 +466,10 @@
           ]
         }
       },
-      "manifest_sha256": "6fe6c551f51aa61936f1913dfa99d3ad911174970e57ba70bffbc7def7fed918",
+      "manifest_sha256": "aeca73bc7a57b48cc9f9e1b6a71f3ade7a198eaaa0b677f31a482e304375f176",
       "archive": {
-        "url": "pool/da9e26ae887e504572db98e6804b35e39ea9a152fc45d28287c9f06e69ccd81b",
-        "sha256": "da9e26ae887e504572db98e6804b35e39ea9a152fc45d28287c9f06e69ccd81b",
+        "url": "pool/aa07bc4e3e97b44a0ee6b2a52c2f95ed306585716efa965bb7f7cd81faf0fd6f",
+        "sha256": "aa07bc4e3e97b44a0ee6b2a52c2f95ed306585716efa965bb7f7cd81faf0fd6f",
         "bytes": 7925760
       }
     },

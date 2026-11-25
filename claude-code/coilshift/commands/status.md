@@ -1,5 +1,5 @@
 ---
-description: Zustand der CoilShift-Bridge (gekoppelte Autos, Unterwegs-Modus, Sitzungen)
+description: State of the CoilShift bridge (paired cars, away mode, sessions)
 ---
 !`node "${CLAUDE_PLUGIN_ROOT}/bin/coilshift-bridge.mjs" status --data "${CLAUDE_PLUGIN_DATA}"`
 

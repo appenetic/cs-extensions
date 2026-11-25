@@ -44,6 +44,18 @@
     return String(text || '').replace(/^\s+|\s+$/g, '');
   }
 
+  // The app speaks the car's language: German where the car is set to German,
+  // English otherwise, as the service says in the view (lang). t picks between
+  // a German and an English text; word reads a map of such pairs, and leaves a
+  // key it does not know as it is.
+  var lang = 'de';
+  function t(de, en) {
+    return lang === 'en' ? en : de;
+  }
+  function word(map, key) {
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key][lang === 'en' ? 1 : 0] : key;
+  }
+
   // ------------------------------------------------------------ markdown
 
   // Claude answers in Markdown. The app draws its common parts as elements,
@@ -246,7 +258,23 @@
     if (typeof data.rev === 'number') rev = data.rev;
     mode = 'live';
     if (data.theme) document.documentElement.setAttribute('data-theme', data.theme === 'day' ? 'light' : 'dark');
+    speak(data.lang === 'en' ? 'en' : 'de');
     render();
+  }
+
+  // Another language builds the page anew. What was typed stays: the answer
+  // field from its draft, the task as it was. A sound playing stops; sounds
+  // and pictures load again when shown.
+  function speak(next) {
+    if (next === lang) return;
+    lang = next;
+    document.documentElement.setAttribute('lang', lang);
+    stop();
+    speakers = {};
+    shots = {};
+    var task = els.task.value;
+    build();
+    els.task.value = task;
   }
 
   // ------------------------------------------------------------ actions
@@ -263,13 +291,14 @@
       },
       function (error) {
         sending = false;
-        say(error.message || 'Senden fehlgeschlagen.', 'bad');
+        say(error.message || t('Senden fehlgeschlagen.', 'Sending failed.'), 'bad');
         render();
       }
     );
   }
 
-  var HOW = { hook: 'an die wartende Frage', inbox: 'in die laufende Sitzung', resume: 'als Fortsetzung im Hintergrund', fork: 'als Kopie im Hintergrund' };
+  var HOW = { hook: ['an die wartende Frage', 'to the waiting question'], inbox: ['in die laufende Sitzung', 'into the running session'],
+    resume: ['als Fortsetzung im Hintergrund', 'as a continuation in the background'], fork: ['als Kopie im Hintergrund', 'as a copy in the background'] };
 
   function answer(session, prompt, fields, label, after) {
     var body = { session: session.id, prompt: prompt ? prompt.id : '', source: 'touch' };
@@ -278,7 +307,7 @@
     act('/api/reply', body, function (result) {
       picks = {};
       if (after) after();
-      say(label + (HOW[result.delivered] ? ' · ' + HOW[result.delivered] : '') + '.', 'ok');
+      say(label + (HOW[result.delivered] ? ' · ' + word(HOW, result.delivered) : '') + '.', 'ok');
     });
   }
 
@@ -300,22 +329,24 @@
     if (!ms) return '';
     var now = view && view.now ? view.now * 1000 : Date.now();
     var minutes = Math.round((now - ms) / 60000);
-    if (minutes < 1) return 'gerade eben';
-    if (minutes < 60) return 'vor ' + minutes + ' Min.';
-    if (minutes < 24 * 60) return 'vor ' + Math.round(minutes / 60) + ' Std.';
+    if (minutes < 1) return t('gerade eben', 'just now');
+    if (minutes < 60) return t('vor ' + minutes + ' Min.', minutes + ' min ago');
+    if (minutes < 24 * 60) return t('vor ' + Math.round(minutes / 60) + ' Std.', Math.round(minutes / 60) + ' h ago');
     var d = new Date(ms);
-    return d.getDate() + '.' + (d.getMonth() + 1) + '.';
+    return t(d.getDate() + '.' + (d.getMonth() + 1) + '.', MONTHS[d.getMonth()] + ' ' + d.getDate());
   }
-  var STATUS = { working: 'arbeitet', waiting: 'wartet auf dich', idle: 'bereit', ended: 'beendet' };
-  var KIND = { interactive: 'Terminal', background: 'Hintergrund', ended: 'beendet' };
-  var ROLE = { user: 'Du', assistant: 'Claude', car: 'Aus dem Auto' };
-  var LINK = { online: 'Verbunden', connecting: 'Verbinde …', offline: 'Mac nicht erreichbar', rejected: 'Kopplung abgelehnt', unpaired: 'Nicht gekoppelt' };
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var STATUS = { working: ['arbeitet', 'working'], waiting: ['wartet auf dich', 'waiting for you'], idle: ['bereit', 'ready'], ended: ['beendet', 'ended'] };
+  var KIND = { interactive: ['Terminal', 'Terminal'], background: ['Hintergrund', 'Background'], ended: ['beendet', 'ended'] };
+  var ROLE = { user: ['Du', 'You'], assistant: ['Claude', 'Claude'], car: ['Aus dem Auto', 'From the car'] };
+  var LINK = { online: ['Verbunden', 'Connected'], connecting: ['Verbinde …', 'Connecting …'], offline: ['Mac nicht erreichbar', 'Mac not reachable'],
+    rejected: ['Kopplung abgelehnt', 'Pairing refused'], unpaired: ['Nicht gekoppelt', 'Not paired'] };
   // A small green dot that pulses while Claude works in a session. Every update
   // redraws the list, so its animation is locked to the clock: a new dot goes
   // on in step with the old one instead of starting over.
   function pulse(x) {
     if (x.status !== 'working' || x.pending) return '';
-    var dot = h('span', { class: 'pulse', role: 'img', 'aria-label': 'arbeitet gerade' });
+    var dot = h('span', { class: 'pulse', role: 'img', 'aria-label': t('arbeitet gerade', 'working') });
     dot.style.animationDelay = '-' + (Date.now() % 1600) + 'ms';
     return dot;
   }
@@ -338,7 +369,7 @@
     var key = session + ' ' + message + ' ' + n;
     if (shots[key]) return shots[key].node;
     var entry = (shots[key] = { state: '', zoom: false });
-    entry.node = button('', { type: 'button', 'aria-label': 'Bild ' + (n + 1) }, function () {
+    entry.node = button('', { type: 'button', 'aria-label': t('Bild ', 'Image ') + (n + 1) }, function () {
       if (entry.state === 'failed') load();
       if (entry.state !== 'ok') return;
       entry.zoom = !entry.zoom;
@@ -347,19 +378,19 @@
     function load() {
       entry.state = 'loading';
       entry.node.setAttribute('class', 'shot wait');
-      entry.node.textContent = 'Bild wird geladen …';
+      entry.node.textContent = t('Bild wird geladen …', 'Loading image …');
       request('GET', '/api/image?session=' + encodeURIComponent(session) + '&message=' + encodeURIComponent(message) + '&n=' + n)
         .then(function (d) {
           // Only a picture becomes the data URL, nothing else the answer holds.
-          if (!d || !IMAGE_TYPES[d.type] || typeof d.data !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(d.data)) throw new Error('Kein gültiges Bild.');
+          if (!d || !IMAGE_TYPES[d.type] || typeof d.data !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(d.data)) throw new Error(t('Kein gültiges Bild.', 'Not a valid image.'));
           entry.state = 'ok';
           entry.node.setAttribute('class', 'shot');
-          entry.node.replaceChildren(h('img', { src: 'data:' + d.type + ';base64,' + d.data, alt: 'Bild ' + (n + 1) }));
+          entry.node.replaceChildren(h('img', { src: 'data:' + d.type + ';base64,' + d.data, alt: t('Bild ', 'Image ') + (n + 1) }));
         })
         .catch(function (error) {
           entry.state = 'failed';
           entry.node.setAttribute('class', 'shot wait');
-          entry.node.textContent = ((error && error.message) || 'Bild nicht verfügbar.') + ' Antippen für einen neuen Versuch.';
+          entry.node.textContent = ((error && error.message) || t('Bild nicht verfügbar.', 'Image not available.')) + t(' Antippen für einen neuen Versuch.', ' Tap to try again.');
         });
     }
     load();
@@ -378,26 +409,26 @@
     var key = session + ' ' + m.id;
     if (speakers[key]) return speakers[key].node;
     var entry = (speakers[key] = { state: '', sound: '' });
-    entry.node = button('▶ Vorlesen', { type: 'button', class: 'chip speak' }, function () {
+    entry.node = button(t('▶ Vorlesen', '▶ Read aloud'), { type: 'button', class: 'chip speak' }, function () {
       if (entry.state === 'loading') return;
       if (playing && playing.entry === entry) return stop();
       // Another answer takes over: the music stays paused for it.
       stop(true);
       if (entry.sound) return play(entry);
       entry.state = 'loading';
-      entry.node.textContent = 'Wird vorbereitet …';
+      entry.node.textContent = t('Wird vorbereitet …', 'Preparing …');
       request('GET', '/api/speech?session=' + encodeURIComponent(session) + '&message=' + encodeURIComponent(m.id))
         .then(function (d) {
-          if (!d || d.type !== 'audio/mp4' || typeof d.data !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(d.data)) throw new Error('Kein gültiger Ton.');
+          if (!d || d.type !== 'audio/mp4' || typeof d.data !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(d.data)) throw new Error(t('Kein gültiger Ton.', 'Not a valid sound.'));
           entry.sound = 'data:' + d.type + ';base64,' + d.data;
           if (!playing) return play(entry);
           // Another answer started meanwhile; this one waits for a tap.
           entry.state = '';
-          entry.node.textContent = '▶ Vorlesen';
+          entry.node.textContent = t('▶ Vorlesen', '▶ Read aloud');
         })
         .catch(function (error) {
           entry.state = '';
-          entry.node.textContent = ((error && error.message) || 'Vorlesen fehlgeschlagen.') + ' Nochmal antippen.';
+          entry.node.textContent = ((error && error.message) || t('Vorlesen fehlgeschlagen.', 'Reading aloud failed.')) + t(' Nochmal antippen.', ' Tap again.');
           if (!playing) music('resume');
         });
     });
@@ -406,14 +437,14 @@
   function play(entry) {
     if (!window.Audio) {
       entry.state = '';
-      entry.node.textContent = 'Hier lässt sich kein Ton abspielen.';
+      entry.node.textContent = t('Hier lässt sich kein Ton abspielen.', 'No sound can be played here.');
       music('resume');
       return;
     }
     var audio = new window.Audio(entry.sound);
     playing = { entry: entry, audio: audio };
     entry.state = 'playing';
-    entry.node.textContent = '■ Stopp';
+    entry.node.textContent = t('■ Stopp', '■ Stop');
     audio.onended = function () {
       if (playing && playing.audio === audio) stop();
     };
@@ -433,7 +464,9 @@
           note('web.play', name);
           if (playing && playing.audio === audio) playing = null;
           entry.state = '';
-          entry.node.textContent = name === 'NotAllowedError' ? 'Das Auto lässt den Ton nicht zu. Einmal auf den Bildschirm tippen, dann nochmal.' : 'Der Ton lässt sich nicht abspielen (' + name + ').';
+          entry.node.textContent = name === 'NotAllowedError'
+            ? t('Das Auto lässt den Ton nicht zu. Einmal auf den Bildschirm tippen, dann nochmal.', 'The car does not allow the sound. Tap the screen once, then try again.')
+            : t('Der Ton lässt sich nicht abspielen (', 'The sound cannot be played (') + name + ').';
           music('resume');
         }
       );
@@ -452,7 +485,7 @@
       p.audio.load();
     } catch (e) {}
     p.entry.state = '';
-    p.entry.node.textContent = '▶ Vorlesen';
+    p.entry.node.textContent = t('▶ Vorlesen', '▶ Read aloud');
     if (!keep) music('resume');
   }
   // music asks the car to pause its music for an answer, or to play it on.
@@ -491,7 +524,7 @@
 
   function toolBubble(count, live) {
     var dots = h('span', { class: 'typing' + (live ? ' live' : ''), role: 'img',
-      'aria-label': count > 1 ? count + ' Werkzeugaufrufe' : 'ein Werkzeugaufruf' });
+      'aria-label': count > 1 ? count + t(' Werkzeugaufrufe', ' tool calls') : t('ein Werkzeugaufruf', 'one tool call') });
     var phase = Date.now() % 1200;
     for (var i = 0; i < 3; i++) {
       var dot = h('i', {});
@@ -509,28 +542,29 @@
 
   function build() {
     els.link = h('span', { class: 'link', id: 'link-state' });
-    els.away = button('Unterwegs-Modus', { type: 'button', class: 'toggle', 'aria-pressed': 'false', id: 'away' }, function () {
+    els.away = button(t('Unterwegs-Modus', 'Away mode'), { type: 'button', class: 'toggle', 'aria-pressed': 'false', id: 'away' }, function () {
       var on = !(view && view.bridge && view.bridge.away);
       act('/api/away', { on: on }, function () {
-        say(on ? 'Unterwegs-Modus an: Fragen und Freigaben warten auf deine Antwort im Auto.' : 'Unterwegs-Modus automatisch: an während der Fahrt.', 'ok');
+        say(on ? t('Unterwegs-Modus an: Fragen und Freigaben warten auf deine Antwort im Auto.', 'Away mode on: questions and approvals wait for your answer in the car.')
+          : t('Unterwegs-Modus automatisch: an während der Fahrt.', 'Away mode automatic: on while driving.'), 'ok');
       });
     });
     els.flash = h('p', { class: 'flash', 'aria-live': 'polite', id: 'flash' });
     els.pairing = h('section', { class: 'card pairing', id: 'pairing' });
 
     // The composer: one textarea for answers and new instructions.
-    els.composer = h('textarea', { id: 'composer', rows: '3', 'aria-label': 'Nachricht an Claude', lang: 'de' });
+    els.composer = h('textarea', { id: 'composer', rows: '3', 'aria-label': t('Nachricht an Claude', 'Message to Claude'), lang: lang });
     els.composer.addEventListener('input', function () {
       var s = current();
       if (s) drafts[s.id] = els.composer.value;
     });
-    els.send = button('Senden', { type: 'button', class: 'primary', id: 'send' }, sendComposer);
+    els.send = button(t('Senden', 'Send'), { type: 'button', class: 'primary', id: 'send' }, sendComposer);
     els.composerHint = h('p', { class: 'hint', id: 'composer-hint' });
     els.composerBox = h('section', { class: 'composer', id: 'composer-box' }, els.composer, h('div', { class: 'row' }, els.composerHint, els.send));
 
     // On a narrow screen the list and one session take turns; wide shows both.
-    els.nav = h('nav', { class: 'sessions', id: 'sessions', 'aria-label': 'Sitzungen' });
-    els.back = button('‹ Alle Sitzungen', { type: 'button', class: 'back', id: 'back' }, function () {
+    els.nav = h('nav', { class: 'sessions', id: 'sessions', 'aria-label': t('Sitzungen', 'Sessions') });
+    els.back = button(t('‹ Alle Sitzungen', '‹ All sessions'), { type: 'button', class: 'back', id: 'back' }, function () {
       focused = false;
       render();
     });
@@ -541,40 +575,41 @@
     els.split = h('div', { class: 'split', id: 'split' }, els.nav, els.detail);
 
     // New background session: built once as well.
-    els.project = h('select', { id: 'project', 'aria-label': 'Projekt' });
-    els.task = h('textarea', { id: 'task', rows: '4', lang: 'de', 'aria-label': 'Auftrag', placeholder: 'Was soll Claude tun? Tippen oder diktieren.' });
-    els.start = button('Im Hintergrund starten', { type: 'button', class: 'primary', id: 'start' }, function () {
+    els.project = h('select', { id: 'project', 'aria-label': t('Projekt', 'Project') });
+    els.task = h('textarea', { id: 'task', rows: '4', lang: lang, 'aria-label': t('Auftrag', 'Task'),
+      placeholder: t('Was soll Claude tun? Tippen oder diktieren.', 'What should Claude do? Type or dictate.') });
+    els.start = button(t('Im Hintergrund starten', 'Start in the background'), { type: 'button', class: 'primary', id: 'start' }, function () {
       var task = trim(els.task.value);
-      if (!task) return say('Bitte einen Auftrag eingeben.', 'bad');
+      if (!task) return say(t('Bitte einen Auftrag eingeben.', 'Please enter a task.'), 'bad');
       act('/api/start', { cwd: els.project.value, text: task, source: 'touch' }, function () {
         els.task.value = '';
         screen = 'sessions';
-        say('Neue Sitzung gestartet. Sie erscheint gleich in der Liste.', 'ok');
+        say(t('Neue Sitzung gestartet. Sie erscheint gleich in der Liste.', 'New session started. It shows in the list in a moment.'), 'ok');
       });
     });
     els.newCard = h('section', { class: 'card', id: 'new' },
-      h('h2', {}, 'Neue Sitzung'),
-      h('label', { for: 'project' }, 'Projekt'), els.project,
-      h('label', { for: 'task' }, 'Auftrag'), els.task,
-      h('div', { class: 'row' }, button('Abbrechen', { type: 'button', id: 'cancel-new' }, function () {
+      h('h2', {}, t('Neue Sitzung', 'New session')),
+      h('label', { for: 'project' }, t('Projekt', 'Project')), els.project,
+      h('label', { for: 'task' }, t('Auftrag', 'Task')), els.task,
+      h('div', { class: 'row' }, button(t('Abbrechen', 'Cancel'), { type: 'button', id: 'cancel-new' }, function () {
         screen = 'sessions';
         render();
       }), els.start),
-      h('p', { class: 'hint' }, 'Startet claude --bg im gewählten Projekt auf dem Mac.'));
+      h('p', { class: 'hint' }, t('Startet claude --bg im gewählten Projekt auf dem Mac.', 'Runs claude --bg in the chosen project on the Mac.')));
 
     els.diag = h('dl', { class: 'diag', id: 'diag' });
     els.techActions = h('div', { class: 'row' },
-      button('Neuen Kopplungs-QR-Code', { type: 'button', id: 'pair-again' }, function () {
+      button(t('Neuen Kopplungs-QR-Code', 'New pairing QR code'), { type: 'button', id: 'pair-again' }, function () {
         act('/api/pairing', {}, function () {
-          say('Kopplungsseite geöffnet, der QR-Code steht oben.', 'ok');
+          say(t('Kopplungsseite geöffnet, der QR-Code steht oben.', 'Pairing page opened, the QR code is at the top.'), 'ok');
         });
       }),
-      button('Entkoppeln', { type: 'button', class: 'danger', id: 'unpair' }, function () {
+      button(t('Entkoppeln', 'Unpair'), { type: 'button', class: 'danger', id: 'unpair' }, function () {
         act('/api/unpair', {}, function () {
-          say('Entkoppelt.', 'ok');
+          say(t('Entkoppelt.', 'Unpaired.'), 'ok');
         });
       }));
-    els.tech = h('details', { class: 'card', id: 'technical' }, h('summary', {}, 'Technik'), els.diag, els.techActions);
+    els.tech = h('details', { class: 'card', id: 'technical' }, h('summary', {}, t('Technik', 'Technical')), els.diag, els.techActions);
 
     root.replaceChildren(
       h('header', { class: 'top' }, h('h1', {}, 'Claude Code'), els.link, els.away),
@@ -598,11 +633,11 @@
     if (p && p.kind === 'question' && s.delivery === 'hook') {
       var answers = {};
       answers[p.questions[0].question] = text;
-      answer(s, p, { answers: answers }, 'Antwort gesendet', clear);
+      answer(s, p, { answers: answers }, t('Antwort gesendet', 'Answer sent'), clear);
     } else if (p && p.kind === 'permission' && s.delivery === 'hook') {
-      answer(s, p, { decision: 'deny', text: text }, 'Abgelehnt mit Hinweis', clear);
+      answer(s, p, { decision: 'deny', text: text }, t('Abgelehnt mit Hinweis', 'Denied with a note'), clear);
     } else {
-      answer(s, p && p.kind === 'input' ? p : null, { text: text }, s.delivery === 'resume' ? 'Fortgesetzt' : 'Gesendet', clear);
+      answer(s, p && p.kind === 'input' ? p : null, { text: text }, s.delivery === 'resume' ? t('Fortgesetzt', 'Continued') : t('Gesendet', 'Sent'), clear);
     }
   }
 
@@ -611,13 +646,13 @@
   function render() {
     var link = (view && view.link) || { state: 'connecting' };
     var bridgeName = (view && view.bridge && view.bridge.name) || link.bridge || '';
-    var label = LINK[link.state] || link.state || '';
-    if (mode === 'retry' && !view) label = 'Claude-Dienst im Auto startet …';
+    var label = word(LINK, link.state) || '';
+    if (mode === 'retry' && !view) label = t('Claude-Dienst im Auto startet …', 'Claude service in the car is starting …');
     els.link.textContent = label + (link.state === 'online' && bridgeName ? ' · ' + bridgeName : '');
     els.link.setAttribute('class', 'link ' + (link.state || ''));
     var away = Boolean(view && view.bridge && view.bridge.away);
     els.away.setAttribute('aria-pressed', away ? 'true' : 'false');
-    els.away.textContent = away ? 'Unterwegs-Modus an' : 'Unterwegs-Modus aus';
+    els.away.textContent = away ? t('Unterwegs-Modus an', 'Away mode on') : t('Unterwegs-Modus aus', 'Away mode off');
     els.away.disabled = mode !== 'live' || link.state !== 'online' || sending;
 
     var pairingOpen = view && view.pairing && view.pairing.state === 'open';
@@ -638,25 +673,27 @@
     var pairing = (view && view.pairing) || {};
     var addresses = pairing.addresses || [];
     var code = pairing.state === 'open' ? pairing.code : '';
-    var parts = [h('h2', {}, 'Mit dem Mac koppeln')];
+    var parts = [h('h2', {}, t('Mit dem Mac koppeln', 'Pair with the Mac'))];
     if (link.state === 'rejected' && link.error) parts.push(h('p', { class: 'bad' }, link.error));
-    var install = h('li', {}, 'Auf dem Mac einmal das Claude-Code-Plugin installieren, im Terminal:',
+    var install = h('li', {}, t('Auf dem Mac einmal das Claude-Code-Plugin installieren, im Terminal:', 'On the Mac, install the Claude Code plugin once, in the terminal:'),
       h('code', { class: 'cmd' }, 'claude plugin marketplace add appenetic/cs-extensions'),
       h('code', { class: 'cmd' }, 'claude plugin install coilshift@appenetic'),
-      h('span', { class: 'hint' }, 'Oder in Claude Code dieselben Befehle mit /plugin statt claude plugin.'));
+      h('span', { class: 'hint' }, t('Oder in Claude Code dieselben Befehle mit /plugin statt claude plugin.', 'Or in Claude Code, the same commands with /plugin instead of claude plugin.')));
     var phone = [
-      h('li', {}, 'In Claude Code ', h('code', {}, '/coilshift:pair'),
-        ' ohne Code ausführen. Der Kopplungslink landet in der Zwischenablage, per Universal Clipboard auch auf dem iPhone.'),
-      h('li', {}, 'Diesen QR-Code mit dem Handy scannen und das lokale Zertifikat einmal bestätigen.'),
-      h('li', {}, 'Auf der Handy-Seite den Link einfügen und „Koppeln“ tippen.')];
+      h('li', {}, t('In Claude Code ', 'In Claude Code, run '), h('code', {}, '/coilshift:pair'),
+        t(' ohne Code ausführen. Der Kopplungslink landet in der Zwischenablage, per Universal Clipboard auch auf dem iPhone.',
+          ' without a code. The pairing link lands in the clipboard, and through Universal Clipboard on the iPhone too.')),
+      h('li', {}, t('Diesen QR-Code mit dem Handy scannen und das lokale Zertifikat einmal bestätigen.', 'Scan this QR code with your phone and confirm the local certificate once.')),
+      h('li', {}, t('Auf der Handy-Seite den Link einfügen und „Koppeln“ tippen.', 'On the phone page, paste the link and tap “Pair”.'))];
     if (code) {
       parts.push(h('ol', { class: 'steps', id: 'setup-steps' }, install,
-        h('li', {}, 'In einer neuen Claude-Code-Sitzung eingeben:',
+        h('li', {}, t('In einer neuen Claude-Code-Sitzung eingeben:', 'In a new Claude Code session, enter:'),
           h('code', { class: 'cmd pair-code', id: 'pairing-code' }, '/coilshift:pair ' + code),
-          h('span', { class: 'hint' }, 'Das klappt überall, ohne gemeinsames WLAN und ohne Tailscale: Der Mac schickt die Kopplung über ein Ende-zu-Ende-verschlüsseltes Internet-Relay.'))));
+          h('span', { class: 'hint' }, t('Das klappt überall, ohne gemeinsames WLAN und ohne Tailscale: Der Mac schickt die Kopplung über ein Ende-zu-Ende-verschlüsseltes Internet-Relay.',
+            'This works anywhere, without a shared Wi-Fi and without Tailscale: the Mac sends the pairing through an end-to-end encrypted internet relay.')))));
       if (pairing.message) parts.push(h('p', { class: 'hint', id: 'pairing-message' }, pairing.message));
       if (addresses.length) {
-        parts.push(h('h3', {}, 'Oder mit dem Handy, im selben WLAN oder Tailnet wie das Auto'));
+        parts.push(h('h3', {}, t('Oder mit dem Handy, im selben WLAN oder Tailnet wie das Auto', 'Or with your phone, on the same Wi-Fi or tailnet as the car')));
         parts.push(h.apply(null, ['ol', { class: 'steps' }].concat(phone)));
       }
     } else {
@@ -665,9 +702,9 @@
     if (pairing.state === 'open' && addresses.length) {
       var shown = addresses[0];
       for (var i = 0; i < addresses.length; i++) if (addresses[i].url === picks.address) shown = addresses[i];
-      parts.push(h('img', { class: 'qr', id: 'pairing-qr', src: shown.qr, alt: 'QR-Code für die Kopplung am Handy', width: '256', height: '256' }));
+      parts.push(h('img', { class: 'qr', id: 'pairing-qr', src: shown.qr, alt: t('QR-Code für die Kopplung am Handy', 'QR code for pairing on the phone'), width: '256', height: '256' }));
       var until = new Date(pairing.expires * 1000);
-      parts.push(h('p', { class: 'hint', id: 'pairing-url' }, shown.url.split('#')[0] + ' · gültig bis ' + until.getHours() + ':' + ('0' + until.getMinutes()).slice(-2)));
+      parts.push(h('p', { class: 'hint', id: 'pairing-url' }, shown.url.split('#')[0] + t(' · gültig bis ', ' · valid until ') + until.getHours() + ':' + ('0' + until.getMinutes()).slice(-2)));
       if (addresses.length > 1) {
         var row = h('div', { class: 'row' });
         addresses.forEach(function (a) {
@@ -679,13 +716,14 @@
         parts.push(row);
       }
     } else if (view && link.state === 'rejected' && mode === 'live') {
-      var again = button('Neuen QR-Code anzeigen', { type: 'button', class: 'primary', id: 'pair-new' }, function () {
+      var again = button(t('Neuen QR-Code anzeigen', 'Show a new QR code'), { type: 'button', class: 'primary', id: 'pair-new' }, function () {
         act('/api/pairing', {});
       });
       again.disabled = sending;
       parts.push(again);
     } else if (!code) {
-      parts.push(h('p', { class: 'hint' }, pairing.state === 'failed' ? 'Die Kopplungsseite konnte nicht gestartet werden.' : 'QR-Code wird vorbereitet …'));
+      parts.push(h('p', { class: 'hint' }, pairing.state === 'failed' ? t('Die Kopplungsseite konnte nicht gestartet werden.', 'The pairing page could not be started.')
+        : t('QR-Code wird vorbereitet …', 'Preparing the QR code …')));
     }
     els.pairing.replaceChildren.apply(els.pairing, parts);
   }
@@ -701,7 +739,7 @@
     }
     els.split.setAttribute('class', 'split' + (focused && s ? ' show-detail' : ''));
     var items = [];
-    if (!list.length) items.push(h('p', { class: 'hint' }, 'Noch keine Sitzungen. Sie erscheinen, sobald Claude Code auf dem Mac läuft.'));
+    if (!list.length) items.push(h('p', { class: 'hint' }, t('Noch keine Sitzungen. Sie erscheinen, sobald Claude Code auf dem Mac läuft.', 'No sessions yet. They appear as soon as Claude Code runs on the Mac.')));
     list.forEach(function (x) {
       var item = button('', { type: 'button', class: 'session' + (s && x.id === s.id ? ' on' : '') + (x.pending ? ' asks' : ''), 'aria-label': x.title }, function () {
         selected = x.id;
@@ -711,20 +749,20 @@
       });
       item.append(
         h('span', { class: 'name' }, pulse(x), x.title),
-        h('span', { class: 'meta' }, (x.pending ? 'Frage offen' : STATUS[x.status] || x.status) + ' · ' + (KIND[x.kind] || x.kind) + ' · ' + ago(x.updated))
+        h('span', { class: 'meta' }, (x.pending ? t('Frage offen', 'Question open') : word(STATUS, x.status)) + ' · ' + word(KIND, x.kind) + ' · ' + ago(x.updated))
       );
       items.push(item);
     });
     if ((view.projects || []).length && mode === 'live') {
-      items.push(button('+ Neue Sitzung', { type: 'button', class: 'new', id: 'new-session' }, function () {
+      items.push(button(t('+ Neue Sitzung', '+ New session'), { type: 'button', class: 'new', id: 'new-session' }, function () {
         screen = 'new';
         render();
       }));
     }
     if (view.hidden > 0 && mode === 'live') {
-      var back = button(view.hidden + ' ausgeblendet · wieder einblenden', { type: 'button', class: 'new', id: 'unhide' }, function () {
+      var back = button(view.hidden + t(' ausgeblendet · wieder einblenden', ' hidden · show again'), { type: 'button', class: 'new', id: 'unhide' }, function () {
         act('/api/unhide', {}, function () {
-          say('Alle Sitzungen wieder eingeblendet.', 'ok');
+          say(t('Alle Sitzungen wieder eingeblendet.', 'All sessions shown again.'), 'ok');
         });
       });
       back.disabled = sending;
@@ -737,18 +775,18 @@
 
   function renderDetail(s) {
     // Hidden until something happens in the session again.
-    var hide = button('Ausblenden', { type: 'button', class: 'chip', id: 'hide' }, function () {
+    var hide = button(t('Ausblenden', 'Hide'), { type: 'button', class: 'chip', id: 'hide' }, function () {
       act('/api/hide', { session: s.id }, function () {
         selected = null;
         focused = false;
-        say('Ausgeblendet. Die Sitzung kommt zurück, sobald dort wieder etwas passiert.', 'ok');
+        say(t('Ausgeblendet. Die Sitzung kommt zurück, sobald dort wieder etwas passiert.', 'Hidden. The session comes back as soon as something happens there.'), 'ok');
       });
     });
     hide.disabled = sending || mode !== 'live';
     els.head.replaceChildren(
       h('div', { class: 'title' },
         h('h2', {}, pulse(s), s.title),
-        h('p', { class: 'hint' }, shortPath(s.cwd) + ' · ' + (KIND[s.kind] || s.kind) + ' · ' + (s.pending ? 'wartet auf dich' : STATUS[s.status] || s.status))),
+        h('p', { class: 'hint' }, shortPath(s.cwd) + ' · ' + word(KIND, s.kind) + ' · ' + (s.pending ? t('wartet auf dich', 'waiting for you') : word(STATUS, s.status)))),
       hide
     );
     els.prompt.replaceChildren();
@@ -767,12 +805,12 @@
       // The images stand below the text instead of their "[Image #n]".
       var text = m.images ? trim(String(m.text || '').replace(/\[Image #\d+\]/g, '')) : m.text;
       var body = m.role === 'assistant' ? markdown(m.text) : h('span', { class: 'text' }, text);
-      var item = h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, (ROLE[m.role] || m.role) + ' · ' + ago(m.at)), body);
+      var item = h('li', { class: 'message ' + m.role }, h('span', { class: 'who' }, word(ROLE, m.role) + ' · ' + ago(m.at)), body);
       if (m.role === 'user' && m.images > 0) item.append(pictures(s.id, m));
       if (m.role === 'assistant' && m.text) item.append(speaker(s.id, m));
       rows.unshift(item);
     }
-    if (!rows.length) rows.push(h('li', { class: 'hint' }, 'Noch kein Verlauf.'));
+    if (!rows.length) rows.push(h('li', { class: 'hint' }, t('Noch kein Verlauf.', 'No history yet.')));
     els.messages.replaceChildren.apply(els.messages, rows);
     renderComposer(s);
   }
@@ -800,7 +838,7 @@
             }
             var answers = {};
             answers[q.question] = o.label;
-            answer(s, p, { answers: answers }, 'Antwort gesendet');
+            answer(s, p, { answers: answers }, t('Antwort gesendet', 'Answer sent'));
           });
           b.disabled = !live;
           if (o.description) b.append(h('small', {}, o.description));
@@ -809,7 +847,7 @@
         card.append(row);
       });
       if (collect) {
-        var all = button('Antworten senden', { type: 'button', class: 'primary', id: 'send-picks' }, function () {
+        var all = button(t('Antworten senden', 'Send answers'), { type: 'button', class: 'primary', id: 'send-picks' }, function () {
           var answers = {};
           questions.forEach(function (q, qi) {
             var labels = [];
@@ -818,39 +856,43 @@
             });
             if (labels.length) answers[q.question] = labels.join(', ');
           });
-          if (!Object.keys(answers).length) return say('Bitte zuerst eine Antwort wählen.', 'bad');
-          answer(s, p, { answers: answers }, 'Antworten gesendet');
+          if (!Object.keys(answers).length) return say(t('Bitte zuerst eine Antwort wählen.', 'Please choose an answer first.'), 'bad');
+          answer(s, p, { answers: answers }, t('Antworten gesendet', 'Answers sent'));
         });
         all.disabled = !live;
         card.append(all);
       }
     } else if (p.kind === 'permission') {
-      card.append(h('h3', {}, 'Freigabe: ' + (p.tool || 'Werkzeug')), h('pre', { class: 'detail-text' }, p.detail || p.text));
-      var allow = button('Erlauben', { type: 'button', class: 'primary', id: 'allow' }, function () {
-        answer(s, p, { decision: 'allow' }, 'Freigegeben');
+      card.append(h('h3', {}, t('Freigabe: ', 'Approval: ') + (p.tool || t('Werkzeug', 'tool'))), h('pre', { class: 'detail-text' }, p.detail || p.text));
+      var allow = button(t('Erlauben', 'Allow'), { type: 'button', class: 'primary', id: 'allow' }, function () {
+        answer(s, p, { decision: 'allow' }, t('Freigegeben', 'Allowed'));
       });
-      var deny = button('Ablehnen', { type: 'button', class: 'danger', id: 'deny' }, function () {
-        answer(s, p, { decision: 'deny' }, 'Abgelehnt');
+      var deny = button(t('Ablehnen', 'Deny'), { type: 'button', class: 'danger', id: 'deny' }, function () {
+        answer(s, p, { decision: 'deny' }, t('Abgelehnt', 'Denied'));
       });
       allow.disabled = !live;
       deny.disabled = !live;
       card.append(h('div', { class: 'options' }, allow, deny));
     } else {
-      card.append(h('h3', {}, 'Claude wartet auf dich'), markdown(p.text));
+      card.append(h('h3', {}, t('Claude wartet auf dich', 'Claude is waiting for you')), markdown(p.text));
     }
     if (p.kind !== 'input' && s.delivery !== 'hook') {
-      card.append(h('p', { class: 'hint' }, 'Diese Frage ist im Terminal auf dem Mac offen. Mit eingeschaltetem Unterwegs-Modus warten künftige Fragen auf deine Antwort im Auto.'));
+      card.append(h('p', { class: 'hint' }, t('Diese Frage ist im Terminal auf dem Mac offen. Mit eingeschaltetem Unterwegs-Modus warten künftige Fragen auf deine Antwort im Auto.',
+        'This question is open in the terminal on the Mac. With away mode on, future questions wait for your answer in the car.')));
     } else {
-      card.append(h('p', { class: 'hint' }, 'Antwort per Tippen, über das Mikrofon der Tastatur oder mit der Sprachtaste: „Claude, …“'));
+      card.append(h('p', { class: 'hint' }, t('Antwort per Tippen, über das Mikrofon der Tastatur oder mit der Sprachtaste: „Claude, …“',
+        'Answer by tapping, with the keyboard\'s microphone or with the voice button: “Claude, …”')));
     }
     return card;
   }
 
   var HINTS = {
-    inbox: 'Geht direkt in die laufende Sitzung. Diktieren über das Mikrofon der Tesla-Tastatur.',
-    hook: 'Beantwortet die offene Frage mit eigenem Text.',
-    resume: 'Setzt die beendete Sitzung auf dem Mac im Hintergrund fort.',
-    fork: 'Diese Sitzung läuft ohne Postfach, weil sie vor dem Plugin gestartet wurde. Deine Nachricht startet eine Kopie im Hintergrund, die mit dem bisherigen Verlauf weiterarbeitet.'
+    inbox: ['Geht direkt in die laufende Sitzung. Diktieren über das Mikrofon der Tesla-Tastatur.',
+      'Goes straight into the running session. Dictate with the microphone of the Tesla keyboard.'],
+    hook: ['Beantwortet die offene Frage mit eigenem Text.', 'Answers the open question with your own words.'],
+    resume: ['Setzt die beendete Sitzung auf dem Mac im Hintergrund fort.', 'Continues the ended session on the Mac in the background.'],
+    fork: ['Diese Sitzung läuft ohne Postfach, weil sie vor dem Plugin gestartet wurde. Deine Nachricht startet eine Kopie im Hintergrund, die mit dem bisherigen Verlauf weiterarbeitet.',
+      'This session runs without an inbox because it started before the plugin. Your message starts a copy in the background that carries on with the history so far.']
   };
 
   function renderComposer(s) {
@@ -859,15 +901,17 @@
       els.composer.value = drafts[s.id] || '';
       els.composer.setAttribute('data-session', s.id);
     }
-    els.composer.setAttribute('placeholder', s.delivery === 'resume' || s.delivery === 'fork' ? 'Woran soll Claude weiterarbeiten?' : 'Nachricht an Claude …');
+    els.composer.setAttribute('placeholder', s.delivery === 'resume' || s.delivery === 'fork'
+      ? t('Woran soll Claude weiterarbeiten?', 'What should Claude carry on with?') : t('Nachricht an Claude …', 'Message to Claude …'));
     els.composer.disabled = !canSend;
     els.send.disabled = !canSend;
-    els.send.textContent = sending ? 'Wird gesendet …' : s.delivery === 'resume' ? 'Fortsetzen' : s.delivery === 'fork' ? 'Als Kopie senden' : 'Senden';
+    els.send.textContent = sending ? t('Wird gesendet …', 'Sending …') : s.delivery === 'resume' ? t('Fortsetzen', 'Continue')
+      : s.delivery === 'fork' ? t('Als Kopie senden', 'Send as a copy') : t('Senden', 'Send');
     els.composerHint.textContent = canSend
-      ? HINTS[s.delivery] || HINTS.inbox
+      ? word(HINTS, HINTS[s.delivery] ? s.delivery : 'inbox')
       : mode !== 'live'
-        ? 'Verbindung zum Claude-Dienst im Auto wird aufgebaut …'
-        : 'Diese Sitzung nimmt gerade keinen Text an. Sie läuft vermutlich ohne das CoilShift-Plugin.';
+        ? t('Verbindung zum Claude-Dienst im Auto wird aufgebaut …', 'Connecting to the Claude service in the car …')
+        : t('Diese Sitzung nimmt gerade keinen Text an. Sie läuft vermutlich ohne das CoilShift-Plugin.', 'This session takes no text right now. It probably runs without the CoilShift plugin.');
   }
 
   function renderNew() {
@@ -892,16 +936,18 @@
   function renderTechnical(link) {
     var diag = (view && view.diag) || {};
     var rows = [
-      ['Verbindung', (LINK[link.state] || link.state || '–') + (link.error ? ' · ' + link.error : '')],
+      [t('Verbindung', 'Connection'), (word(LINK, link.state) || '–') + (link.error ? ' · ' + link.error : '')],
       ['Bridge', view && view.bridge ? (view.bridge.name || '') + ' · ' + (view.bridge.version || '') : '–'],
-      ['Weg zum Mac', !diag.route ? '–' : diag.route.indexOf('relay') === 0 ? 'Internet-Relay' + (diag.route.length > 6 ? ' · ' + diag.route.slice(6) : '') : 'direkt · ' + diag.route],
-      ['Web-Port', diag['web.listen'] ? diag['web.listen'] + (diag['web.port'] ? ' · ' + diag['web.port'] + ' (' + (diag['web.mode'] || '') + ')' : '') : 'noch keine Meldung'],
-      ['Web-Dienst', (diag['web.service'] || '–') + (diag['web.bind'] ? ' · Namespace ' + diag['web.bind'] : '')],
-      ['Karte über der Navi', diag.card || 'noch keine Meldung'],
-      ['Sprachtaste', diag.voice || 'noch keine Meldung'],
-      ['Letzte Sprachantwort', diag['voice.last'] || '–'],
-      ['Musik beim Vorlesen', diag.media || '–'],
-      ['Fahrstufe', (view && view.gear) || '–']
+      [t('Weg zum Mac', 'Route to the Mac'), !diag.route ? '–' : diag.route.indexOf('relay') === 0
+        ? t('Internet-Relay', 'Internet relay') + (diag.route.length > 6 ? ' · ' + diag.route.slice(6) : '') : t('direkt · ', 'direct · ') + diag.route],
+      [t('Web-Port', 'Web port'), diag['web.listen'] ? diag['web.listen'] + (diag['web.port'] ? ' · ' + diag['web.port'] + ' (' + (diag['web.mode'] || '') + ')' : '')
+        : t('noch keine Meldung', 'no report yet')],
+      [t('Web-Dienst', 'Web service'), (diag['web.service'] || '–') + (diag['web.bind'] ? ' · Namespace ' + diag['web.bind'] : '')],
+      [t('Karte über der Navi', 'Card over the map'), diag.card || t('noch keine Meldung', 'no report yet')],
+      [t('Sprachtaste', 'Voice button'), diag.voice || t('noch keine Meldung', 'no report yet')],
+      [t('Letzte Sprachantwort', 'Last voice answer'), diag['voice.last'] || '–'],
+      [t('Musik beim Vorlesen', 'Music while reading aloud'), diag.media || '–'],
+      [t('Fahrstufe', 'Gear'), (view && view.gear) || '–']
     ];
     var cells = [];
     rows.forEach(function (r) {

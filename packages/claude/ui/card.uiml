@@ -10,7 +10,9 @@
      margins: a wrapped label needs a box of definite width. Answers stack at
      full width so long labels are not cut; Close, Allow and Deny sit in the
      footer next to the hint. Layout keys as the firmware's own UIML spells them
-     (Alignment:left|wordwrap, Width:100%, Flex:1). -->
+     (Alignment:left|wordwrap, Width:100%, Flex:1). Every text, the footer's
+     button labels included ({card.lallow}, {card.ldeny}, {card.lclose}), comes
+     from the model in the car's language, German or English. -->
 <Library>
     <Templates>
         <DisplayView name="ClaudeCard" enableCssLayout="true" touchBehaviors="IgnoreTouches"
@@ -27,9 +29,9 @@
                 </DisplayView>
                 <DisplayView name="Footer" horizontalLayoutStyle="Padding:0,12,0,0; AlignItems:center;">
                     <LabelView name="Hint" style="Text/Caption1; Color:Text/secondary; Alignment:left|wordwrap; Flex:1;" text="{card.hint}"/>
-                    <ButtonView name="Allow" enabled="{card.live}" visible="{card.decide}" label="Erlauben" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
-                    <ButtonView name="Deny" enabled="{card.live}" visible="{card.decide}" label="Ablehnen" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
-                    <ButtonView name="Close" visible="{card.close}" label="Schließen" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
+                    <ButtonView name="Allow" enabled="{card.live}" visible="{card.decide}" label="{card.lallow}" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
+                    <ButtonView name="Deny" enabled="{card.live}" visible="{card.decide}" label="{card.ldeny}" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
+                    <ButtonView name="Close" visible="{card.close}" label="{card.lclose}" style="ProfilePanel/OutlineButton; Margin:12,0,0,0;"/>
                 </DisplayView>
             </DisplayView>
         </DisplayView>

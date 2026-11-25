@@ -1,5 +1,5 @@
 {
-  "description": "Meldet Sitzungen, Fragen und Freigaben an die CoilShift-Bridge; im Unterwegs-Modus wartet eine Frage auf die Antwort aus dem Auto.",
+  "description": "Reports sessions, questions and approvals to the CoilShift bridge; in away mode a question waits for the answer from the car.",
   "hooks": {
     "SessionStart": [
       {

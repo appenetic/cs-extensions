@@ -8,8 +8,16 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const VERSION = '0.2.10'
+export const VERSION = '0.2.11'
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+// The Mac's language, for what the plugin prints there: German where the
+// locale's language is German, English otherwise. What goes to the car follows
+// the car's language instead (the bridge's carLang).
+export function macLang(env = process.env) {
+  const locale = env.LC_ALL || env.LC_MESSAGES || env.LANG || Intl.DateTimeFormat().resolvedOptions().locale
+  return /^de([_.@-]|$)/i.test(String(locale || '')) ? 'de' : 'en'
+}
 
 // The plugin data directory survives plugin updates and goes with an uninstall.
 // Hooks and MCP servers get it in their environment, slash commands pass --data.

@@ -6,8 +6,9 @@ import { test } from 'node:test'
 import http from 'node:http'
 import net from 'node:net'
 import { execFileSync } from 'node:child_process'
-import { Bridge, allowedPeer, bridgeHosts, closingQuestion, germanVoice, imageCount, parseTranscript, shrinkImage, speakText, speakable, toolSummary, transcriptImages, userText } from '../bin/coilshift-bridge.mjs'
-import { VERSION, ensureBridge, local, older, socketPath } from '../lib/common.mjs'
+import { fileURLToPath } from 'node:url'
+import { Bridge, allowedPeer, bridgeHosts, closingQuestion, imageCount, parseTranscript, shrinkImage, speakText, speakable, toolSummary, transcriptImages, userText, voiceFor } from '../bin/coilshift-bridge.mjs'
+import { VERSION, ensureBridge, local, macLang, older, socketPath } from '../lib/common.mjs'
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'csb-'))
@@ -235,12 +236,106 @@ test("Claude's answers read aloud: Markdown made speakable, speech made once, on
 
 test('say speaks German as AAC and leaves no work files', { skip: process.platform !== 'darwin' }, async () => {
   const dir = tmp()
-  const voice = await germanVoice()
+  const voice = await voiceFor('de')
   assert.equal(typeof voice, 'string')
+  // English never gets the first voice listed, a novelty voice such as Albert.
+  assert.ok(['Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa', ''].includes(await voiceFor('en')))
   const out = await speakText('Hallo aus dem Auto.', voice, dir)
   assert.equal(out.type, 'audio/mp4')
   assert.ok(out.data.length > 1000 && Buffer.from(out.data, 'base64').subarray(4, 8).toString() === 'ftyp', 'an MP4 file')
   assert.deepEqual(fs.readdirSync(dir), [])
+})
+
+test("the bridge's words for the car follow the language its long poll names, German before it names one", async () => {
+  const calls = []
+  const spoken = []
+  const b = bridge({
+    spawnClaude: async (args) => {
+      calls.push(args)
+      return 'abcdef12'
+    },
+    speak: async (text, voice) => {
+      spoken.push([text, voice])
+      return { type: 'audio/mp4', data: 'dG9u' }
+    },
+    voice: async (lang) => (lang === 'en' ? 'Samantha' : 'Anna'),
+  })
+  const res = { on() {} }
+  const device = b.redeem(b.newCode(), 'Tesla')
+  const call = (method, route, body = {}) => b.handle({ method, url: new URL('https://bridge' + route), authorization: 'Bearer ' + device, body })
+  const state = (q) => call('GET', '/v1/state?' + new URLSearchParams({ since: '0', wait: '0', ...q }))
+  const pending = (id) => {
+    const shown = b.snapshot().sessions
+    const s = shown.find((x) => x.id === id)
+    assert.ok(s, `${id} is not among ${shown.map((x) => x.id)}`)
+    return s.pending
+  }
+  const permission = (id) => b.hook({ session_id: id, hook_event_name: 'PermissionRequest', cwd: '/p', tool_name: 'Bash', tool_input: { command: 'ls' } }, res)
+  await permission('g')
+  assert.deepEqual([pending('g').title, pending('g').text], ['Freigabe', 'Claude möchte Bash ausführen.'], 'German before a car names a language')
+  // An older car names none, and only de and en count.
+  await state({})
+  await state({ lang: 'fr' })
+  assert.equal(b.carLang, 'de')
+  // A new language is a new revision at once, so the long poll does not wait.
+  const rev = b.rev
+  const answer = await state({ lang: 'en', since: String(rev), wait: '30' })
+  assert.equal(answer.status, 200)
+  assert.ok(answer.body.rev > rev)
+  assert.equal(b.carLang, 'en')
+  await permission('e')
+  assert.deepEqual([pending('e').title, pending('e').text], ['Approval', 'Claude wants to run Bash.'])
+  await b.hook({ session_id: 'q', hook_event_name: 'PreToolUse', cwd: '/p', tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: 'Which one?', options: [] }] } }, res)
+  assert.equal(pending('q').title, 'Claude asks')
+  await b.hook({ session_id: 'w', hook_event_name: 'Stop', cwd: '/p', last_assistant_message: 'Shall I go on?' }, res)
+  assert.equal(pending('w').title, 'Claude is waiting for you')
+  await b.hook({ session_id: 'n', hook_event_name: 'UserPromptSubmit', prompt: 'hi' }, res)
+  assert.equal(b.snapshot().sessions.find((s) => s.id === 'n').title, 'Session', 'a session without a name or folder')
+  // Errors the car shows.
+  assert.deepEqual(await call('POST', '/v1/reply', { session: 'nope', text: 'x' }), { status: 404, body: { error: 'failed', message: 'The Mac no longer knows this session.' } })
+  const open = await call('POST', '/v1/reply', { session: 'e', prompt: pending('e').id, decision: 'allow' })
+  assert.equal(open.body.message, 'The question is open in the terminal. With away mode on, future questions can be answered in the car.')
+  assert.equal((await call('POST', '/v1/hide', { session: 'nope' })).body.message, 'The Mac no longer knows this session.')
+  // What the driver sends is marked for Claude in the car's language.
+  assert.equal((await b.reply({ session: 'w', text: 'Yes', source: 'touch' })).delivered, 'fork')
+  await b.reply({ session: 'w', text: 'Go on', source: 'voice' })
+  assert.deepEqual(calls.map((args) => args.at(-1)), ['[From the car] Yes', '[From the car, dictated by voice] Go on'])
+  // A held permission denied in the car, as Claude and the history get it.
+  b.config.away = 'on'
+  const held = b.hook({ session_id: 'h', hook_event_name: 'PermissionRequest', cwd: '/p', tool_name: 'Bash', tool_input: { command: 'rm -rf build' } }, res)
+  await b.reply({ session: 'h', prompt: pending('h').id, decision: 'deny', source: 'card' })
+  assert.deepEqual(await held, { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', message: 'Denied in the car.' } } })
+  assert.equal(b.snapshot().sessions.find((s) => s.id === 'h').messages.at(-1).text, 'Denied: Bash')
+  b.config.away = 'auto'
+  // Read aloud with an English voice, code and tables named in English.
+  assert.equal(speakable('Done.\n```\nx\n```\n| a | b |', 'en'), 'Done.\nCode block skipped.\nTable skipped.')
+  await b.hook({ session_id: 'r', hook_event_name: 'Stop', cwd: '/p', last_assistant_message: 'Done.\n```\nnpm test\n```' }, res)
+  const said = b.snapshot().sessions.find((s) => s.id === 'r').messages.at(-1)
+  assert.equal((await call('GET', '/v1/speech?' + new URLSearchParams({ session: 'r', message: said.id }))).status, 200)
+  assert.deepEqual(spoken, [['Done.\nCode block skipped.', 'Samantha']])
+  // Back to German.
+  await state({ lang: 'de' })
+  await permission('d')
+  assert.equal(pending('d').title, 'Freigabe')
+})
+
+test("what the commands print follows the Mac's locale: German for German, English for any other", () => {
+  assert.equal(macLang({ LANG: 'de_DE.UTF-8' }), 'de')
+  assert.equal(macLang({ LANG: 'de_AT' }), 'de')
+  assert.equal(macLang({ LANG: 'de' }), 'de')
+  assert.equal(macLang({ LANG: 'en_US.UTF-8' }), 'en')
+  assert.equal(macLang({ LANG: 'fr_FR.UTF-8' }), 'en')
+  assert.equal(macLang({ LANG: 'C' }), 'en')
+  assert.equal(macLang({ LANG: 'dev' }), 'en')
+  assert.equal(macLang({ LC_ALL: 'en_GB.UTF-8', LANG: 'de_DE.UTF-8' }), 'en', 'LC_ALL first')
+  assert.equal(macLang({ LC_MESSAGES: 'de_CH.UTF-8', LANG: 'en_US.UTF-8' }), 'de', 'then LC_MESSAGES')
+  assert.ok(['de', 'en'].includes(macLang({})), 'without any, the locale of Intl')
+  // The status command against a data directory without a bridge.
+  const dir = tmp()
+  const script = fileURLToPath(new URL('../bin/coilshift-bridge.mjs', import.meta.url))
+  const run = (lang) => execFileSync(process.execPath, [script, 'status', '--data', dir], { env: { ...process.env, LC_ALL: '', LC_MESSAGES: '', LANG: lang }, encoding: 'utf8' }).trim()
+  assert.equal(run('de_DE.UTF-8'), 'Die Bridge läuft nicht. Sie startet mit der nächsten Claude-Code-Sitzung.')
+  assert.equal(run('en_US.UTF-8'), 'The bridge is not running. It starts with the next Claude Code session.')
 })
 
 test('sessions without a word stay out of the car, like the half-hourly probes of CodexBar', async () => {

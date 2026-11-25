@@ -21,6 +21,14 @@ status() {
     # Reasons are fixed source strings, never vehicle or user input.
     api PUT /status "{\"state\":\"$1\",\"reason\":\"$2\"}" >/dev/null || :
 }
+# say GERMAN ENGLISH: the words in the car's language, as the page speaks it:
+# German where the car is set to German or has not said, English otherwise.
+say() {
+    case "$(api GET /dv/GUI_locale 2>/dev/null)" in
+        ''|'<invalid>'|de|de[_-]*) printf '%s' "$1" ;;
+        *) printf '%s' "$2" ;;
+    esac
+}
 
 # The tile as the daemon builds one for a manifest tile (the browser config and
 # webapp.json), but with a window that opens maximized and stays so, without a

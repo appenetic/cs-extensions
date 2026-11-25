@@ -41,6 +41,9 @@ with open(daemon / 'requests', 'a') as log:
 if (method, path) == ('PUT', '/v1/status'):
     (daemon / 'status').write_text(body)
     sys.exit(0)
+if (method, path) == ('GET', '/v1/dv/GUI_locale') and (daemon / 'locale').exists():
+    print((daemon / 'locale').read_text())
+    sys.exit(0)
 if (method, path) == ('PUT', '/v1/web/app'):
     print('{{"port":29911,"netns":"chromium-entertainment","origin":"http://127.0.0.1:29911"}}')
     sys.exit(0)
@@ -121,6 +124,15 @@ class QuietView(unittest.TestCase):
         result = self.hook('apply')
         self.assertEqual(result.returncode, 1)
         self.assertIn('Kachel', (self.daemon / 'status').read_text())
+        # A car set to another language than German gets the reasons in English.
+        (self.daemon / 'locale').write_text('de_AT')
+        self.hook('apply')
+        self.assertIn('Kachel', (self.daemon / 'status').read_text())
+        (self.daemon / 'locale').write_text('en_US')
+        self.hook('apply')
+        self.assertIn('The tile could not be installed.', (self.daemon / 'status').read_text())
+        self.hook('apply', CSDK_WEB_APP_PORT='')
+        self.assertIn('No web port', (self.daemon / 'status').read_text())
 
     def test_remove_leaves_the_rest_to_the_ledger(self):
         result = self.hook('remove')

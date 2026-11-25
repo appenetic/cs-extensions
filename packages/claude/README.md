@@ -156,7 +156,8 @@ nächsten direkten Kontakt selbst.
    - Beginnt es mit einem Rufwort, geht der Rest an die neueste offene Frage,
      sonst an die zuletzt aktive Sitzung.
    - Optionen wählst du mit „die zweite“, „Option drei“ oder dem Wortlaut.
-     Freigaben mit „ja“ oder „nein, …“.
+     Freigaben mit „ja“ oder „nein, …“. Englisch geht immer auch („option
+     two“, „yes“, „no, …“), gleich in welcher Sprache das Auto steht.
    - Teslas Assistent reagiert zusätzlich selbst auf den Satz.
    - Die Rufwörter lassen sich einstellen. Vorgabe:
      `claude, clod, klod, klaud, cloud, glod`.
@@ -166,6 +167,15 @@ nächsten direkten Kontakt selbst.
 Der DataValue-Name wurde offline in der Firmware 2026.38.5.12 gefunden, im
 `QtCarSpeechRecognizer`. Ob er am Auto lesbar ist oder wie die Navi-Koordinaten
 `<redacted>` liefert, zeigt **Technik → Sprachtaste**.
+
+## Deutsch oder Englisch
+
+Im Auto folgt alles der Sprache des Autos (`GUI_locale`): App, Karte über der
+Navi, Kopplungsseite am Handy, Meldungen und Diagnose, und was die Bridge ins
+Auto schickt, auch die Stimme beim Vorlesen. Deutsch, wenn das Auto auf Deutsch
+steht, sonst Englisch. Das Plugin auf dem Mac schreibt in der Sprache des Macs
+(`LC_ALL`, `LC_MESSAGES`, `LANG`). Die Beschreibungen im Feed und im
+Plugin-Marktplatz sind Englisch.
 
 ## Karte über der Navi
 

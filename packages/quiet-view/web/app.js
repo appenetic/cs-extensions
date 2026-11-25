@@ -1148,34 +1148,57 @@ void main() {
     return { d: lines.map(path).join(''), also: also ? path(also) : '' };
   }
 
-  // The service words a turn as "in 150 m links" or, without its direction,
-  // "Abbiegen in 150 m": the distance shows large, the words under it, and the
-  // arrow for what they say beside them.
-  const KINDS = [[/wenden/, 180], [/Kreisverkehr/, 0, 'ring'], [/Ausfahrt/, 40, 'exit'], [/einfädeln/, 30],
-    [/leicht/, 45], [/scharf/, 135], [/geradeaus/, 0], [/links|rechts/, 90]];
+  // The service gives a turn's distance and words in the page's language, and
+  // its kind: the distance shows large, the words under it, and the arrow for
+  // the kind beside them. A turn without a kind (QtCar keeps its direction to
+  // itself) has no arrow.
+  const KINDS = new Map([['uturn', [180]], ['roundabout', [0, 'ring']], ['exit', [40, 'exit']], ['merge', [30]],
+    ['slight', [45]], ['sharp', [135]], ['straight', [0]], ['turn', [90]]]);
   function showTurn(t) {
-    const text = t && typeof t.text === 'string' ? t.text : '';
-    reveal($('turn'), !!text);
-    if (!text) return;
-    const m = /^in (\S+ \S+) (.+)$/.exec(text) || /^Abbiegen in (\S+ \S+)$/.exec(text);
-    const words = m ? (m[2] || 'Abbiegen') : '';
-    $('turnDist').textContent = m ? m[1] : text;
+    const words = t && typeof t.words === 'string' ? t.words : '';
+    reveal($('turn'), !!words);
+    if (!words) return;
+    $('turnDist').textContent = typeof t.dist === 'string' ? t.dist : '';
     $('turnWords').textContent = words;
-    const kind = KINDS.find(([re]) => re.test(words));
+    const kind = KINDS.get(t.kind);
     $('turnGlyph').style.display = kind ? '' : 'none';
     if (kind) {
       // A roundabout's exit lies a quarter round for the right, three quarters
       // for the left, half round without a side.
       const exit = t.side > 0 ? 90 : t.side < 0 ? 270 : 180;
-      const glyph = kind[2] === 'ring' ? arrowPaths(exit, 1, 'ring')
-        : arrowPaths(kind[1], t.side || (kind[1] === 180 ? -1 : 1), kind[2]);
+      const glyph = kind[1] === 'ring' ? arrowPaths(exit, 1, 'ring')
+        : arrowPaths(kind[0], t.side || (kind[0] === 180 ? -1 : 1), kind[1]);
       $('turnPath').setAttribute('d', glyph.d);
       $('turnAlso').setAttribute('d', glyph.also);
     }
     $('turn').style.setProperty('--near', String(clamp(Number(t.near) || 0, 0, 1)));
   }
 
+  // The page speaks the car's language, as the service says (lang): German as
+  // index.html has it where the car is set to German, English otherwise.
+  const ENGLISH = {
+    arrived: 'Arrived', arrival: 'Arrival', hint: 'Swipe down to close · press and hold for options',
+    credit: 'Buildings: OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors', options: 'Options',
+    shows: 'What the view shows', eta: 'Arrival time and progress', turns: 'Turn hints', speed: 'Speedometer',
+    pulses: 'Light streaks', buildings: 'Buildings', look: 'Light path', fine: 'Fine', soft: 'Soft', style: 'Style',
+    ambient: 'Ambient', bright: 'Brightness', high: 'Bright', low: 'Dimmed', done: 'Done',
+  };
+  const GERMAN = {};
+  for (const el of document.querySelectorAll('[data-t]')) GERMAN[el.dataset.t] = el.textContent;
+  for (const el of document.querySelectorAll('[data-t-label]')) GERMAN[el.dataset.tLabel] = el.getAttribute('aria-label');
+  let lang = 'de';
+  function speak(next) {
+    next = next === 'en' ? 'en' : 'de';
+    if (next === lang) return;
+    lang = next;
+    const words = lang === 'en' ? ENGLISH : GERMAN;
+    document.documentElement.lang = lang;
+    for (const el of document.querySelectorAll('[data-t]')) el.textContent = words[el.dataset.t];
+    for (const el of document.querySelectorAll('[data-t-label]')) el.setAttribute('aria-label', words[el.dataset.tLabel]);
+  }
+
   function render(v) {
+    speak(v.lang);
     // Arrived: the drive's summary instead of arrival, turn and progress.
     const done = v.arrived && typeof v.arrived === 'object' ? v.arrived : null;
     const block = $('arrivedBlock');
@@ -1196,7 +1219,7 @@ void main() {
     if (arrival) {
       $('eta').textContent = v.eta;
       const parts = [];
-      if (v.min) parts.push(`noch ${v.min} min`);
+      if (v.min) parts.push(lang === 'en' ? `${v.min} min left` : `noch ${v.min} min`);
       if (v.dist) parts.push(v.dist);
       $('rest').textContent = parts.join(' · ');
       const progress = typeof v.progress === 'number' && v.progress >= 0;

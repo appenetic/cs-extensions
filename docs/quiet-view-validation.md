@@ -545,6 +545,26 @@ Ersetzen des Pakets schreibt der Daemon einen neuen Token nach
 - Auf dem Mac mit echten Prozessen geprüft: neuer Token → Exit 3 nach etwa
   2,5 s, SIGTERM → sofort Exit 0.
 
+## Englisch (alpha.29)
+
+Wunsch aus der Community (Discord): die App auch auf Englisch.
+- **Sprache:** Der Dienst liest `GUI_locale` über die SDK-Schnittstelle (am
+  Auto `de_DE`, über `/v1/dv/GUI_locale` lesbar). Deutsch, wenn die Sprache
+  `de` ist, sonst Englisch; unbekannt bleibt Deutsch. Er gibt `lang` im View
+  an die Seite und formuliert selbst in der Sprache: Abbiegungen (als Art,
+  Entfernung und Wörter, die Seite zeichnet den Pfeil nach der Art),
+  Dezimaltrennzeichen, Statusmeldungen. Die Seite behält Deutsch im HTML und
+  tauscht die Texte nach `lang` aus einem englischen Wörterbuch.
+- **Uhr:** Ankunftszeiten folgen `GUI_24hourTime` (am Auto `true`): mit der
+  12-Stunden-Uhr „11:41 PM“.
+- **Feed:** Titel „Quiet View (experimental)“, Beschreibung auf Englisch
+  (Wunsch des Nutzers, die CoilShift-App selbst ist Englisch).
+- **Geprüft:** Go-Tests für Sprachregel, 12-Stunden-Uhr, Abbiegungen und View
+  in beiden Sprachen; Standbilder aus Chrome headless (1920×1200) der
+  Fahransicht, einer scharfen Abbiegung, der Ankunft und des Menüs auf
+  Englisch und Deutsch: kein Umbruch, Layout unverändert. Am deutschen Auto
+  ist Englisch nicht zu sehen.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
