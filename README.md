@@ -40,15 +40,15 @@ durchgespielt.
 ## Quiet-Ansicht (neu, experimentell)
 
 Nach dem „Quiet Mode“ von FSD v15: eine App mit eigener Kachel im Launcher. Sie
-öffnet sich direkt maximiert, auch in D, und zeigt einen animierten Lichtschein
-in der Farbe des Ambientelichts. Die Lichtbahnen zeigen die Bahn des Lenkwinkels, Lichtstreifen fließen in deinem
-Tempo darauf, und die Linie leuchtet mit dem Blinker. Dahinter stehen schematisch die Gebäude der Umgebung aus
-OpenStreetMap. Darüber ruhig Tacho, Ankunft, nächste Abbiegung und
-Fortschritt, am Ziel ein eigener Ankunftsbildschirm; bei Warnungen schließt sie
-sich selbst. Fest nach unten wischen
-schließt sie, lange drücken öffnet die Optionen. Sie spricht Deutsch oder
-Englisch, je nach Sprache des Autos; im Feed heißt sie „Quiet View“.
-[Funktionsweise](packages/quiet-view/README.md) ·
+öffnet sich direkt maximiert, auch in D, und zeigt die Straßen und Häuser rund
+um das Auto aus OpenStreetMap aus der Höhe eines Fahrers. Die eigene Straße
+leuchtet in der Farbe des Ambientelichts voraus, an der nächsten Abbiegung in
+deren Richtung; im Profil Mad Max gleiten weiche Pfeile darauf. Darüber ruhig
+Tacho, Self-Driving-Profil, Ankunft, nächste Abbiegung und Fortschritt, am Ziel
+ein eigener Ankunftsbildschirm; bei Warnungen schließt sie sich selbst. Fest
+nach unten wischen schließt sie, lange drücken öffnet die Optionen. Sie spricht
+Deutsch oder Englisch, je nach Sprache des Autos; im Feed heißt sie „Quiet
+View“. [Funktionsweise](packages/quiet-view/README.md) ·
 [Validierung](docs/quiet-view-validation.md).
 
 ## Home Assistant Bridge

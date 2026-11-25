@@ -2,54 +2,41 @@
 
 Experimentelles SDK-1.0-Paket nach dem Vorbild des „Quiet Mode“ von FSD v15.
 Es bringt eine App mit der Kachel **Quiet** in den Launcher. Sie öffnet sich
-direkt maximiert und ohne Titelleiste, auch in D. Zu sehen ist ein dunkler
-Bildschirm mit einem Lichtschein in der Farbe deines Ambientelichts: oben ein
-weicher, atmender Schein, unten eine Straße bei Nacht, deren zwei Fahrbahnlinien
-feine Lichtfäden sind, die im Dunst verschwinden. Auf ihnen fließen
-Lichtstreifen zu dir hin, so schnell wie die Straße, bei hohem Tempo gebremst;
-im Stand stehen sie.
-Die beiden Linien zeigen die Bahn, die das Auto beim gerade eingeschlagenen
-Lenkwinkel fahren würde, wie die Hilfslinien einer Rückfahrkamera: leicht
-gelenkt eine sanfte Kurve, voll eingeschlagen ein enger Bogen zur Seite. Blinkst du, leuchtet die Linie auf dieser Seite im Takt auf.
-Statt der feinen Linien kann die Bahn auch aussehen wie auf den Fotos des
-Originals: zwei breite, weiche Lichtbahnen auf dem Boden, durch deren Herz die
-Lichtstreifen als weiche Pulse laufen. Die nasse Straße spiegelt den Schein.
-Dahinter steht die Stadt rund um das Auto, aus OpenStreetMap, wie bei Nacht:
-dunkle Silhouetten vor dem Schein, mit Etagen und Fenstern, von denen etwa jedes
-sechste in der Farbe des Lichts leuchtet, am Fuß vom Licht der Straße
-angestrahlt, mit feinen, glatten Lichtlinien an Dachkanten und Ecken. Beim
-Öffnen wachsen die Häuser aus dem Boden. Sie blenden ab 40 m
-ein und lösen sich gegen 400 m im Dunst auf.
+direkt maximiert und ohne Titelleiste, auch in D. Zu sehen sind die Straßen und
+Häuser rund um das Auto aus OpenStreetMap, aus der Höhe eines Fahrers, unter
+einem weichen, atmenden Schein in der Farbe deines Ambientelichts. Die Straße,
+auf der du fährst, leuchtet in dieser Farbe voraus, über ihre ganze Breite und
+bis etwa 400 m weit, wohin sie weiterführt: geradeaus, und an der nächsten
+Abbiegung der Navigation in deren Richtung. Lange, leise Lichtwellen laufen in
+deinem Tempo darauf zu dir hin; blinkst du, leuchtet ihr Rand auf dieser Seite
+im Takt heller. Im Profil Mad Max gleiten weiche Pfeile aus Licht vor dem Auto
+her. Die anderen Straßen liegen dunkel daneben, ihre Ränder feine Linien des
+Lichts. Die Häuser stehen mit ihren echten Höhen als helle Körper da, ein festes
+Licht von Westnordwest fällt seitlich auf ihre Fronten, ihre Dachkanten sind
+feine Lichtlinien. Direkt neben dem Auto dunkeln sie zur Silhouette ab, in der
+Ferne lösen sie sich im Dunst auf statt im Schwarz; Bauwerke ab 60 m wie ein
+Fernsehturm bleiben bis 2,6 km sichtbar, soweit die geladenen Kacheln reichen.
+Beim Öffnen wachsen die Häuser aus dem Boden.
 
-Im Stil **Neon** wird daraus eine Retro-Neonstadt in der Dämmerung, unabhängig
-von der Farbe des Ambientelichts. Der Himmel geht von tiefem Violett über
-Magenta in einen rosa Dunst am Horizont über, mit Sternen, die beim Abbiegen an
-ihrem Platz am Himmel bleiben. Vorn geht die Sonne unter, so tief, dass sie
-unter der Ankunftszeit bleibt. In Kurven bleibt sie wie die Stadt an ihrem Platz
-in der Welt und wandert mit ihrer Spiegelung über das Bild; auf der Geraden
-kommt sie langsam wieder nach vorn. Die Häuser stehen deckend im Dunst und
-nehmen mit der Entfernung seine Farbe an, bis sie sich in der Ferne ganz darin
-auflösen. Vor der Sonne bleiben sie immer Silhouetten. Die nahen, die gerade
-erst einblenden, verdecken ihre Scheibe und lassen nur ihren Schein weich
-durch. Manche tragen türkise Lichtbänder an
-jeder Etage, manche sind Türme voller warm erleuchteter Fenster, die übrigen
-dunkel, mit Dachkanten in Pink oder Türkis. Die Linien sind golden, die
-weichen Lichtbahnen ein rosa Schein. Die nasse Straße spiegelt Sonne und Stadt
-gewellt.
+Ruhig darüber, in Teslas eigener Schrift: oben links der Tacho, darunter das
+Self-Driving-Profil mit Teslas Namen (Faultier, Lässig, Standard, Sportlich,
+Mad Max), daneben die nächste Abbiegung als Pfeil mit Entfernung („200 m“,
+darunter „rechts“), über dem Horizont wie im Original die Ankunftszeit,
+darunter eine feine Linie mit einem Lichtpunkt für den Fortschritt der Route
+und Restzeit und Reststrecke. Was kommt und geht, blendet weich ein und aus;
+beim Öffnen erwacht das Bild aus dem Schwarz und die Straße leuchtet vom Auto
+aus auf. Eine neue Farbe, etwa beim nächsten Song, blendet ruhig über das ganze
+Bild, in 2,4 s. Fest nach unten wischen schließt die App, lange drücken öffnet
+die Optionen.
 
-Ruhig darüber, in Teslas eigener Schrift: oben links der Tacho und daneben die
-nächste Abbiegung als Pfeil mit Entfernung („200 m“, darunter „rechts“), über
-dem Horizont wie im Original die Ankunftszeit, darunter eine feine Linie mit
-einem Lichtpunkt für den Fortschritt der Route und Restzeit und Reststrecke.
-Was kommt und geht, blendet weich ein und aus; beim Öffnen erwacht das Bild aus
-dem Schwarz und die Bahn wächst vom Auto zum Horizont. Eine neue Farbe, etwa
-beim nächsten Song, breitet sich als Welle vom Horizont her aus. Fest nach
-unten wischen schließt die App, lange drücken öffnet die Optionen.
+Bis alpha.30 zeigte die App statt der Straßen zwei Lichtlinien für den
+Lenkwinkel, dazu einen Stil Neon mit Sonne; beides ist mit alpha.31 entfallen.
 
 ## Angekommen
 
-Am Ziel endet die Straße in einem Ring aus Licht, der langsam atmet; ab und zu
-geht eine Lichtwelle von ihm aus, und die Lichtstreifen kommen zur Ruhe. Darüber
+Am Ziel liegt 26 m voraus ein Ring aus Licht auf der Straße, der langsam
+atmet; ab und zu geht eine Lichtwelle von ihm aus, und das Leuchten der Straße
+voraus erlischt. Darüber
 steht „Angekommen“ mit der Fahrt: „12,4 km in 18 min · 18:42“. Der Bildschirm
 bleibt bis zu 10 Minuten, eine neue Route oder Weiterfahren über 20 km/h
 beenden ihn.
@@ -66,11 +53,12 @@ Zeitzone als die Anzeige im Auto.
 
 Pakete aus einem Repository bekommen in CoilShift keine Einstellungen. Ein
 langer Druck in der App öffnet deshalb ein Menü: Ankunftszeit und Fortschritt,
-Abbiegehinweise, Tacho, Lichtstreifen und Gebäude an oder aus, die Lichtbahn
-Fein oder Weich, der Stil Ambiente oder Neon, Helligkeit Auto, Hell oder
-Gedämpft. Der Dienst hebt die Wahl in `CSDK_STATE/options.json` auf; was eine
-ältere Version dort ablegte, gilt weiter, Neues beginnt mit seinem Standard
-(Lichtbahn Fein, Stil Ambiente).
+Abbiegehinweise, Tacho, Lichtstreifen sowie Straßen und Gebäude an oder aus,
+die Blickhöhe Straße (1,6 m, Standard), Erhöht (4 m) oder Hoch (9 m),
+Helligkeit Auto, Hell oder Gedämpft. Der Dienst hebt die Wahl in
+`CSDK_STATE/options.json` auf; was eine ältere Version dort ablegte, gilt
+weiter, Neues beginnt mit seinem Standard, und die Lichtbahn und der Stil von
+bis alpha.30 fallen weg.
 
 ## Sprache
 
@@ -79,12 +67,16 @@ auf Deutsch steht, sonst Englisch. Die Ankunftszeit folgt der 12- oder
 24-Stunden-Uhr des Autos (`GUI_24hourTime`). Im Feed heißt das Paket
 „Quiet View“.
 
-## Gebäude
+## Straßen und Gebäude
 
-Die Gebäude kommen als Vektorkacheln von [OpenFreeMap](https://openfreemap.org)
-(OpenMapTiles-Schema, Zoomstufe 14, frei und ohne Schlüssel): Grundriss, Höhe
-und Sockelhöhe aus OpenStreetMap. Wo dort keine Höhe steht, setzt OpenMapTiles
-eine eigene an. Der Dienst lädt nur, solange die App offen und die Option an
+Straßen und Gebäude kommen als Vektorkacheln von
+[OpenFreeMap](https://openfreemap.org) (OpenMapTiles-Schema, Zoomstufe 14, frei
+und ohne Schlüssel): Grundriss, Höhe und Sockelhöhe der Gebäude, die Straßen
+mit ihrer Art und ob sie Einbahnstraßen sind, aus OpenStreetMap. Wo keine Höhe
+steht, setzt OpenMapTiles eine eigene an. Gezeichnet werden Autobahnen,
+Schnellstraßen, Haupt-, Neben- und Wohnstraßen und Zufahrten, so breit wie ihre
+Art (von der Mitte bis zum Rand 7 m bis 2,2 m, eine Fahrbahn einer Einbahnstraße
+ein Viertel schmaler); Tunnel, Fußwege, Gleise und Fähren nicht. Der Dienst lädt nur, solange die App offen und die Option an
 ist, die Kacheln im Umkreis von 450 m um das Auto (meist ein bis zwei von
 1,5 km Kantenlänge). Neue Kacheln kosten je etwa 0,3 bis 0,6 MB über das Netz
 des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
@@ -103,8 +95,20 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
   Öffentliche DNS-Server (1.1.1.1, 9.9.9.9, 8.8.8.8) sehen den Namen
   `tiles.openfreemap.org`, denn das Netz des Dienstes hat keinen eigenen
   DNS-Server. Wer das nicht will, schaltet die Gebäude im Menü aus.
-- **Lizenz:** Solange Gebäude zu sehen sind, steht unten rechts klein
-  „OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende“.
+- **Lizenz:** Solange Straßen oder Gebäude zu sehen sind, steht unten rechts
+  klein „Karte: OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende“.
+- **Die eigene Straße:** Die Seite sucht zehnmal pro Sekunde die Straße des
+  Autos: unter den Stücken bis 15 m entfernt, deren Richtung höchstens 35° von
+  seiner abweicht (Einbahnstraßen nur in ihrer Richtung), das nächste. Die
+  bisherige bleibt, solange das Auto bis 10 m neben ihrem Rand und 50° von ihrer
+  Richtung bleibt. Die Kamera rückt über etwa eine halbe Sekunde seitlich auf
+  ihre Mitte und dreht sich in ihre Richtung, denn GPS legt das Auto oft ein
+  paar Meter daneben. Von dort folgt das Leuchten ihrer Linie; wo sie endet oder
+  andere sie treffen, geht es auf der weiter, die am geradesten weiterführt,
+  nie gegen eine Einbahnstraße. An der Kreuzung, die der nächsten Abbiegung der
+  Navigation am nächsten liegt (bis 30 m daneben), biegt es in die Straße, die
+  höchstens 45° vom Winkel der Abbiegung abweicht. Tesla gibt die Route selbst
+  nicht heraus; weiter als bis zur nächsten Abbiegung kennt die App sie nicht.
 - **Bewegung:** Zwischen zwei Positionen fährt die Seite mit dem Tempo weiter
   und dreht so schnell, wie der Lenkwinkel es sagt: wie Radstand 2,89 m und
   Übersetzung 10:1, mal 0,65 (auf einer Fahrt in Berlin gegen den Kurs
@@ -142,7 +146,7 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
   Auto noch nicht zu sehen. Das Paket erkennt sie an Wörtern (`left`, `right`,
   `both`, `visual`, `chime`, `slow`, `struck`, `escalat`).
 - **Lenkwinkel im Stand:** In P kann `VAPI_steeringAngle` `<invalid>` sein;
-  dann bleibt die Bahn gerade. Der Dienst schreibt während der Fahrt
+  dann dreht die Kamera zwischen zwei Kursen nicht mit. Der Dienst schreibt während der Fahrt
   Drehrate, Gierrate, Lenkwinkel, Tempo, Kurs, den Ort im Rahmen der Sitzung
   und wie oft Kurs und Position neu kamen in `CSDK_STATE/turns.log` (höchstens
   etwa 512 KB).
@@ -166,7 +170,8 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
   nur, solange die Seite offen ist: Tacho, Übernahme, Hände-Mahnung und
   Seitenkollision als Streams, der Rest ein- bis zweimal pro Sekunde nacheinander.
 - **Lenkwinkel direkt:** Die Streams liefern Änderungen nur etwa alle 1,6 s. Den
-  Lenkwinkel liest der Dienst deshalb über eine eigene D-Bus-Verbindung
+  Lenkwinkel, aus dem die Seite zwischen zwei Kursen die Drehung des Autos
+  rechnet, liest der Dienst deshalb über eine eigene D-Bus-Verbindung
   20-mal pro Sekunde bei QtCar (`com.tesla.Debug.get_data_value`, derselbe
   Aufruf, den die Schnittstelle des Autos nutzt). Klappt das nicht, liest er
   ihn alle 100 ms über die Schnittstelle.
@@ -186,50 +191,37 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
 | Ankunft | `GUI_navNextDestinationArrivalTime`, wenn `GUI_navNextDestinationArrivalInfoValid`; `NAV_minutesToArrival`; `NAV_milesToArrival` in den Einheiten des Autos (`GUI_distanceUnits`) |
 | Fortschritt | Reststrecke gegen die längste seit Beginn der Route; wächst sie um mehr als ein Zehntel und eine halbe Meile, ist es eine neue Route |
 | Abbiegung | `NAV_milesToNextTurn` ab 1,5 km, die Richtung aus `NAV_nextTurnAngle` im Uhrzeigersinn ab geradeaus (99 war rechts): unter 12° keine Abbiegung, bis 45° leicht, bis 135° normal, bis 165° scharf, darüber wenden. Ohne Winkel nur „Abbiegen in …“ |
-| Bahn | Nur `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt). Die Krümmung ist tan(Lenkwinkel / 10) / 2,89 m, also Lenkübersetzung etwa 10:1 und Radstand 2,89 m: 2° biegen die Bahn auf 60 m ein wenig, 180° auf einen Radius von etwa 9 m. Die Linien sind Kreisbögen 1,75 m innen und außen; sichtbar sind etwa 60 m, nie über die Umkehr hinaus. Unter 0,3° bleibt sie gerade. Der Dienst liest den Winkel 30-mal pro Sekunde direkt bei QtCar und gibt jeden neuen Wert sofort weiter; eine kritisch gedämpfte Feder auf der Seite trägt die Bahn ohne Stufen von Wert zu Wert, etwa 0,08 s hinter einem drehenden Lenkrad. Ohne gültigen Lenkwinkel läuft die Bahn gerade; Abbiegehinweise biegen sie nicht |
-| Tempo | Die Lichtstreifen laufen langsam so schnell wie die Straße (1,3 m/s bei 5 km/h), darüber gebremst gegen 13 m/s (8,5 m/s bei 50 km/h, 12 m/s bei 120 km/h). Sie folgen dem Tempo über etwa 1,5 s und kommen im Stand ganz zum Stehen |
+| Straße voraus | Die eigene Straße aus den Kacheln (siehe „Straßen und Gebäude“), an der nächsten Abbiegung mit `NAV_milesToNextTurn` und `NAV_nextTurnAngle` in deren Richtung |
+| Self-Driving | `GUI_autopilotDrivingProfile` („Sloth“, „Chill“, „Standard“, „Hurry“, „Mad Max“), mit Teslas Namen in der Sprache des Autos (Faultier, Lässig, Standard, Sportlich, Mad Max) |
+| Tempo | Die Lichtwellen laufen langsam so schnell wie die Straße (1,3 m/s bei 5 km/h), darüber gebremst gegen 13 m/s (8,5 m/s bei 50 km/h, 12 m/s bei 120 km/h). Sie folgen dem Tempo über etwa 1,5 s und kommen im Stand ganz zum Stehen |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
-| Gebäude | Position aus `com.tesla.SensitiveDataValues.get_LOC_geoLocation` (6-mal pro Sekunde, mit laufender Nummer), Kurs `LOC_estimatedHdg` und Tempo (5-mal), Gebäude aus OpenFreeMap-Kacheln im Umkreis von 450 m, neu ausgewählt alle 60 m |
+| Straßen und Gebäude | Position aus `com.tesla.SensitiveDataValues.get_LOC_geoLocation` (6-mal pro Sekunde, mit laufender Nummer), Kurs `LOC_estimatedHdg` und Tempo (5-mal), aus OpenFreeMap-Kacheln die Gebäude im Umkreis von 450 m und die Straßen, die bis 480 m herankommen, neu ausgewählt alle 60 m |
 
-Das Bild zeichnet ein WebGL-Shader in echter Perspektive: eine Kamera 1,25 m
-über der Mitte einer 3,5 m breiten Spur, der Horizont auf 58 % der Höhe. Die
-Linien haben einen fast weißen Kern, der mit der Entfernung feiner wird, und
-einen Bloom in Bildschirmpixeln, gemessen am Gefälle der Linie selbst und auch
-am Boden nur wenige Meter breit; ein Lichtstreifen leuchtet darin entlang der
-Linie und wird mit dem Abstand weicher. Die Bahn ist ein Kreisbogen, nahe der
-Geraden eine Parabel. Am Ende
-stehen ein filmisches Tonemapping und feines Rauschen, damit dunkle Verläufe
-keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder im
-Mittel länger als etwa 26 ms, zeichnet die Seite weniger Pixel; die ersten 90
-Bilder nach dem Start oder einer Pause zählen dabei nicht, ebenso wenig 90
-Bilder, in die eine neue Gebäudeauswahl fiel. Läuft sie danach etwa 15 s im
-Takt des Bildschirms, geht sie eine Stufe zurück nach oben; muss sie eine
-solche Stufe wieder abgeben, bleibt sie für die Sitzung dort. Bis alpha.29
-konnte die Auflösung nur sinken und blieb nach einem einzigen langsamen Moment
-bis zum Schließen unscharf. Ohne WebGL steht ein
-schlichteres Canvas-Bild da. Farbe, Helligkeit, Bahn und Tempo gleiten weich
-in ihre neuen Werte; eine neue Farbe, die weit von der alten liegt, wächst als
-Front vom Fluchtpunkt aus über 1,8 s, kleine Schritte wie beim Regenbogen
-gleiten einfach. In der weichen Lichtbahn ist jede Linie ein Band aus Licht auf
-dem Boden, 0,8 m breit (Standardabweichung) um ein 0,3 m schmales Herz; weil
-die Breite in Metern auf dem Boden gilt, verengt die Perspektive es von selbst.
-Die weichen Bahnen verblassen früher als die Linien, damit sich ihr Licht dort,
-wo die Straße nur noch wenige Pixel breit ist, nicht zu einem hellen Fleck
-staut. Die Gebäude zeichnet ein zweiter Durchgang aus derselben
-Kamera: dunkle Wände, erst nur in die Tiefe, dann abgedunkelt, wo jeweils die
-vorderste steht, damit hintereinander stehende Häuser nicht doppelt dunkeln;
-zum Boden hin heller im Dunst und vom Licht der Straße angestrahlt. Auf den
-Wänden liegen Fenster in Etagen von 3,3 m, alle 2,6 m eines, mittig auf jeder
-Wand, über dem Erdgeschoss und unter der Brüstung von Häusern über 6 m; etwa
-jedes sechste leuchtet, mal wärmer, mal mehr in der Lichtfarbe, mit einem
-weichen Schein um die Scheibe. Welche leuchten, hängt nur an ganzen Zahlen
-(Fenster, Etage, Wand), damit es stabil bleibt; wo Fenster enger stehen, als
-Pixel sie zeigen können, bleibt nur ihr schwacher Mittelwert, damit nichts
-flimmert. Darüber Dachkanten als schmale Bänder mit weichem Profil, an jeder
-Neigung glatt statt pixelig, die Ecken viel schwächer. Wenn die Gebäude zum
-ersten Mal erscheinen, wachsen sie in 2,2 s aus dem Boden. Alles blendet ab 40 m ein und ist vor dem Rand der Auswahl (450 m,
-alle 60 m neu) verschwunden, damit dort nichts aufpoppt. Das Canvas-Bild zeigt
-keine Gebäude.
+Das Bild zeichnet WebGL in echter Perspektive: eine Kamera in der gewählten
+Höhe über der Straßenmitte, der Horizont auf 58 % der Höhe, die Brennweite 0,78
+der Breite. Ein Durchgang malt Himmel und Boden: dunkel, darüber der Schein und
+ein Band aus Dunst am Horizont, in den alles in der Ferne übergeht. Dann die
+Straßen als Streifen auf dem Boden, die Ecken auf Gehrung, damit sie in Kurven
+ihre Breite halten: zuerst für alle ihre Ränder, 1,5 Pixel breit in jeder
+Entfernung, dann die Straßen selbst darüber, sodass dort, wo Straßen sich
+treffen, ihre Ränder zu einem Umriss verschmelzen; dann das Leuchten der Straße
+voraus, alle 2 m ein Punkt, über ein paar Meter geglättet, damit es ohne Ecken
+biegt. Die Gebäude zeichnet ein weiterer Durchgang aus derselben Kamera: erst
+nur ihre Tiefe, dann ihre Farbe, wo jeweils die vorderste Wand steht. Jede Wand
+blendet über ihr letztes Pixel oben und am Fuß aus, damit die Umrisse an jeder
+Neigung glatt bleiben, ohne das Antialiasing der GPU, das jedes Pixel kosten
+würde; ihre Dachkanten sind schmale Bänder mit weichem Profil, die Ecken
+schwächer. Am Ende stehen eine Vignette, ein filmisches Tonemapping und feines
+Rauschen, damit dunkle Verläufe keine Stufen zeigen. Rechnet die Grafik in
+Software oder dauern Bilder im Mittel länger als etwa 26 ms, zeichnet die Seite
+weniger Pixel; die ersten 90 Bilder nach dem Start oder einer Pause zählen
+dabei nicht, ebenso wenig 90 Bilder, in die eine neue Auswahl von Gebäuden und
+Straßen fiel. Läuft sie danach etwa 15 s im Takt des Bildschirms, geht sie eine
+Stufe zurück nach oben; muss sie eine solche Stufe wieder abgeben, bleibt sie
+für die Sitzung dort. Ohne WebGL steht ein schlichteres Canvas-Bild da, nur der
+Schein über dem Boden. Eine neue Farbe blendet über OKLab, damit die Farben
+dazwischen klar bleiben statt schmutzig zu werden, und das Bild dämpft sich
+dabei kurz etwas, je mehr, je weiter die Farben auseinanderliegen.
 
 Die Schrift ist die des Autos, Universal Sans in 300 und 500, Tacho und
 Ankunftszeit mit gleich breiten Ziffern, damit nichts springt, wenn eine Zahl

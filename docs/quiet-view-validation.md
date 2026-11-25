@@ -622,10 +622,45 @@ Jetzt:
   15 s) geht sie eine Stufe hoch; wird eine solche Stufe wieder abgegeben,
   bleibt sie für die Sitzung unten, damit das Bild nicht pendelt.
 
+## Echte Straßen (alpha.31)
+
+Wunsch nach der Fahrt durch Berlin: statt der Linien des Lenkwinkels die
+echten Straßen, Neon und Sonne weg, die Häuser klar statt dunkel und neblig,
+alles schicker. Das Design entstand in der Demo (Versionen 24 bis 32) und wurde
+dort abgenommen: Blickhöhe „Straße“, die eigene Straße leuchtet durchgehend über
+ihre ganze Breite, ruhige Farbüberblendung, Self-Driving-Profil, im Profil
+Mad Max ruhige Pfeile.
+- **Dienst:** Er liest aus denselben Kacheln die Ebene `transportation`
+  (Autobahn bis Zufahrt, ohne Tunnel, Fußwege, Gleise, Fähren), schneidet die
+  Linien auf die eigene Kachel und schickt die Straßen, die bis 480 m
+  herankommen, als `r` mit den Gebäuden (Art, Einbahn, Punkte in Metern).
+  Abbiegungen tragen nun Meter und Winkel (`m`, `a`).
+  `GUI_autopilotDrivingProfile` kommt im Sekundentakt dazu und geht mit
+  Teslas Namen aus `QtCar_de.qm` an die Seite (Faultier, Lässig, Standard,
+  Sportlich, Mad Max). Am Auto gelesen: „Hurry“, später „Standard“;
+  `DAS_autopilotState` im Stand „Disabled“. Optionen: `view` (street, raised,
+  high) statt `look` und `style`; eine Datei von alpha.23 bis 30 behält ihre
+  übrigen Werte.
+- **Seite:** Neuer Renderer (Himmel und Boden, Straßen als Streifen mit
+  Rändern, Gebäude als beleuchtete Körper), die eigene Straße per Abgleich mit
+  den Straßen in der Nähe, ihr Weg voraus bis 400 m mit der nächsten Abbiegung.
+- **Mit echten Daten geprüft:** Mit den Kacheln der Berliner Fahrt an drei
+  Stellen (Median, p90, schwerste: bis 692 Umrisse und 348 Straßen, 99 KB je
+  Auswahl) die echte Seite gerendert, in Orange und Blau, Sportlich, Standard
+  und Mad Max, dazu das Menü: Das Auto steht auf seiner Straße, das Leuchten
+  läuft auf ihr voraus und biegt mit ihr ab.
+- **Tests:** Go: Straßen aus einer handgebauten Kachel (Hauptstraße über den
+  Rand geschnitten, Tunnel und Fußweg fallen weg), Auswahl der Straßen, Namen
+  der Profile, alte Optionsdateien. Python: alle Shader kompiliert, auch das
+  Straßenprogramm gelinkt.
+- **Offen:** wie sich der Abgleich mit der Straße beim Fahren anfühlt, vor
+  allem an Kreuzungen und auf mehrspurigen Straßen mit getrennten Fahrbahnen;
+  welcher Wert zeigt, dass FSD gerade fährt.
+
 ## Am Auto offen
 
-1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
-   (alpha.14 und 15 bisher nur in der Demo und im Rendering gesehen).
+1. Wie die Straße voraus beim Fahren wirkt (alpha.31), auch an Kreuzungen
+   und auf der Autobahn.
 2. Ob sich die Gebäude mit alpha.30 beim Fahren ruhig mitbewegen. Kurs und
    Takt sind aus `turns.log` geklärt (alpha.30), dass sie ankommen mit
    alpha.17.

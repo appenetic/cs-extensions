@@ -9,7 +9,10 @@
 <body>
 <canvas id="glow"></canvas>
 <div class="top">
-  <div id="speed" class="speed" hidden><span id="speedValue" class="num"></span><span id="speedUnit" class="unit"></span></div>
+  <div class="left">
+    <div id="speed" class="speed" hidden><span id="speedValue" class="num"></span><span id="speedUnit" class="unit"></span></div>
+    <div id="fsd" class="fsd" hidden><span class="fsdLabel">Self-Driving</span><span id="fsdProfile" class="fsdProfile"></span></div>
+  </div>
   <div id="turn" class="turn" hidden>
     <svg id="turnGlyph" class="glyph" viewBox="0 0 48 48" aria-hidden="true"><path id="turnAlso" class="also" d=""/><path id="turnPath" d=""/></svg>
     <div><p id="turnDist" class="dist"></p><p id="turnWords" class="words"></p></div>
@@ -28,7 +31,7 @@
   </div>
 </main>
 <p id="hint" class="hint" data-t="hint">Nach unten wischen zum Schließen · lange drücken für Optionen</p>
-<p id="credit" class="credit" data-t="credit" hidden>Gebäude: OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende</p>
+<p id="credit" class="credit" data-t="credit" hidden>Karte: OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende</p>
 <div id="menu" class="menu" hidden>
   <div class="panel" role="dialog" aria-label="Optionen" data-t-label="options">
     <h2>Quiet</h2>
@@ -37,17 +40,12 @@
     <button class="row" data-option="turns" type="button"><span data-t="turns">Abbiegehinweise</span><i></i></button>
     <button class="row" data-option="speed" type="button"><span data-t="speed">Tacho</span><i></i></button>
     <button class="row" data-option="pulses" type="button"><span data-t="pulses">Lichtstreifen</span><i></i></button>
-    <button class="row" data-option="buildings" type="button"><span data-t="buildings">Gebäude</span><i></i></button>
-    <div class="row"><span data-t="look">Lichtbahn</span>
+    <button class="row" data-option="buildings" type="button"><span data-t="buildings">Straßen und Gebäude</span><i></i></button>
+    <div class="row"><span data-t="view">Blickhöhe</span>
       <div class="choices">
-        <button type="button" data-look="fine" data-t="fine">Fein</button>
-        <button type="button" data-look="soft" data-t="soft">Weich</button>
-      </div>
-    </div>
-    <div class="row"><span data-t="style">Stil</span>
-      <div class="choices">
-        <button type="button" data-style="ambient" data-t="ambient">Ambiente</button>
-        <button type="button" data-style="neon">Neon</button>
+        <button type="button" data-view="street" data-t="street">Straße</button>
+        <button type="button" data-view="raised" data-t="raised">Erhöht</button>
+        <button type="button" data-view="high" data-t="above">Hoch</button>
       </div>
     </div>
     <div class="row bright"><span data-t="bright">Helligkeit</span>

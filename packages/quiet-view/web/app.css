@@ -31,7 +31,7 @@ p { margin: 0; }
 }
 
 /* What comes and goes fades. */
-.top > *, main, main > div, .progress { transition: opacity 0.7s ease; }
+.top > *, .left > *, main, main > div, .progress { transition: opacity 0.7s ease; }
 .out { opacity: 0 !important; }
 
 /* Top left, as in the car: the speed, and the next turn beside it. */
@@ -46,12 +46,45 @@ p { margin: 0; }
   text-shadow: 0 1px 16px rgba(0, 0, 0, 0.55);
 }
 
+/* The speed, and the Self-Driving profile under it. */
+.left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 22px;
+}
+
 .speed {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
 }
+
+.fsd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  transition: opacity 0.7s ease;
+}
+
+.fsd .fsdLabel {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.fsd .fsdProfile {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.1;
+  transition: opacity 0.35s ease;
+}
+
+.fsd .fsdProfile.swap { opacity: 0; }
 
 .speed .num {
   font-size: 76px;

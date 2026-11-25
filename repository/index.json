@@ -415,7 +415,7 @@
     },
     {
       "id": "com.appenetic.quiet-view",
-      "version": "0.1.0-alpha.30",
+      "version": "0.1.0-alpha.31",
       "sdk": ">=1.0 <2",
       "title": "Quiet View (experimental)",
       "published_unix": 1794614400,
@@ -423,10 +423,10 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.quiet-view",
-        "version": "0.1.0-alpha.30",
+        "version": "0.1.0-alpha.31",
         "sdk": ">=1.0 <2",
         "title": "Quiet View (experimental)",
-        "summary": "A calm full-screen app after FSD v15's Quiet Mode: a glow in your ambient light color or a neon city, with speedometer, arrival time, turn hints and the buildings around you. Swipe down to close. In German or English, as your car is set.",
+        "summary": "A calm full-screen app after FSD v15's Quiet Mode: the streets and buildings around you from OpenStreetMap, your street lit ahead in your ambient light color, with speedometer, Self-Driving profile, arrival time and turn hints. Swipe down to close. German or English.",
         "authors": [
           {
             "name": "Appenetic",
@@ -466,11 +466,11 @@
           ]
         }
       },
-      "manifest_sha256": "e993a7cf08400346fc4bc1e62031af20c62ba4a96db09b051d7f1e7ec3bdf892",
+      "manifest_sha256": "151e9aeaf24ce52f0ab6bbb072b7efe5ef5681ddaab3b2c7c79b16f945c0ad39",
       "archive": {
-        "url": "pool/98f7ada4d51d2db15fc03379b0d010307bd8f8e754bb872c1a3720e192a7ddda",
-        "sha256": "98f7ada4d51d2db15fc03379b0d010307bd8f8e754bb872c1a3720e192a7ddda",
-        "bytes": 7936000
+        "url": "pool/21ccf304f33309697d991cd5f537550a7c5dd0f83d89e8d4c85db6fa16b55ae8",
+        "sha256": "21ccf304f33309697d991cd5f537550a7c5dd0f83d89e8d4c85db6fa16b55ae8",
+        "bytes": 7946240
       }
     },
     {

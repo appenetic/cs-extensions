@@ -167,8 +167,8 @@ class QuietViewFiles(unittest.TestCase):
         self.assertNotIn('http', html)
         js = (PACKAGE / 'web/app.js').read_text()
         for needle in ["new EventSource('events')", "fetch('state'", "askWindow('max')", "askWindow('close')",
-                       "'X-Quiet': '1'", "fetch('options'", 'steerCurvature(v.steer)', 'paceFor(v.kmh)',
-                       "fetch('buildings'", 'takeFix(v.pose)']:
+                       "'X-Quiet': '1'", "fetch('options'", 'steerCurvature(state.steer)', 'paceFor(v.kmh)',
+                       "fetch('buildings'", 'takeFix(v.pose)', 'indexStreets(rows)', 'picture.setRoads(rows)']:
             self.assertIn(needle, js)
 
     def test_page_sends_every_option(self):
@@ -179,7 +179,8 @@ class QuietViewFiles(unittest.TestCase):
         sent = re.search(r"fetch\('options', \{.*?JSON\.stringify\(\{(.*?)\}\)", js, re.S).group(1)
         keys = lambda text: sorted(re.findall(r'(\w+):', text))
         self.assertEqual(keys(default), keys(sent))
-        self.assertIn('style', keys(sent))
+        self.assertIn('view', keys(sent))
+        self.assertNotIn('style', keys(sent))
 
     @unittest.skipUnless(shutil.which('node'), 'node checks the script syntax')
     def test_script_parses(self):
@@ -189,10 +190,10 @@ class QuietViewFiles(unittest.TestCase):
     def test_shaders_compile(self):
         # A shader the GPU refuses leaves its part out of the picture without a
         # word (a variable named `out` once took the buildings away), so each
-        # one is compiled here, and the walls' pair linked, as WebGL does with
-        # the derivatives extension and without it.
+        # one is compiled here, and the streets' and the walls' pairs linked,
+        # as WebGL does with the derivatives extension and without it.
         js = (PACKAGE / 'web/app.js').read_text()
-        names = ['DUSK_SKY', 'FRAGMENT', 'BUILDING_CAMERA', 'BUILDING_SEEN', 'WALL_VERTEX', 'WALL_FRAGMENT']
+        names = ['SKY', 'CAMERA', 'GROUND', 'ROAD_VERTEX', 'ROAD_FRAGMENT', 'WALL_VERTEX', 'WALL_FRAGMENT']
         consts = ''
         for name in names:
             m = re.search(r'const ' + name + r' = (.*?`);\n', js, re.S)
@@ -212,12 +213,14 @@ for (const derivatives of [true, false]) {
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) failed.push(name + ': ' + gl.getShaderInfoLog(s));
     return s;
   };
-  compile('road', gl.FRAGMENT_SHADER, FRAGMENT);
-  const pr = gl.createProgram();
-  gl.attachShader(pr, compile('walls', gl.VERTEX_SHADER, WALL_VERTEX));
-  gl.attachShader(pr, compile('walls', gl.FRAGMENT_SHADER, WALL_FRAGMENT));
-  gl.linkProgram(pr);
-  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) failed.push('walls: ' + gl.getProgramInfoLog(pr));
+  compile('ground', gl.FRAGMENT_SHADER, GROUND);
+  for (const [name, vertex, fragment] of [['streets', ROAD_VERTEX, ROAD_FRAGMENT], ['walls', WALL_VERTEX, WALL_FRAGMENT]]) {
+    const pr = gl.createProgram();
+    gl.attachShader(pr, compile(name, gl.VERTEX_SHADER, vertex));
+    gl.attachShader(pr, compile(name, gl.FRAGMENT_SHADER, fragment));
+    gl.linkProgram(pr);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) failed.push(name + ': ' + gl.getProgramInfoLog(pr));
+  }
 }
 document.title = failed.length ? 'FAILED ' + failed.join(' / ') : 'compiled';
 </script>''' % consts
