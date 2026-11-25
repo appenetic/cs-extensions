@@ -527,6 +527,24 @@ Sonne steht hinter dem Haus. Bei 0:52 verdeckt ein fernes, deckendes Haus die
 Sonne zur Hälfte, wie zuvor. Die übrigen Szenen unterscheiden sich nur in der
 Uhrzeit und den funkelnden Sternen.
 
+## Neustart nach Updates (alpha.28)
+
+Vom Nutzer weitergegebener Hinweis: Ein Update legt die neuen Dateien ab,
+startet die Dienste aber nicht verlässlich neu, und das alte Binary läuft
+weiter. Hier kam der Neustart bisher etwa eine Minute später (alpha.10). Beim
+Ersetzen des Pakets schreibt der Daemon einen neuen Token nach
+`$CSDK_RUN/token`; das `run`-Skript liest ihn bei jedem Start
+(`read -r CSDK_TOKEN`).
+- Der Dienst liest die Datei alle 2 s. Steht zweimal hintereinander ein anderer
+  Token darin als sein eigener, fährt er herunter wie bei SIGTERM und endet mit
+  Exit-Code 3.
+- Nicht 0: Am Auto gelesen nimmt das `finish`-Skript eines Dienstes mit
+  `restart: on-failure` ihn nach Exit 0 ganz herunter (`sv d`). Nach jedem
+  anderen Code startet er nach 2 s neu, aus dem `run`-Skript der neuen Version.
+  SIGTERM endet weiter mit 0.
+- Auf dem Mac mit echten Prozessen geprüft: neuer Token → Exit 3 nach etwa
+  2,5 s, SIGTERM → sofort Exit 0.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
@@ -550,3 +568,8 @@ Uhrzeit und den funkelnden Sternen.
 9. Die Einheit von `VAPI_yawRate`.
 10. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation
     die Route beendet.
+11. Ob ein Update den Dienst binnen Sekunden neu startet: `sha256sum` von
+    `/proc/<pid>/exe` gleich `bin/quiet-linux-amd64` der neuen Version. Prüfbar
+    erst beim Update nach alpha.28, denn das Update auf alpha.28 läuft noch mit
+    dem alten Binary. Dabei auch notieren, ob das `run`-Skript schon die neue
+    Version nennt, wenn der Token wechselt.

@@ -141,7 +141,7 @@ Nutzer „funktioniert alles“.
   (`claude plugin marketplace add appenetic/cs-extensions`) funktioniert in
   einer isolierten Claude-Code-Konfiguration.
 
-## Am Auto, 2026-11-18 (bis alpha.18)
+## Am Auto, 2026-11-18 (bis alpha.22)
 
 - **Karte über der Navi:**
   - Der UI-Host benennt den Datenkontext nach der Vorlagendatei. alpha.13
@@ -166,6 +166,9 @@ Nutzer „funktioniert alles“.
   letzten Zustand wieder her (`restorePlayback(…, "paused")`, etwa 1,5 s).
   alpha.22 wartet bis zu 5 s auf die Quelle, dann 2 s, spielt weiter und prüft
   es, sonst noch einmal.
+- **Bestätigt (alpha.22):** Apple Music hält beim Vorlesen an und spielt danach
+  weiter (`angehalten: AppleMusic` um 15:19:47 UTC, `weitergespielt:
+  AppleMusic` um 15:20:09). Früher offen: Weiterspielen nach dem Vorlesen.
 - **Bestätigt (alpha.20):** Vorlesen spielt im Auto (`web.audio=aac=probably ·
   stimmen=0`, `web.play=ok`). Früher offen: Vorlesen. Die App meldet `web.audio` (spielt das Auto
   AAC, hat Chromium eigene Stimmen, bleibt die Seite im Hintergrund) und nach
@@ -176,3 +179,16 @@ Nutzer „funktioniert alles“.
   Vergrößern per Tipp und Laden über das Internet-Relay. Auf dem Mac sind sie
   mit Tests und gegen ein echtes Transkript geprüft (28 MB, Bild in 53 ms
   gefunden, in 72 ms auf 1024×685 verkleinert, 123 KB).
+
+## Neustart nach Updates (alpha.23)
+
+Vom Nutzer weitergegebener Hinweis: Ein Update legt die neuen Dateien ab,
+startet die Dienste aber nicht verlässlich neu, und das alte Binary läuft
+weiter. Beim Ersetzen des Pakets schreibt der Daemon einen neuen Token nach
+`$CSDK_RUN/token`. Beide Dienste, `link` und `web`, lesen die Datei alle 2 s.
+Steht zweimal hintereinander ein anderer Token darin als ihr eigener, fahren sie
+herunter wie bei SIGTERM und enden mit Exit-Code 3. Bei `restart: on-failure`
+nimmt das `finish`-Skript einen Dienst nach Exit 0 ganz herunter (`sv d`, am
+Auto gelesen); nach Exit 3 startet er nach 2 s neu, aus dem `run`-Skript der
+neuen Version. Auf dem Mac geprüft: neuer Token → Exit 3 nach etwa 2,5 s,
+SIGTERM → sofort Exit 0. Am Auto prüfbar erst beim Update nach alpha.23.

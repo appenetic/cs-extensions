@@ -242,3 +242,16 @@ Beim Host-Abschlusstest wurde außerdem ein Rennen zwischen asynchroner Dienst-
 Bereinigung und Testverzeichnis-Löschung gefunden. Dienst und Tests warten jetzt
 auf die abgeschlossene Bereinigung; der Status einer direkt gespeicherten
 Konfiguration bleibt dabei `saved` und wird nicht versehentlich `sent`.
+
+## Version 0.1.0-alpha.17: Neustart nach Updates
+
+Vom Nutzer weitergegebener Hinweis: Ein Update legt die neuen Dateien ab,
+startet die Dienste aber nicht verlässlich neu, und das alte Binary läuft
+weiter. Beim Ersetzen des Pakets schreibt der Daemon einen neuen Token nach
+`$CSDK_RUN/token`. Der Dienst liest die Datei alle 2 s. Steht zweimal
+hintereinander ein anderer Token darin als sein eigener, fährt er herunter wie
+bei SIGTERM und endet mit Exit-Code 3. Bei `restart: on-failure` nimmt das
+`finish`-Skript einen Dienst nach Exit 0 ganz herunter (`sv d`, am Auto
+gelesen); nach Exit 3 startet er nach 2 s neu, aus dem `run`-Skript der neuen
+Version. Auf dem Mac geprüft: neuer Token → Exit 3 nach etwa 2,7 s, SIGTERM →
+sofort Exit 0. Am Auto prüfbar erst beim Update nach alpha.17.

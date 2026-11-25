@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.claude",
-      "version": "0.1.0-alpha.22",
+      "version": "0.1.0-alpha.23",
       "sdk": ">=1.0 <2",
       "title": "Claude Code (experimental)",
       "published_unix": 1794614400,
@@ -106,7 +106,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.claude",
-        "version": "0.1.0-alpha.22",
+        "version": "0.1.0-alpha.23",
         "sdk": ">=1.0 <2",
         "title": "Claude Code (experimental)",
         "summary": "Deine Claude-Code-Sitzungen vom Mac auf der MCU: Liste, Verlauf, Fragen als Karte über der Navi, Antworten per Touch, Diktat oder Sprachtaste. Kopplung per Code oder QR-Code, auch ohne Tailscale.",
@@ -213,16 +213,16 @@
           ]
         }
       },
-      "manifest_sha256": "2e4f4a50a2e01ddbcb98243a4bc1fc15d521f59c428eea31d0590b9384afe4b2",
+      "manifest_sha256": "0d27819c039457b0c10a78bc8bd1f55573b1d29477b4e5102a001a549804327f",
       "archive": {
-        "url": "pool/55efeafc5f2a290b95a966242cbfb25b8645e3f31a485cb8d3e435eb8dbbdeb0",
-        "sha256": "55efeafc5f2a290b95a966242cbfb25b8645e3f31a485cb8d3e435eb8dbbdeb0",
+        "url": "pool/91afbfe1832308a295e7b1df2e64e1304ea6b14fd02471e54f9ed6063dacec8e",
+        "sha256": "91afbfe1832308a295e7b1df2e64e1304ea6b14fd02471e54f9ed6063dacec8e",
         "bytes": 8601600
       }
     },
     {
       "id": "com.appenetic.home-assistant",
-      "version": "0.1.0-alpha.16",
+      "version": "0.1.0-alpha.17",
       "sdk": ">=1.0 <2",
       "title": "Home Assistant Bridge (experimental)",
       "published_unix": 1794614400,
@@ -230,7 +230,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.home-assistant",
-        "version": "0.1.0-alpha.16",
+        "version": "0.1.0-alpha.17",
         "sdk": ">=1.0 <2",
         "title": "Home Assistant Bridge (experimental)",
         "summary": "Überträgt GPS, Geschwindigkeit, Fahrstufe, Akkuladestand und Fahrertür über HTTPS an Home Assistant. Mit eigener Einstellungsseite.",
@@ -381,7 +381,7 @@
           ]
         },
         "panel": {
-          "entry": "panel/settings-0.1.0-alpha.16.html",
+          "entry": "panel/settings-0.1.0-alpha.17.html",
           "title": "Home Assistant · Einstellungen",
           "permissions": [
             "settings.read",
@@ -406,16 +406,16 @@
           ]
         }
       },
-      "manifest_sha256": "f3eb7ec3e2ffa3d2b5c3cc8ff80c4d3da18174272efe5f94b1442b1b3cd64f2c",
+      "manifest_sha256": "e63093dc5fe7d7c13b36066bc92a4a08d00e82a08a9a8164dfff20ab361a53ef",
       "archive": {
-        "url": "pool/46c868680bbf963c2d4903d897f1be002d9684797311f420083f76cdfc5ab14e",
-        "sha256": "46c868680bbf963c2d4903d897f1be002d9684797311f420083f76cdfc5ab14e",
+        "url": "pool/1f5dda5029e7caae133239d3a501013abceead5d21a9d872211e2008cebd6a7f",
+        "sha256": "1f5dda5029e7caae133239d3a501013abceead5d21a9d872211e2008cebd6a7f",
         "bytes": 8581120
       }
     },
     {
       "id": "com.appenetic.quiet-view",
-      "version": "0.1.0-alpha.27",
+      "version": "0.1.0-alpha.28",
       "sdk": ">=1.0 <2",
       "title": "Quiet-Ansicht (experimental)",
       "published_unix": 1794614400,
@@ -423,7 +423,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.quiet-view",
-        "version": "0.1.0-alpha.27",
+        "version": "0.1.0-alpha.28",
         "sdk": ">=1.0 <2",
         "title": "Quiet-Ansicht (experimental)",
         "summary": "Eine App nach dem Quiet Mode von FSD v15: ein ruhiger, animierter Lichtschein in der Farbe deines Ambientelichts oder als Neonstadt, mit Tacho, Ankunftszeit, Abbiegehinweisen und den Gebäuden der Umgebung, direkt im Vollbild. Nach unten wischen schließt sie.",
@@ -466,11 +466,11 @@
           ]
         }
       },
-      "manifest_sha256": "020c0e7bbacf867c709138d0abe565ba22b6d8b3f961ff6deab171a757790abe",
+      "manifest_sha256": "6fe6c551f51aa61936f1913dfa99d3ad911174970e57ba70bffbc7def7fed918",
       "archive": {
-        "url": "pool/c2fe399c2e0eca738e72dfe5181129517e99ea40d435995d4bf6710a21e8732e",
-        "sha256": "c2fe399c2e0eca738e72dfe5181129517e99ea40d435995d4bf6710a21e8732e",
-        "bytes": 7915520
+        "url": "pool/da9e26ae887e504572db98e6804b35e39ea9a152fc45d28287c9f06e69ccd81b",
+        "sha256": "da9e26ae887e504572db98e6804b35e39ea9a152fc45d28287c9f06e69ccd81b",
+        "bytes": 7925760
       }
     },
     {
