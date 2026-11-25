@@ -92,8 +92,10 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
 - **Position:** QtCar schwärzt `NAV_vehicleLatitude` und `NAV_vehicleLongitude`
   auch über D-Bus. Die Nur-Lese-Methode
   `com.tesla.SensitiveDataValues.get_LOC_geoLocation` liefert die Position aber,
-  wie das Home-Assistant-Paket sie liest. Der Dienst fragt sie zweimal pro
-  Sekunde ab, den Kurs (`LOC_estimatedHdg`) und das Tempo fünfmal.
+  wie das Home-Assistant-Paket sie liest. Der Dienst fragt sie sechsmal pro
+  Sekunde ab, den Kurs (`LOC_estimatedHdg`) und das Tempo fünfmal. Das Auto
+  erneuert Position und Kurs nur etwa einmal pro Sekunde; so fällt eine neue
+  Position nach höchstens 0,17 s auf. Jede neue Position trägt eine Nummer.
 - **Datenschutz:** Seite, Stream und Gebäude kennen nur Meter östlich und
   nördlich des ersten Standorts der Sitzung, nie den Ort selbst. Ins Log und
   nach `turns.log` kommt keine Position. OpenFreeMap (über Cloudflare) sieht,
@@ -103,9 +105,15 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
   DNS-Server. Wer das nicht will, schaltet die Gebäude im Menü aus.
 - **Lizenz:** Solange Gebäude zu sehen sind, steht unten rechts klein
   „OpenFreeMap · © OpenMapTiles · © OpenStreetMap-Mitwirkende“.
-- **Bewegung:** Zwischen zwei Positionen fährt die Seite mit dem Tempo weiter und
-  dreht mit dem Kurs, wie schnell er sich zuletzt drehte. Neue Positionen
-  gleitet sie über etwa 0,35 s an.
+- **Bewegung:** Zwischen zwei Positionen fährt die Seite mit dem Tempo weiter
+  und dreht so schnell, wie der Lenkwinkel es sagt: wie Radstand 2,89 m und
+  Übersetzung 10:1, mal 0,65 (auf einer Fahrt in Berlin gegen den Kurs
+  gemessen, Korrelation 0,91). Position und Kurs ziehen die Kamera nur über
+  etwa eine Sekunde nach. Eine neue Position erkennt die Seite an ihrer
+  Nummer, nicht an jeder Ansicht dazwischen. Bis alpha.29 hielt sie jede
+  Ansicht für eine neue Position: Bei 50 km/h lief die Stadt dann im
+  Sekundentakt zwischen 0,6 und 41 m/s, nach dem Fix zwischen 12 und 15 m/s
+  (nachgerechnet mit dem Takt aus der Fahrt).
 
 ## Sicherheit
 
@@ -181,7 +189,7 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
 | Bahn | Nur `VAPI_steeringAngle`, rechts positiv (aus einer echten Fahrt bestimmt). Die Krümmung ist tan(Lenkwinkel / 10) / 2,89 m, also Lenkübersetzung etwa 10:1 und Radstand 2,89 m: 2° biegen die Bahn auf 60 m ein wenig, 180° auf einen Radius von etwa 9 m. Die Linien sind Kreisbögen 1,75 m innen und außen; sichtbar sind etwa 60 m, nie über die Umkehr hinaus. Unter 0,3° bleibt sie gerade. Der Dienst liest den Winkel 30-mal pro Sekunde direkt bei QtCar und gibt jeden neuen Wert sofort weiter; eine kritisch gedämpfte Feder auf der Seite trägt die Bahn ohne Stufen von Wert zu Wert, etwa 0,08 s hinter einem drehenden Lenkrad. Ohne gültigen Lenkwinkel läuft die Bahn gerade; Abbiegehinweise biegen sie nicht |
 | Tempo | Die Lichtstreifen laufen langsam so schnell wie die Straße (1,3 m/s bei 5 km/h), darüber gebremst gegen 13 m/s (8,5 m/s bei 50 km/h, 12 m/s bei 120 km/h). Sie folgen dem Tempo über etwa 1,5 s und kommen im Stand ganz zum Stehen |
 | Blinker | `VAPI_turnSignalActive` im Takt von `AUDIO_turnSignalPeriodMs` |
-| Gebäude | Position aus `com.tesla.SensitiveDataValues.get_LOC_geoLocation` (2-mal pro Sekunde), Kurs `LOC_estimatedHdg` und Tempo (5-mal), Gebäude aus OpenFreeMap-Kacheln im Umkreis von 450 m, neu ausgewählt alle 60 m |
+| Gebäude | Position aus `com.tesla.SensitiveDataValues.get_LOC_geoLocation` (6-mal pro Sekunde, mit laufender Nummer), Kurs `LOC_estimatedHdg` und Tempo (5-mal), Gebäude aus OpenFreeMap-Kacheln im Umkreis von 450 m, neu ausgewählt alle 60 m |
 
 Das Bild zeichnet ein WebGL-Shader in echter Perspektive: eine Kamera 1,25 m
 über der Mitte einer 3,5 m breiten Spur, der Horizont auf 58 % der Höhe. Die
@@ -193,7 +201,12 @@ Geraden eine Parabel. Am Ende
 stehen ein filmisches Tonemapping und feines Rauschen, damit dunkle Verläufe
 keine Stufen zeigen. Rechnet die Grafik in Software oder dauern Bilder im
 Mittel länger als etwa 26 ms, zeichnet die Seite weniger Pixel; die ersten 90
-Bilder nach dem Start oder einer Pause zählen dabei nicht. Ohne WebGL steht ein
+Bilder nach dem Start oder einer Pause zählen dabei nicht, ebenso wenig 90
+Bilder, in die eine neue Gebäudeauswahl fiel. Läuft sie danach etwa 15 s im
+Takt des Bildschirms, geht sie eine Stufe zurück nach oben; muss sie eine
+solche Stufe wieder abgeben, bleibt sie für die Sitzung dort. Bis alpha.29
+konnte die Auflösung nur sinken und blieb nach einem einzigen langsamen Moment
+bis zum Schließen unscharf. Ohne WebGL steht ein
 schlichteres Canvas-Bild da. Farbe, Helligkeit, Bahn und Tempo gleiten weich
 in ihre neuen Werte; eine neue Farbe, die weit von der alten liegt, wächst als
 Front vom Fluchtpunkt aus über 1,8 s, kleine Schritte wie beim Regenbogen

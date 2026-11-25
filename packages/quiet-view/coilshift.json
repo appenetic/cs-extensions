@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "com.appenetic.quiet-view",
-  "version": "0.1.0-alpha.29",
+  "version": "0.1.0-alpha.30",
   "sdk": ">=1.0 <2",
   "title": "Quiet View (experimental)",
   "summary": "A calm full-screen app after FSD v15's Quiet Mode: a glow in your ambient light color or a neon city, with speedometer, arrival time, turn hints and the buildings around you. Swipe down to close. In German or English, as your car is set.",

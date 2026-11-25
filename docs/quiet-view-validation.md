@@ -575,14 +575,60 @@ Wunsch aus der Community (Discord): die App auch auf Englisch.
   Englisch und Deutsch: kein Umbruch, Layout unverändert. Am deutschen Auto
   ist Englisch nicht zu sehen.
 
+## Gleichmäßige Fahrt (alpha.30)
+
+Rückmeldung nach einer Fahrt durch Berlin-Mitte am 25.11. (8,7 min, bis
+66 km/h, mit offener App): bei höherem Tempo und vielen Gebäuden „nicht so
+optimal“. Aus `turns.log` dieser Fahrt (nur Summen ausgewertet, keine Orte):
+- **Kurs:** 99 % der Schritte von 4 bis 60 m liegen unter 15° vom gefahrenen
+  Kurs (im Mittel 2,3°). `LOC_estimatedHdg` zählt also ab Norden im
+  Uhrzeigersinn; die Gebäude stehen richtig herum.
+- **Takt:** Position und Kurs kommen nur etwa einmal pro Sekunde neu (je Zeile,
+  also etwa je Sekunde: 1,28 neue Positionen, 1,25 neue Kurse).
+- **Gierrate:** `VAPI_yawRate` ist rad/s, nach links positiv (Korrelation
+  −0,88 mit der Kursänderung, Faktor −52 ≈ −57,3 mit Verzug).
+- **Lenkwinkel:** Die Drehrate aus dem Lenkwinkel (tan(Winkel/10)/2,89 m mal
+  Tempo) korreliert mit 0,91 mit der Kursänderung, ist aber 1,5-mal zu groß:
+  Faktor 0,65.
+- **Gebäudelast:** Mit den Kacheln dieser Fahrt an 1718 Stellen auf Haupt-
+  und Nebenstraßen nachgerechnet: höchstens 660 Umrisse, 6726 Wände
+  (40 000 Ecken, 87 KB JSON) je Auswahl, im Median 235 Umrisse. Daran liegt
+  es nicht.
+
+Der Fehler lag in der Seite: Sie hielt jede Ansicht für eine neue Position und
+setzte ihre Zeit zurück. Ansichten kommen aber mit jedem Lenkwinkel bis zu
+30-mal pro Sekunde, die Position nur einmal. Die Kamera blieb so an der alten
+Position hängen und sprang mit jeder neuen vor. Nachgerechnet mit diesem Takt
+lief die Stadt bei 50 km/h im Sekundentakt zwischen 0,6 und 41 m/s.
+
+Jetzt:
+- **Nummer:** Der Dienst gibt jeder neuen Position eine Nummer (`n` in
+  `pose`) und liest die Position sechs- statt zweimal pro Sekunde.
+- **Seite:** Sie nimmt eine Position nur bei neuer Nummer und fährt dazwischen
+  mit Tempo und der Drehrate aus dem Lenkwinkel (Faktor 0,65) weiter. Position
+  und Kurs ziehen sie über etwa 1 s nach (vorher 0,35 s).
+- **Simulation:** Nachgerechnet mit Positionen jede Sekunde, 0,15 s
+  Erkennung, Ansichten alle 50–150 ms und 60 Bildern pro Sekunde läuft die
+  Stadt bei 50 km/h mit 12,3–15,4 m/s (1. bis 99. Perzentil). In einer Kurve
+  mit 15°/s dreht sie mit 13,7–16,4°/s.
+- **Tests:** `TestPositionFromTheBus` prüft die Nummer: Dieselbe Position
+  zweimal gelesen bleibt Nummer 1, eine neue wird 2.
+- **Gleicher Code:** Dieselbe Simulation lief auch mit `takeFix`, `follow`
+  und `turnRate` aus `app.js` selbst, mit denselben Werten.
+- **Auflösung:** Sie konnte bis alpha.29 nur sinken: Ein langsames Fenster aus
+  90 Bildern (eine neue Gebäudeauswahl, ein Ruckler) ließ das Bild für den Rest
+  der Sitzung unschärfer. Jetzt zählt ein Fenster mit neuer Gebäudeauswahl
+  nicht. Nach zehn Fenstern im Takt des Bildschirms (unter 18,5 ms, etwa
+  15 s) geht sie eine Stufe hoch; wird eine solche Stufe wieder abgegeben,
+  bleibt sie für die Sitzung unten, damit das Bild nicht pendelt.
+
 ## Am Auto offen
 
 1. Wie sich die Bahn mit dem Lenkwinkel anfühlt, auch auf der Autobahn
    (alpha.14 und 15 bisher nur in der Demo und im Rendering gesehen).
-2. Ob die Gebäude dort stehen, wo sie draußen stehen (Kurs ab Norden im
-   Uhrzeigersinn angenommen), und sich beim Fahren ruhig mitbewegen; wie oft
-   Kurs und Position sich ändern (`turns.log`). Dass sie ankommen, ist mit
-   alpha.17 geprüft (480 Umrisse im Stand).
+2. Ob sich die Gebäude mit alpha.30 beim Fahren ruhig mitbewegen. Kurs und
+   Takt sind aus `turns.log` geklärt (alpha.30), dass sie ankommen mit
+   alpha.17.
 3. Wie Schrift und Layout von alpha.18, die weiche Lichtbahn von alpha.19 und
    die Stadt von alpha.20 auf dem Bildschirm im Auto wirken, auch in der
    Bildrate.
@@ -595,7 +641,7 @@ Wunsch aus der Community (Discord): die App auch auf Englisch.
    Paketlog.
 8. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
    Auslöser stehen mit ihrem Wert im Paketlog.
-9. Die Einheit von `VAPI_yawRate`.
+9. (Geklärt mit alpha.30: `VAPI_yawRate` ist rad/s, nach links positiv.)
 10. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation
     die Route beendet.
 11. Ob die Wache auch bei vielen Paketen auf einmal die neue Version startet:

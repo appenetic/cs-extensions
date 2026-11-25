@@ -958,13 +958,19 @@ void main() {
     layout();
   });
 
-  // The share of the device's pixels drawn: lower on a renderer in software,
-  // and lower again while frames take longer than about 26 ms. The first 90
-  // frames, and the first 90 after a pause, are not judged: the page's start
-  // and the pause itself would count as slow frames.
+  // The share of the device's pixels drawn: lower on a renderer in software, a
+  // step lower while frames take longer than about 26 ms, and a step back up
+  // after ten windows in a row at the display's pace (about 15 s), unless a
+  // step up had to be taken back before; then it stays. A window is 90
+  // frames. The first ones after the start or a pause are not judged, nor one
+  // that took in a new pick of buildings: they would count as slow frames.
   let quality = picture.soft ? 0.5 : 1;
   let measured = 0;
   let measureStart = 0;
+  let paced = 0;
+  let raised = false;
+  let stayLow = false;
+  let rebuilt = false;
 
   function layout() {
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -1032,12 +1038,26 @@ void main() {
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, cam: showing || buildingsFade > 0.01 ? cam : null,
       buildings: buildingsFade, rise: smooth(0, 1, buildingsRise) });
     if (++measured === 90) {
-      if (measureStart && (now - measureStart) / measured > 26 && quality > 0.35) {
+      const ms = measureStart && !rebuilt ? (now - measureStart) / measured : 0;
+      if (ms > 26 && quality > 0.35) {
+        stayLow = stayLow || raised;
+        raised = false;
+        paced = 0;
         quality = Math.max(0.35, quality * 0.75);
         layout();
+      } else if (ms && ms < 18.5) {
+        if (++paced >= 10 && quality < 1 && !stayLow && !picture.soft) {
+          raised = true;
+          paced = 0;
+          quality = Math.min(1, quality / 0.75);
+          layout();
+        }
+      } else if (ms) {
+        paced = 0;
       }
       measured = 0;
       measureStart = now;
+      rebuilt = false;
     }
     requestAnimationFrame(frame);
   }
@@ -1286,10 +1306,15 @@ void main() {
   }
 
   // Where the car is, for the buildings: its last fix in the service's frame
-  // and its heading, carried on between fixes by the speed and by how fast the
-  // heading turned lately, and eased over about 0.35 s, so a fix never jumps.
-  // A view without a fix keeps the last one while the car stands; moving, the
-  // city would drive along with it.
+  // and its heading. QtCar renews both only about once a second, so between
+  // them the camera is carried on by the speed and by how fast the car turns,
+  // which the steering wheel gives at once: as fast as a wheelbase of 2.89 m
+  // and a ratio of 10:1 would turn it, times 0.65, as measured against the
+  // heading on drives in Berlin. The fix and the heading only pull the camera
+  // back, over about a second, so the city glides instead of surging forward
+  // with each fix and stalling until the next. A fix is new when its number
+  // is; every view in between repeats it. A view without a fix keeps the last
+  // one while the car stands; moving, the city would drive along with it.
   let fix = null;
   let cam = null;
   let hasBuildings = false;
@@ -1308,13 +1333,15 @@ void main() {
       return;
     }
     const now = performance.now();
-    let rate = fix && fix.o === p.o ? fix.rate : 0;
-    if (fix && fix.o === p.o && p.h !== fix.h) {
-      const dt = (now - fix.turnedAt) / 1000;
-      rate = dt < 3 ? 0.5 * rate + 0.5 * clamp(turnOf(p.h, fix.h) / Math.max(dt, 0.05), -60, 60) : 0;
-    }
-    const turnedAt = !fix || p.h !== fix.h ? now : fix.turnedAt;
-    fix = { x: p.x, y: p.y, h: p.h, o: p.o, at: now, turnedAt, rate };
+    const fresh = !fix || fix.o !== p.o || fix.n !== p.n || (p.n === undefined && (fix.x !== p.x || fix.y !== p.y));
+    const turned = !fix || fix.h !== p.h;
+    fix = { x: p.x, y: p.y, h: p.h, o: p.o, n: p.n, at: fresh ? now : fix.at, turnedAt: turned ? now : fix.turnedAt };
+  }
+
+  // Degrees a second the car turns at speed v (m/s), right positive.
+  function turnRate(v) {
+    if (v < 1 || !state || typeof state.steer !== 'number') return 0;
+    return (0.65 * steerCurvature(state.steer) * v * 180) / Math.PI;
   }
 
   function follow(dt, now) {
@@ -1323,26 +1350,25 @@ void main() {
       return;
     }
     const v = Math.max(0, Number.parseFloat(state && state.kmh) || 0) / 3.6;
+    const turn = turnRate(v);
+    // The heading and the fix as they would be now, carried on since they came.
+    const h = fix.h + turn * Math.min(1.5, (now - fix.turnedAt) / 1000);
     const age = Math.min(1.5, (now - fix.at) / 1000);
-    // The turn carries the heading on for 0.3 s; a heading that then stays
-    // put means the turn ended, and the carrying fades out by 0.9 s.
-    const since = (now - fix.turnedAt) / 1000;
-    const carry = since <= 0.3 ? since : 0.3 * Math.max(0, (0.9 - since) / 0.6);
-    const h = fix.h + (v > 1 ? fix.rate * carry : 0);
-    const r = (h * Math.PI) / 180;
+    const r = ((h - (turn * age) / 2) * Math.PI) / 180;
     const tx = fix.x + v * Math.sin(r) * age;
     const ty = fix.y + v * Math.cos(r) * age;
     if (!cam || cam.o !== fix.o || Math.hypot(tx - cam.x, ty - cam.y) > 50) {
       cam = { x: tx, y: ty, h, o: fix.o };
       return;
     }
+    cam.h += turn * dt;
     const cr = (cam.h * Math.PI) / 180;
     cam.x += v * Math.sin(cr) * dt;
     cam.y += v * Math.cos(cr) * dt;
-    const k = Math.min(1, dt / 0.35);
+    const k = Math.min(1, dt / 1.0);
     cam.x += (tx - cam.x) * k;
     cam.y += (ty - cam.y) * k;
-    cam.h += turnOf(h, cam.h) * k;
+    cam.h += turnOf(h, cam.h) * Math.min(1, dt / 0.8);
   }
 
   async function loadBuildings() {
@@ -1357,6 +1383,7 @@ void main() {
       if (doc && Array.isArray(doc.b)) {
         hasBuildings = picture.setBuildings(doc.b);
         buildingsOrigin = doc.o;
+        rebuilt = true;
       }
     } catch {
       // The next pick tries again.

@@ -415,7 +415,7 @@
     },
     {
       "id": "com.appenetic.quiet-view",
-      "version": "0.1.0-alpha.29",
+      "version": "0.1.0-alpha.30",
       "sdk": ">=1.0 <2",
       "title": "Quiet View (experimental)",
       "published_unix": 1794614400,
@@ -423,7 +423,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.quiet-view",
-        "version": "0.1.0-alpha.29",
+        "version": "0.1.0-alpha.30",
         "sdk": ">=1.0 <2",
         "title": "Quiet View (experimental)",
         "summary": "A calm full-screen app after FSD v15's Quiet Mode: a glow in your ambient light color or a neon city, with speedometer, arrival time, turn hints and the buildings around you. Swipe down to close. In German or English, as your car is set.",
@@ -466,11 +466,11 @@
           ]
         }
       },
-      "manifest_sha256": "aeca73bc7a57b48cc9f9e1b6a71f3ade7a198eaaa0b677f31a482e304375f176",
+      "manifest_sha256": "e993a7cf08400346fc4bc1e62031af20c62ba4a96db09b051d7f1e7ec3bdf892",
       "archive": {
-        "url": "pool/aa07bc4e3e97b44a0ee6b2a52c2f95ed306585716efa965bb7f7cd81faf0fd6f",
-        "sha256": "aa07bc4e3e97b44a0ee6b2a52c2f95ed306585716efa965bb7f7cd81faf0fd6f",
-        "bytes": 7925760
+        "url": "pool/98f7ada4d51d2db15fc03379b0d010307bd8f8e754bb872c1a3720e192a7ddda",
+        "sha256": "98f7ada4d51d2db15fc03379b0d010307bd8f8e754bb872c1a3720e192a7ddda",
+        "bytes": 7936000
       }
     },
     {
