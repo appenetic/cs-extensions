@@ -191,7 +191,12 @@ herunter wie bei SIGTERM und enden mit Exit-Code 3. Bei `restart: on-failure`
 nimmt das `finish`-Skript einen Dienst nach Exit 0 ganz herunter (`sv d`, am
 Auto gelesen); nach Exit 3 startet er nach 2 s neu, aus dem `run`-Skript der
 neuen Version. Auf dem Mac geprüft: neuer Token → Exit 3 nach etwa 2,5 s,
-SIGTERM → sofort Exit 0. Am Auto prüfbar erst beim Update nach alpha.23.
+SIGTERM → sofort Exit 0.
+**Am Auto bestätigt (alpha.23 → alpha.24, 2026-11-25, 15:08 UTC):** neuer
+Token um 15:08:40, `link` endet 3 s, `web` 4 s danach mit Exit 3 (`backoff`
+2), beide laufen um 15:08:44 und 15:08:46 als alpha.24; Hash von
+`/proc/<pid>/exe` gleich dem installierten Binary, kein zweiter Neustart
+durch den Daemon.
 
 ## Deutsch und Englisch (alpha.24, Plugin 0.2.11)
 

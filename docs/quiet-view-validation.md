@@ -545,6 +545,16 @@ Ersetzen des Pakets schreibt der Daemon einen neuen Token nach
 - Auf dem Mac mit echten Prozessen geprüft: neuer Token → Exit 3 nach etwa
   2,5 s, SIGTERM → sofort Exit 0.
 
+**Am Auto bestätigt (alpha.28 → alpha.29, 2026-11-25):** Ein Leseprotokoll lief
+alle 0,5 s auf dem Auto. Um 15:08:41 UTC kam der neue Token, im selben Moment
+standen die `run`-Skripte auf der neuen Version und das alte Paketverzeichnis
+war fort. Um 15:08:45 endete der Dienst von selbst mit Exit 3 (`backoff` 2),
+um 15:08:46 lief alpha.29. Der Hash von `/proc/<pid>/exe` passt zum
+installierten Binary. Der Daemon startete danach nicht noch einmal neu. Beim
+Update um 14:11 UTC, noch ohne Wache und mit fünf Paketen auf einmal, kamen
+die `run`-Skripte 4–9 s nach dem Token, und der Daemon startete die Dienste
+erst 28–83 s später neu.
+
 ## Englisch (alpha.29)
 
 Wunsch aus der Community (Discord): die App auch auf Englisch.
@@ -588,8 +598,6 @@ Wunsch aus der Community (Discord): die App auch auf Englisch.
 9. Die Einheit von `VAPI_yawRate`.
 10. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation
     die Route beendet.
-11. Ob ein Update den Dienst binnen Sekunden neu startet: `sha256sum` von
-    `/proc/<pid>/exe` gleich `bin/quiet-linux-amd64` der neuen Version. Prüfbar
-    erst beim Update nach alpha.28, denn das Update auf alpha.28 läuft noch mit
-    dem alten Binary. Dabei auch notieren, ob das `run`-Skript schon die neue
-    Version nennt, wenn der Token wechselt.
+11. Ob die Wache auch bei vielen Paketen auf einmal die neue Version startet:
+    Kommen die `run`-Skripte mehr als 2–4 s nach dem Token (am 14:11-Update
+    9 s), startet sie womöglich noch einmal die alte Fassung.
