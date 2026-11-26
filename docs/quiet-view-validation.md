@@ -657,28 +657,75 @@ Mad Max ruhige Pfeile.
   allem an Kreuzungen und auf mehrspurigen Straßen mit getrennten Fahrbahnen;
   welcher Wert zeigt, dass FSD gerade fährt.
 
+## Cybertruck-Schrift (alpha.32)
+
+Gewünscht: Zeigt CoilShift die Schrift des Cybertrucks, soll die App sie auch
+zeigen, sonst Teslas eigene.
+
+- **Am Auto gelesen (2026-11-26, im Stand):** Der Schalter ist das Paket
+  `dev.coilshift.ct-ui` („Cybertruck UI“, 1.0.3). Es legt per Bind eine
+  eigene `/usr/tesla/UI/assets/fonts.conf` über die von QtCar (für Text
+  „Blender-TSL Book/Medium“, für Ziffern im Tacho „CT_speed“), dazu ein
+  tmpfs über `/usr/share/fonts` mit den Ordnern `blender` und `ct_speed`, und
+  startet die Oberfläche im Stand neu. Beim Entfernen nimmt es beides wieder
+  weg. Im Tacho stellt es `SpeedLabel` von „LightNumerical“ in 110 auf
+  „NormalNumerical“ (CT_speed) in 75.
+- **Der Browser sieht die Schriften nicht:** Beide Chromium-Käfige
+  (`chromium-entertainment`, `chromium-app`) haben ein eigenes Mount-Namespace
+  und darin nur die Schriftordner der Firmware, ohne `blender` und
+  `ct_speed`. Der Quiet-Dienst läuft im Namespace von init und sieht beides.
+- **Umsetzung:** Der Dienst liest `fonts.conf` bei jeder Sitzung zuerst und
+  dann alle 30 s; `[Default]` `Normal` mit „Blender-TSL“ und alle vier
+  Dateien vorhanden ergibt `font: "cybertruck"`, sonst `"tesla"`. Unter
+  `font/blender-book`, `-medium`, `-bold` und `font/ct-speed` gibt er genau
+  diese Dateien weiter, andere Namen sind 404, nichts aus der Anfrage wird zum
+  Pfad. Die Seite setzt die Klasse `cybertruck` und nimmt die Schriften per
+  `@font-face`; jede Liste fällt auf Universal Sans zurück, auch Zeichen für
+  Zeichen (CT_speed hat nur `.0123456789:DNPR`).
+- **Am Mac geprüft:** Die echte Seite mit Kopien der Schriften des Autos (nur
+  lokal, nie veröffentlicht) gerendert, in Orange und Blau, mit Menü: alle
+  Texte in Blender-TSL, der Tacho in CT_speed, oben bündig mit dem
+  Abbiegehinweis. Ohne Cybertruck UI weicht das Bild in den Textbereichen um
+  höchstens 2 von 255 Helligkeitsstufen von alpha.31 ab (das Bildrauschen).
+- **Tests:** Go: Erkennung (Firmware, Cybertruck, ohne Dateien, zweite
+  `[Default]`-Gruppe, Kommentar, Windows-Zeilenenden), Weitergabe der Dateien
+  samt 404 und 405, Wechsel binnen 30 s in der Sitzung. Python: die Seite
+  lädt nur diese vier Namen, und im Paket liegt keine Schriftdatei.
+- **Neues Symbol (mit Claude alpha.25):** Teslas eigene Launcher-Icons im Auto
+  (`/usr/tesla/UI/assets/night/app/launcher/`, dazu Teslas Web-Apps) sind
+  180-px-Dateien, das Motiv auf den mittleren 88 × 88 px ab 46 px mit etwa
+  11 px Ecken, der Rest transparent; neuere wie Grok und Hulu haben 160 px mit
+  80 px Motiv, also dasselbe Verhältnis. Das alte Quiet-Symbol füllte 168 px,
+  das von Claude 136 px, und beide wirkten im Launcher entsprechend groß. Neu,
+  vom Nutzer im Artboard gewählt: die eigene Straße leuchtet zur Stadt am
+  Horizont, und für Claude der Funke von Claude Code auf Terrakotta. Ein Test
+  prüft bei beiden Paketen 180 × 180 px und den transparenten Rand.
+
 ## Am Auto offen
 
-1. Wie die Straße voraus beim Fahren wirkt (alpha.31), auch an Kreuzungen
+1. Ob die App im Auto mit Cybertruck UI die Schrift des Cybertrucks zeigt
+   und ohne sie Teslas eigene (alpha.32), und ob das neue Symbol nach dem
+   Neustart der Oberfläche im Launcher steht.
+2. Wie die Straße voraus beim Fahren wirkt (alpha.31), auch an Kreuzungen
    und auf der Autobahn.
-2. Ob sich die Gebäude mit alpha.30 beim Fahren ruhig mitbewegen. Kurs und
+3. Ob sich die Gebäude mit alpha.30 beim Fahren ruhig mitbewegen. Kurs und
    Takt sind aus `turns.log` geklärt (alpha.30), dass sie ankommen mit
    alpha.17.
-3. Wie Schrift und Layout von alpha.18, die weiche Lichtbahn von alpha.19 und
+4. Wie Schrift und Layout von alpha.18, die weiche Lichtbahn von alpha.19 und
    die Stadt von alpha.20 auf dem Bildschirm im Auto wirken, auch in der
    Bildrate.
-4. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
+5. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
-5. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
+6. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
    Farben aussieht, auch tagsüber.
-6. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
-7. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
+7. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
+8. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
    Paketlog.
-8. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
+9. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
    Auslöser stehen mit ihrem Wert im Paketlog.
-9. (Geklärt mit alpha.30: `VAPI_yawRate` ist rad/s, nach links positiv.)
-10. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation
+10. (Geklärt mit alpha.30: `VAPI_yawRate` ist rad/s, nach links positiv.)
+11. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation
     die Route beendet.
-11. Ob die Wache auch bei vielen Paketen auf einmal die neue Version startet:
+12. Ob die Wache auch bei vielen Paketen auf einmal die neue Version startet:
     Kommen die `run`-Skripte mehr als 2–4 s nach dem Token (am 14:11-Update
     9 s), startet sie womöglich noch einmal die alte Fassung.

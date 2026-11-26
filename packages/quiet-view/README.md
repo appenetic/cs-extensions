@@ -18,7 +18,7 @@ Ferne lösen sie sich im Dunst auf statt im Schwarz; Bauwerke ab 60 m wie ein
 Fernsehturm bleiben bis 2,6 km sichtbar, soweit die geladenen Kacheln reichen.
 Beim Öffnen wachsen die Häuser aus dem Boden.
 
-Ruhig darüber, in Teslas eigener Schrift: oben links der Tacho, darunter das
+Ruhig darüber, in der Schrift des Autos: oben links der Tacho, darunter das
 Self-Driving-Profil mit Teslas Namen (Faultier, Lässig, Standard, Sportlich,
 Mad Max), daneben die nächste Abbiegung als Pfeil mit Entfernung („200 m“,
 darunter „rechts“), über dem Horizont wie im Original die Ankunftszeit,
@@ -28,6 +28,10 @@ beim Öffnen erwacht das Bild aus dem Schwarz und die Straße leuchtet vom Auto
 aus auf. Eine neue Farbe, etwa beim nächsten Song, blendet ruhig über das ganze
 Bild, in 2,4 s. Fest nach unten wischen schließt die App, lange drücken öffnet
 die Optionen.
+
+Zeigt das Auto mit „Cybertruck UI“ aus CoilShift die Schrift des Cybertrucks,
+tut das auch die App: Blender-TSL für alle Texte, im Tacho die Ziffern
+„CT_speed“ des Cybertruck-Tachos. Sonst bleibt es Teslas Universal Sans.
 
 Bis alpha.30 zeigte die App statt der Straßen zwei Lichtlinien für den
 Lenkwinkel, dazu einen Stil Neon mit Sonne; beides ist mit alpha.31 entfallen.
@@ -158,7 +162,10 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
   `PUT /v1/tiles/app`. Gegenüber der Kachel, die CoilShift aus dem Manifest
   baut, setzt sie `appWindowDefaultOpensToMaximized`, `appWindowIsMaximizedOnly`,
   `canMaximizeAppWindow` und `allowInDrive` und blendet die Titelleiste aus.
-  Der Ledger nimmt sie beim Deinstallieren zurück.
+  Der Ledger nimmt sie beim Deinstallieren zurück. Das Symbol ist gebaut wie
+  Teslas eigene Launcher-Icons: 180 × 180 px, das Motiv auf den mittleren
+  88 × 88 px mit etwa 11 px Ecken, der Rest transparent; größer wirkt es im
+  Launcher neben ihnen bis zu doppelt so groß.
 - **Dienst `web`:** ein Go-Programm (`bin/quiet-linux-amd64`), das `web.sh`
   ins ausführbare `CSDK_RUN` kopiert und startet. Es öffnet den Web-Port in
   jedem Netz-Namespace eines Browsers, auch in denen, die ein App-Fenster erst
@@ -225,7 +232,16 @@ dabei kurz etwas, je mehr, je weiter die Farben auseinanderliegen.
 
 Die Schrift ist die des Autos, Universal Sans in 300 und 500, Tacho und
 Ankunftszeit mit gleich breiten Ziffern, damit nichts springt, wenn eine Zahl
-wechselt; anderswo die Systemschrift. Der Pfeil der Abbiegung wird aus den
+wechselt; anderswo die Systemschrift. Ob das Auto die Schrift des Cybertrucks
+zeigt, liest der Dienst alle 30 s aus QtCars `fonts.conf`: Nennt sie für Text
+Blender-TSL, wie „Cybertruck UI“ sie über die des Autos legt, und liegen die
+Schriften in `/usr/share/fonts`, sagt der Zustand `font: "cybertruck"`. Der
+Browser der Apps sieht in seinem Käfig nur die Schriften der Firmware, darum
+reicht der Dienst die Dateien des Autos unter `font/…` an die Seite weiter;
+sie gehen nie aus dem Auto hinaus und liegen nicht im Paket. Blender-TSL steht
+dann für 300 als Book, für 500 als Medium und darüber als Bold, mit von sich
+aus gleich breiten Ziffern; der Tacho nimmt „CT_speed“ in 52 statt 76 px, so
+viel kleiner, wie das Auto ihn selbst setzt (75 statt 110 px). Der Pfeil der Abbiegung wird aus den
 Worten des Dienstes gezeichnet: leicht, normal, scharf, wenden, Ausfahrt (mit
 der weiterführenden Straße blass daneben), einfädeln, geradeaus, und im
 Kreisverkehr der gefahrene Bogen um einen blassen Ring. Je näher die

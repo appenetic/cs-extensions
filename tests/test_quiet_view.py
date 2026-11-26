@@ -168,8 +168,20 @@ class QuietViewFiles(unittest.TestCase):
         js = (PACKAGE / 'web/app.js').read_text()
         for needle in ["new EventSource('events')", "fetch('state'", "askWindow('max')", "askWindow('close')",
                        "'X-Quiet': '1'", "fetch('options'", 'steerCurvature(state.steer)', 'paceFor(v.kmh)',
-                       "fetch('buildings'", 'takeFix(v.pose)', 'indexStreets(rows)', 'picture.setRoads(rows)']:
+                       "fetch('buildings'", 'takeFix(v.pose)', 'indexStreets(rows)', 'picture.setRoads(rows)',
+                       "classList.toggle('cybertruck', v.font === 'cybertruck')"]:
             self.assertIn(needle, js)
+
+    def test_page_takes_the_cybertruck_fonts_from_the_service(self):
+        # The car's fonts are Tesla's: the service hands over the car's own
+        # files, and none of them may ever ship in the package.
+        css = (PACKAGE / 'web/app.css').read_text()
+        self.assertEqual(sorted(re.findall(r'url\(([^)]*)\)', css)),
+                         ['font/blender-bold', 'font/blender-book', 'font/blender-medium', 'font/ct-speed'])
+        self.assertIn(':root.cybertruck {', css)
+        fonts = [p for p in PACKAGE.rglob('*')
+                 if p.suffix.lower() in {'.ttf', '.otf', '.ttc', '.woff', '.woff2', '.eot'}]
+        self.assertEqual(fonts, [])
 
     def test_page_sends_every_option(self):
         # The service takes only a whole set of options; a choice sent without

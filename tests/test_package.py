@@ -2,11 +2,52 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import struct
 import subprocess
 import tarfile
 import unittest
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def png_rgba(path):
+    """Width, height and the RGBA rows of an 8-bit RGBA PNG without interlacing."""
+    data = Path(path).read_bytes()
+    if data[:8] != b'\x89PNG\r\n\x1a\n':
+        raise ValueError('not a PNG')
+    i, idat = 8, b''
+    while i < len(data):
+        n, kind = struct.unpack('>I4s', data[i:i + 8])
+        body = data[i + 8:i + 8 + n]
+        if kind == b'IHDR':
+            width, height, depth, colour, _, _, interlace = struct.unpack('>IIBBBBB', body)
+        elif kind == b'IDAT':
+            idat += body
+        i += 12 + n
+    if (depth, colour, interlace) != (8, 6, 0):
+        raise ValueError('not 8-bit RGBA without interlacing')
+    raw, stride = zlib.decompress(idat), width * 4
+    rows, prev = [], bytearray(stride)
+    for y in range(height):
+        kind = raw[y * (stride + 1)]
+        line = bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for x in range(stride):
+            a, b = line[x - 4] if x >= 4 else 0, prev[x]
+            c = prev[x - 4] if x >= 4 else 0
+            if kind == 1:
+                line[x] = (line[x] + a) & 255
+            elif kind == 2:
+                line[x] = (line[x] + b) & 255
+            elif kind == 3:
+                line[x] = (line[x] + (a + b) // 2) & 255
+            elif kind == 4:
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                line[x] = (line[x] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        rows.append(bytes(line))
+        prev = line
+    return width, height, rows
 
 
 class Package(unittest.TestCase):
@@ -156,6 +197,20 @@ class Package(unittest.TestCase):
             self.assertEqual((binary[:6], binary[18:20]), (b'\x7fELF\x02\x01', b'\x3e\x00'))
             self.assertIn(b'Go license', archive.extractfile('NOTICE').read())
             self.assertEqual(json.load(archive.extractfile('coilshift.json')), manifest)
+
+    def test_launcher_icons_match_teslas(self):
+        # Tesla's own launcher icons are 180 px files with the icon on the middle
+        # 88 x 88 px (from 46 px, corners about 11 px) and the rest transparent;
+        # one that fills more looks up to twice their size in the launcher.
+        for package in ['claude', 'quiet-view']:
+            width, height, rows = png_rgba(ROOT / 'packages' / package / 'web/icon.png')
+            self.assertEqual((width, height), (180, 180), package)
+            alpha = lambda x, y: rows[y][x * 4 + 3]
+            outside = [(x, y) for y in range(height) for x in range(width)
+                       if not (46 <= x < 134 and 46 <= y < 134) and alpha(x, y)]
+            self.assertEqual(outside, [], package)
+            self.assertEqual([alpha(x, y) for x, y in [(90, 90), (47, 90), (132, 90), (90, 47), (90, 132)]],
+                             [255] * 5, package)
 
     def test_summaries_fit_the_coilshift_index(self):
         import importlib.util

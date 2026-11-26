@@ -1,13 +1,54 @@
 /* The car's own typefaces, Universal Sans in 300, 500 and 600, its numerals
    also as equal widths, so a changing number does not shift; elsewhere the
-   system's. */
+   system's. Where CoilShift's Cybertruck UI has the car show the Cybertruck's
+   typefaces, so does the page (class cybertruck): Blender-TSL, its book for
+   300, medium for 500 and bold above, its digits of equal width already, and
+   on the speedometer CT_speed. The browser has neither, so the service hands
+   over the car's own files. */
+@font-face {
+  font-family: "Cybertruck";
+  src: url(font/blender-book) format("opentype");
+  font-weight: 100 449;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Cybertruck";
+  src: url(font/blender-medium) format("opentype");
+  font-weight: 450 599;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Cybertruck";
+  src: url(font/blender-bold) format("opentype");
+  font-weight: 600 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Cybertruck Speed";
+  src: url(font/ct-speed) format("truetype");
+  font-display: block;
+}
+
+:root {
+  --text: "Universal Sans Text", "Gotham", system-ui, sans-serif;
+  --numerals: "Universal Sans Mono Numerals Text", "Universal Sans Text", system-ui, sans-serif;
+}
+
+:root.cybertruck {
+  --text: "Cybertruck", "Universal Sans Text", system-ui, sans-serif;
+  --numerals: "Cybertruck", "Universal Sans Mono Numerals Text", system-ui, sans-serif;
+}
+
 html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
   background: #050505;
   color: #f4f4f4;
-  font-family: "Universal Sans Text", "Gotham", system-ui, sans-serif;
+  font-family: var(--text);
   font-weight: 300;
   -webkit-user-select: none;
   user-select: none;
@@ -26,7 +67,7 @@ canvas {
 p { margin: 0; }
 
 .num {
-  font-family: "Universal Sans Mono Numerals Text", "Universal Sans Text", system-ui, sans-serif;
+  font-family: var(--numerals);
   font-variant-numeric: tabular-nums;
 }
 
@@ -91,6 +132,17 @@ p { margin: 0; }
   font-weight: 500;
   line-height: 0.9;
   letter-spacing: -0.01em;
+}
+
+/* The Cybertruck's speedometer digits, as much smaller as the car sets them
+   (75 for 110 px). Their glyphs fill the whole em, so they sit a little lower
+   to line up with the turn beside them. */
+.cybertruck .speed .num {
+  margin-top: 6px;
+  font-family: "Cybertruck Speed", var(--numerals);
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .speed .unit {

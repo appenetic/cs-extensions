@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.claude",
-      "version": "0.1.0-alpha.24",
+      "version": "0.1.0-alpha.25",
       "sdk": ">=1.0 <2",
       "title": "Claude Code (experimental)",
       "published_unix": 1794614400,
@@ -106,7 +106,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.claude",
-        "version": "0.1.0-alpha.24",
+        "version": "0.1.0-alpha.25",
         "sdk": ">=1.0 <2",
         "title": "Claude Code (experimental)",
         "summary": "Your Mac's Claude Code sessions on the MCU: list, history, questions as a card over the map, answers by touch, dictation or voice button. Pairing by code or QR code, also without Tailscale. In German or English, as your car is set.",
@@ -213,11 +213,11 @@
           ]
         }
       },
-      "manifest_sha256": "83b05a686c6ad2cee075a84ee8ae78f8dd8d45d349488c48dc1ceb3c3e187bf2",
+      "manifest_sha256": "0dba1104682e934e2411f6e65198f5518216b8155b1e5f372b0a16782900fd80",
       "archive": {
-        "url": "pool/e08c629aa7b1f2012de60801799932c4242162c00593bfb8bdc331a9e200e646",
-        "sha256": "e08c629aa7b1f2012de60801799932c4242162c00593bfb8bdc331a9e200e646",
-        "bytes": 8642560
+        "url": "pool/076bdff2c8ddfc68f97e9b1b01a0b8d7c71eb26c3fbb8ec936af6591e6f5bb0a",
+        "sha256": "076bdff2c8ddfc68f97e9b1b01a0b8d7c71eb26c3fbb8ec936af6591e6f5bb0a",
+        "bytes": 8632320
       }
     },
     {
@@ -415,7 +415,7 @@
     },
     {
       "id": "com.appenetic.quiet-view",
-      "version": "0.1.0-alpha.31",
+      "version": "0.1.0-alpha.32",
       "sdk": ">=1.0 <2",
       "title": "Quiet View (experimental)",
       "published_unix": 1794614400,
@@ -423,7 +423,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.quiet-view",
-        "version": "0.1.0-alpha.31",
+        "version": "0.1.0-alpha.32",
         "sdk": ">=1.0 <2",
         "title": "Quiet View (experimental)",
         "summary": "A calm full-screen app after FSD v15's Quiet Mode: the streets and buildings around you from OpenStreetMap, your street lit ahead in your ambient light color, with speedometer, Self-Driving profile, arrival time and turn hints. Swipe down to close. German or English.",
@@ -466,10 +466,10 @@
           ]
         }
       },
-      "manifest_sha256": "151e9aeaf24ce52f0ab6bbb072b7efe5ef5681ddaab3b2c7c79b16f945c0ad39",
+      "manifest_sha256": "4b46e0361e671fcfff68380670aa16108e0f182af43372e0a585e26771f3b16b",
       "archive": {
-        "url": "pool/21ccf304f33309697d991cd5f537550a7c5dd0f83d89e8d4c85db6fa16b55ae8",
-        "sha256": "21ccf304f33309697d991cd5f537550a7c5dd0f83d89e8d4c85db6fa16b55ae8",
+        "url": "pool/5375171325288afd01cd65ef151b4d5dd41331aa22c505ecfd256668a9725ea7",
+        "sha256": "5375171325288afd01cd65ef151b4d5dd41331aa22c505ecfd256668a9725ea7",
         "bytes": 7946240
       }
     },

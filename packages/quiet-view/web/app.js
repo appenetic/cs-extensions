@@ -1054,6 +1054,9 @@ void main() {
 
   function render(v) {
     speak(v.lang);
+    // The car's typeface: the Cybertruck's while CoilShift's Cybertruck UI
+    // shows it.
+    document.documentElement.classList.toggle('cybertruck', v.font === 'cybertruck');
     // Arrived: the drive's summary instead of arrival, turn and progress.
     const done = v.arrived && typeof v.arrived === 'object' ? v.arrived : null;
     const block = $('arrivedBlock');

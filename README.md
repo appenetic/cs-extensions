@@ -47,8 +47,9 @@ deren Richtung; im Profil Mad Max gleiten weiche Pfeile darauf. Darüber ruhig
 Tacho, Self-Driving-Profil, Ankunft, nächste Abbiegung und Fortschritt, am Ziel
 ein eigener Ankunftsbildschirm; bei Warnungen schließt sie sich selbst. Fest
 nach unten wischen schließt sie, lange drücken öffnet die Optionen. Sie spricht
-Deutsch oder Englisch, je nach Sprache des Autos; im Feed heißt sie „Quiet
-View“. [Funktionsweise](packages/quiet-view/README.md) ·
+Deutsch oder Englisch, je nach Sprache des Autos, und nimmt wie das Auto die
+Schrift des Cybertrucks, wenn in CoilShift „Cybertruck UI“ an ist; im Feed
+heißt sie „Quiet View“. [Funktionsweise](packages/quiet-view/README.md) ·
 [Validierung](docs/quiet-view-validation.md).
 
 ## Home Assistant Bridge

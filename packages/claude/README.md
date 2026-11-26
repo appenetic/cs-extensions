@@ -73,7 +73,9 @@ nächsten direkten Verbindung auch diese Verbindung auf.
 2. **Auto:** Im CoilShift-Paketmanager **Claude Code (experimental)** installieren.
    Die Kachel „Claude Code“ erscheint im App-Launcher. Je nach Firmware geschieht
    das erst nach einem Neustart der Oberfläche im Stand. Einen eigenen Reiter in
-   der CoilShift-App hat das Paket nicht.
+   der CoilShift-App hat das Paket nicht. Ihr Symbol, der Funke von Claude Code
+   auf Terrakotta, ist gebaut wie Teslas eigene Launcher-Icons: 180 × 180 px,
+   das Motiv auf den mittleren 88 × 88 px, der Rest transparent.
 3. **Koppeln:** Die App zeigt ohne Kopplung einen Code wie `K7QM-4ZP2-XR9T-HB3D`.
    - **Mit dem Code, überall:** In Claude Code auf dem Mac
      `/coilshift:pair K7QM-4ZP2-XR9T-HB3D` eingeben. Der Mac schickt die
