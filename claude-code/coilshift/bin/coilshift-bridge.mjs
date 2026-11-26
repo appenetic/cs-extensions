@@ -29,6 +29,9 @@ import { ANSWER_LABEL, OFFER_LABEL, Relay, boxKey, boxKeys, carCode, carCodeFor,
 
 const MAX_MESSAGES = 60
 const MAX_TEXT = 4000
+// What the car shows of a sub-agent's report, read on a tap.
+const MAX_RESULT = 2000
+const AGENT_TOOLS = new Set(['Agent', 'Task'])
 const MAX_SESSIONS = 24
 // Pasted images: at most this many per message, made at most this many pixels
 // a side for the car, and as base64 at most this large before. Images and
@@ -94,6 +97,91 @@ export function userText(content) {
   return clip(s)
 }
 
+// A prompt from the car carries a mark in front (Bridge.fromCar); the car
+// shows it as its own message, without the mark. Through a running session's
+// inbox it comes as a message from another session: Claude Code puts this in
+// front and writes it to the transcript as a meta entry.
+const CAR_MARK = /^\[(?:Aus dem Auto(?:, per Sprache diktiert)?|From the car(?:, dictated by voice)?)\]\s*/
+const INBOX = /^Another Claude session sent a message:\s*/
+
+// taskNotifications reads what Claude Code tells a session, as a turn of its
+// own, about its background work: a command or sub-agent that ended, a
+// monitor's event and the like.
+export function taskNotifications(text) {
+  const out = []
+  for (const m of String(text || '').matchAll(/<task-notification>([\s\S]*?)<\/task-notification>/g)) {
+    const field = (name) => {
+      const f = new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(m[1])
+      return f ? f[1].trim() : ''
+    }
+    out.push({ toolUseId: field('tool-use-id'), status: field('status'), summary: field('summary'), result: field('result') })
+  }
+  return out
+}
+
+// noteEntry is what a notification means for the car: the end of a sub-agent
+// completes that agent's entry; the end of a background command, and anything
+// else, is an event of its own.
+export function noteEntry(n) {
+  const agent = /^Agent "([\s\S]*?)" (finished|failed|is waiting|was stopped|stopped|killed)(?::\s*([\s\S]*))?/.exec(n.summary)
+  if (agent) {
+    if (agent[2] === 'is waiting') return { agent: { tool: n.toolUseId, name: clip(agent[1], 120), state: 'running' } }
+    const state = /stopped|killed/.test(agent[2]) || n.status === 'killed' ? 'stopped' : agent[2] === 'finished' && n.status !== 'failed' ? 'done' : 'failed'
+    return { agent: { tool: n.toolUseId, name: clip(agent[1], 120), state, result: clip(n.result || agent[3] || '', MAX_RESULT) } }
+  }
+  const command = /^Background command "([\s\S]*?)"/.exec(n.summary)
+  if (command) {
+    const code = /exit code (-?\d+)/.exec(n.summary)
+    const exit = code ? Number(code[1]) : undefined
+    const state = /was stopped|stopped|killed/.test(n.summary) || n.status === 'killed' ? 'stopped' : n.status === 'completed' && !exit ? 'done' : 'failed'
+    return { event: { kind: 'command', state, text: clip(command[1], 300), ...(exit === undefined ? {} : { exit }) } }
+  }
+  return { event: { kind: 'notice', state: n.status === 'failed' ? 'failed' : '', text: clip(n.summary.split('\n')[0], 300) } }
+}
+
+// userTurn says what a user turn is for the car: the user's words, a prompt
+// sent from the car, or notifications of background work.
+export function userTurn(content) {
+  const raw = typeof content === 'string' ? content
+    : Array.isArray(content) ? content.filter((b) => b && b.type === 'text' && typeof b.text === 'string').map((b) => b.text).join('\n') : ''
+  const notes = taskNotifications(raw)
+  if (notes.length) return { notes }
+  const text = userText(content).replace(INBOX, '')
+  const car = CAR_MARK.exec(text)
+  return car ? { role: 'car', text: clip(text.slice(car[0].length)) } : { role: 'user', text }
+}
+
+// markSteps marks Claude's words that more work followed in the same turn:
+// the car shows them small, and a turn's last words as its answer. A prompt,
+// a message from the car or an event begins a new turn, and so does a
+// sub-agent's report back, though it shows on the agent's card.
+export function markSteps(messages) {
+  const ends = messages.filter((m) => m.role === 'agent' && m.ended).map((m) => m.ended)
+  let more = false
+  let after = Infinity
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (ends.some((t) => t > m.at && t <= after)) more = false
+    after = m.at
+    if (m.role === 'assistant') {
+      if (more) m.step = true
+      else delete m.step
+      more = true
+    } else if (m.role === 'tool' || m.role === 'agent') {
+      more = true
+    } else {
+      more = false
+    }
+  }
+  return messages
+}
+
+// toolResultText is the text of a tool's answer in a transcript.
+function toolResultText(content) {
+  if (typeof content === 'string') return content
+  return Array.isArray(content) ? content.filter((b) => b && b.type === 'text' && typeof b.text === 'string').map((b) => b.text).join('\n') : ''
+}
+
 // Claude Code writes each pasted image into the prompt as "[Image #n]"; the
 // image itself is only in the transcript.
 export function imageCount(text) {
@@ -134,10 +222,15 @@ export function closingQuestion(text) {
 
 const claudeHome = () => process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
 
-// Transcripts are Claude Code's internal format. They only backfill history the
-// hooks did not see, so anything unexpected in them is skipped.
+// Transcripts are Claude Code's internal format; anything unexpected in them is
+// skipped. The history comes from them: the prompts, every text of Claude's,
+// runs of tool calls, sub-agents with their reports, background work that
+// ended, and where the conversation was summarized. last is the time of the
+// newest entry read.
 export function parseTranscript(file, maxBytes = 512 * 1024) {
-  const result = { messages: [], title: '', cwd: '' }
+  const result = { messages: [], title: '', cwd: '', last: 0 }
+  // Sub-agents by the id of the call that started them.
+  const agents = new Map()
   let fd
   try {
     const size = fs.statSync(file).size
@@ -157,20 +250,63 @@ export function parseTranscript(file, maxBytes = 512 * 1024) {
       if (!e || typeof e !== 'object') continue
       if (e.type === 'ai-title' && e.aiTitle) result.title = clip(e.aiTitle, 120)
       if (e.type === 'custom-title' && e.customTitle) result.title = clip(e.customTitle, 120)
-      if (e.isSidechain || e.isMeta || !e.message) continue
+      if (e.isSidechain || !e.message) continue
+      // Meta entries are Claude Code's own, but for a prompt through the inbox.
+      if (e.isMeta && !(e.type === 'user' && INBOX.test(userText(e.message.content)))) continue
       if (typeof e.cwd === 'string') result.cwd = e.cwd
-      const at = Date.parse(e.timestamp) || Date.now()
+      const stamped = Date.parse(e.timestamp)
+      if (stamped) result.last = Math.max(result.last, stamped)
+      const at = stamped || Date.now()
       const id = typeof e.uuid === 'string' ? e.uuid : undefined
       if (e.type === 'user') {
-        const text = userText(e.message.content)
+        if (e.isCompactSummary) {
+          result.messages.push({ id, role: 'event', kind: 'compact', state: '', text: '', at })
+          continue
+        }
+        const content = e.message.content
+        // The answer to a sub-agent's call: a report, or only that it started
+        // in the background, whose notification ends it later.
+        if (Array.isArray(content)) {
+          for (const b of content) {
+            const a = b && b.type === 'tool_result' && agents.get(b.tool_use_id)
+            const r = e.toolUseResult
+            if (!a || (r && typeof r === 'object' && (r.isAsync === true || /^async/i.test(String(r.status || ''))))) continue
+            const text = toolResultText(b.content)
+            if (/^Async agent launched/i.test(text)) continue
+            Object.assign(a, { state: b.is_error ? 'failed' : 'done', ended: at, result: clip(text, MAX_RESULT) })
+          }
+        }
+        const turn = userTurn(content)
+        if (turn.notes) {
+          turn.notes.forEach((n, k) => {
+            const entry = noteEntry(n)
+            if (entry.event) return result.messages.push({ id: id && `${id}.n${k}`, role: 'event', ...entry.event, at })
+            const a = agents.get(entry.agent.tool)
+            const ended = entry.agent.state === 'running' ? {} : { ended: at }
+            const result_ = entry.agent.result ? { result: entry.agent.result } : {}
+            // Started before the part read: the notification alone stands for it.
+            if (!a) return result.messages.push({ id: id && `${id}.n${k}`, role: 'agent', text: entry.agent.name, agent: '', state: entry.agent.state, at, ...ended, ...result_ })
+            Object.assign(a, { state: entry.agent.state, ...ended, ...result_ })
+          })
+          continue
+        }
         // Images of tool results sit inside those; only pasted ones are top level.
-        const images = Array.isArray(e.message.content) ? Math.min(MAX_IMAGES, e.message.content.filter((b) => b && b.type === 'image').length) : 0
-        if (text || images) result.messages.push({ id, role: 'user', text, at, ...(images ? { images } : {}) })
+        const images = turn.role === 'user' && Array.isArray(content) ? Math.min(MAX_IMAGES, content.filter((b) => b && b.type === 'image').length) : 0
+        if (turn.text || images) result.messages.push({ id, role: turn.role, text: turn.text, at, ...(images ? { images } : {}) })
       } else if (e.type === 'assistant' && Array.isArray(e.message.content)) {
         e.message.content.forEach((b, i) => {
           const bid = id ? `${id}.${i}` : undefined
-          if (b.type === 'text' && b.text) result.messages.push({ id: bid, role: 'assistant', text: clip(b.text), at })
-          else if (b.type === 'tool_use') countTool(result.messages, bid, at)
+          if (b.type === 'text' && b.text) {
+            result.messages.push({ id: bid, role: 'assistant', text: clip(b.text), at })
+          } else if (b.type === 'tool_use' && AGENT_TOOLS.has(b.name)) {
+            const input = b.input && typeof b.input === 'object' ? b.input : {}
+            const a = { id: bid, role: 'agent', text: clip(input.description || String(input.prompt || '').split('\n')[0], 120),
+              agent: clip(input.subagent_type || '', 40), state: 'running', at }
+            if (typeof b.id === 'string') agents.set(b.id, a)
+            result.messages.push(a)
+          } else if (b.type === 'tool_use') {
+            countTool(result.messages, bid, at)
+          }
         })
       }
     }
@@ -179,7 +315,7 @@ export function parseTranscript(file, maxBytes = 512 * 1024) {
   } finally {
     if (fd !== undefined) fs.closeSync(fd)
   }
-  result.messages = result.messages.slice(-MAX_MESSAGES)
+  result.messages = markSteps(result.messages).slice(-MAX_MESSAGES)
   return result
 }
 
@@ -634,24 +770,60 @@ export class Bridge {
   session(id) {
     let s = this.sessions.get(id)
     if (!s) {
+      // messages is what the car sees: the transcript's history (history)
+      // with what only the hooks or the car saw so far (extra).
       s = { id, cwd: '', title: '', name: '', kind: 'ended', status: 'ended', updated: this.now(), messages: [], pending: null,
-        socket: '', transcript: '', hooked: false, backfilled: false, mtime: 0 }
+        socket: '', transcript: '', hooked: false, backfilled: false, history: null, synced: '', extra: [] }
       this.sessions.set(id, s)
     }
     return s
   }
 
-  addMessage(s, role, text, id) {
+  // addMessage keeps what the hooks or the car saw until the transcript has it;
+  // keep marks the car's answers and copies it never will.
+  addMessage(s, role, text, fields = {}) {
     text = clip(text)
     if (!text) return null
-    const m = { id: id || `m${++this.seq}`, role, text, at: this.now() }
-    s.messages.push(m)
-    if (s.messages.length > MAX_MESSAGES) s.messages.splice(0, s.messages.length - MAX_MESSAGES)
+    const m = { id: `m${++this.seq}`, role, text, at: this.now(), ...fields }
+    s.extra.push(m)
+    this.merge(s)
+    return m
+  }
+  addEntry(s, entry) {
+    const m = { id: `m${++this.seq}`, at: this.now(), ...entry }
+    s.extra.push(m)
+    this.merge(s)
     return m
   }
   addTool(s) {
-    if (countTool(s.messages, `m${this.seq + 1}`, this.now())) this.seq++
-    if (s.messages.length > MAX_MESSAGES) s.messages.splice(0, s.messages.length - MAX_MESSAGES)
+    if (countTool(s.extra, `m${this.seq + 1}`, this.now())) this.seq++
+    this.merge(s)
+  }
+  // note adds what a notification of background work means, where no
+  // transcript tells it.
+  note(s, entry) {
+    if (entry.event) return this.addEntry(s, { role: 'event', ...entry.event })
+    const a = entry.agent
+    return this.addEntry(s, { role: 'agent', text: a.name, agent: '', state: a.state,
+      ...(a.state === 'running' ? {} : { ended: this.now() }), ...(a.result ? { result: a.result } : {}) })
+  }
+
+  // merge puts the history together. A copy from the hooks leaves once the
+  // transcript has the same words or has gone past it; the car's prompts once
+  // the transcript has them, its answers never.
+  merge(s) {
+    const history = s.history ? s.history.messages : []
+    const key = (m) => `${m.role}\n${squash(m.text)}`
+    const said = new Set(history.filter((m) => m.role !== 'tool').map(key))
+    const upTo = s.history ? s.history.last : 0
+    s.extra = s.extra.filter((m) => {
+      if (m.role === 'car') return m.keep || !said.has(key(m))
+      if (said.has(key(m))) return false
+      return !(history.length && upTo && m.at <= upTo)
+    }).slice(-MAX_MESSAGES)
+    const all = [...history, ...s.extra].map((m, i) => [m, i])
+    all.sort((a, b) => a[0].at - b[0].at || a[1] - b[1])
+    s.messages = markSteps(all.map(([m]) => m)).slice(-MAX_MESSAGES)
   }
 
   // tail is transcriptTail for a session, read again only when the file changed.
@@ -705,36 +877,39 @@ export class Bridge {
     return ''
   }
 
-  // History the hooks did not see: once for a hooked session, on every change
-  // of the file for one that runs without the plugin's hooks. Answers whether
-  // it read the file, so the caller can publish a new revision.
-  backfill(s) {
+  // sync reads the session's transcript again when it changed; the history
+  // comes from it, with every step Claude takes. Answers whether it read the
+  // file, so the caller can publish a new revision.
+  sync(s) {
     if (!s.transcript) s.transcript = this.findTranscript(s.id)
-    if (!s.transcript || (s.hooked && s.backfilled)) return false
+    if (!s.transcript) return false
     let stat
     try {
       stat = fs.statSync(s.transcript)
     } catch {
       return false
     }
-    if (!s.hooked && s.backfilled && stat.mtimeMs === s.mtime) return false
+    const mark = `${stat.size}:${stat.mtimeMs}`
+    if (s.synced === mark) return false
     const t = parseTranscript(s.transcript)
-    s.mtime = stat.mtimeMs
+    s.synced = mark
     s.backfilled = true
-    if (!s.hooked || s.messages.length === 0) s.messages = t.messages.map((m) => ({ ...m, id: m.id || `m${++this.seq}` }))
+    s.history = t
     if (t.title && !s.title) s.title = t.title
     if (!s.cwd) s.cwd = t.cwd
     const last = t.messages.length ? t.messages[t.messages.length - 1].at : 0
     if (!s.hooked && last) s.updated = Math.max(s.updated, last)
+    this.merge(s)
     return true
   }
 
-  // Sessions without hooks change only in their transcript; a change wakes the
-  // car's long poll like a hook would.
+  // A transcript also changes between hooks: Claude's words before a long
+  // tool call, a sub-agent's end, and every step of a session without the
+  // plugin's hooks. A change wakes the car's long poll like a hook would.
   refreshTranscripts() {
     let changed = false
     for (const s of [...this.sessions.values()].sort((a, b) => b.updated - a.updated).slice(0, MAX_SESSIONS)) {
-      if (!s.hooked && this.backfill(s)) changed = true
+      if (this.sync(s)) changed = true
     }
     if (changed) this.touch()
   }
@@ -762,8 +937,15 @@ export class Bridge {
       pending: p
         ? { id: p.id, kind: p.kind, title: p.title, text: p.text, tool: p.tool || '', detail: p.detail || '', questions: p.questions || [], since: p.since }
         : undefined,
-      messages: s.messages,
+      messages: s.messages.map(Bridge.shown),
     }
+  }
+
+  // shown is a message as the car gets it, without the bridge's own marks.
+  static shown(m) {
+    const out = { id: m.id, role: m.role, text: m.text, at: m.at }
+    for (const k of ['count', 'images', 'step', 'kind', 'state', 'exit', 'agent', 'ended', 'result']) if (m[k] !== undefined) out[k] = m[k]
+    return out
   }
 
   // image is one image of a user's message, made small for the car. The
@@ -859,7 +1041,7 @@ export class Bridge {
     const shown = [...this.sessions.values()].filter((s) => !s.archived && !this.quiet(s))
     const list = shown.filter((s) => !hidden(s)).sort((a, b) => b.updated - a.updated).slice(0, MAX_SESSIONS)
     let read = false
-    for (const s of list) read = this.backfill(s) || read
+    for (const s of list) read = this.sync(s) || read
     // New history is a new revision, or the car would keep its old copy.
     if (read) this.touch()
     return {
@@ -1045,17 +1227,26 @@ export class Bridge {
     switch (event) {
       case 'SessionStart':
         s.status = 'idle'
-        if (s.messages.length === 0) this.backfill(s)
+        this.sync(s)
         // A new session without a word joins the car's list after a minute.
         s.startedAt = this.now()
         if (!talked(s.messages)) this.later(() => this.sessions.get(s.id) === s && s.kind !== 'ended' && !talked(s.messages) && this.touch(), QUIET_START)
         break
       case 'UserPromptSubmit': {
         if (s.pending && !s.pending.waiter) s.pending = null
-        const text = userText(input.prompt)
-        const m = this.addMessage(s, 'user', text)
-        if (m && imageCount(text)) m.images = imageCount(text)
         s.status = 'working'
+        this.sync(s)
+        const turn = userTurn(input.prompt)
+        if (turn.notes) {
+          // Background work that ended: from the transcript, or here without one.
+          if (!s.history) for (const n of turn.notes) this.note(s, noteEntry(n))
+          break
+        }
+        // A prompt from the car is already its message.
+        const known = (m) => m.role === turn.role && squash(m.text) === squash(turn.text)
+        if (turn.role === 'car' && s.messages.some(known)) break
+        const m = this.addMessage(s, turn.role, turn.text)
+        if (m && turn.role === 'user' && imageCount(turn.text)) m.images = imageCount(turn.text)
         break
       }
       case 'PreToolUse': {
@@ -1097,8 +1288,12 @@ export class Bridge {
         break
       }
       case 'PostToolUse':
+        // A sub-agent's own call (agent_id) is its work, not the session's
+        // next step: an open question stays, and its calls are not counted.
+        if (input.agent_id) break
         this.settle(s)
-        this.addTool(s)
+        // With a transcript the call is in it already.
+        if (!this.sync(s) && !s.history) this.addTool(s)
         s.status = 'working'
         break
       case 'Notification':
@@ -1106,8 +1301,9 @@ export class Bridge {
         break
       case 'Stop': {
         this.settle(s)
+        this.sync(s)
         const text = clip(input.last_assistant_message)
-        if (text) this.addMessage(s, 'assistant', text)
+        if (text && !s.messages.some((m) => m.role === 'assistant' && squash(m.text) === squash(text))) this.addMessage(s, 'assistant', text)
         s.status = 'idle'
         const question = closingQuestion(text)
         if (question && !s.pending) s.pending = this.newPrompt('input', { title: this.toCar('Claude wartet auf dich', 'Claude is waiting for you'), text: question })
@@ -1213,13 +1409,13 @@ export class Bridge {
           }
           if (Object.keys(out).length === 0 && text && p.originals[0]) out[p.originals[0]] = text
           if (Object.keys(out).length === 0) throw fail(400, this.toCar('Bitte eine Antwort wählen oder sprechen.', 'Please choose or speak an answer.'))
-          this.addMessage(s, 'car', Object.entries(out).map(([q, a]) => `${q} → ${a}`).join('\n'))
+          this.addMessage(s, 'car', Object.entries(out).map(([q, a]) => `${q} → ${a}`).join('\n'), { keep: true })
           p.waiter(Bridge.questionOutput(p, out))
         } else if (p.kind === 'permission') {
           const allow = r.decision === 'allow'
           const message = text || this.toCar('Im Auto abgelehnt.', 'Denied in the car.')
           const said = allow ? this.toCar('Freigegeben', 'Approved') : this.toCar('Abgelehnt', 'Denied')
-          this.addMessage(s, 'car', `${said}: ${p.tool}${!allow && text ? ' · ' + text : ''}`)
+          this.addMessage(s, 'car', `${said}: ${p.tool}${!allow && text ? ' · ' + text : ''}`, { keep: true })
           p.waiter({
             hookSpecificOutput: {
               hookEventName: 'PermissionRequest',
@@ -1251,7 +1447,7 @@ export class Bridge {
       // takes the text and works on in the background.
       const id = await this.spawnClaude(['--bg', '--resume', s.id, '--fork-session', ...this.permissionArgs(), message], s.cwd)
       if (s.pending && s.pending.kind === 'input') s.pending = null
-      this.addMessage(s, 'car', text)
+      this.addMessage(s, 'car', text, { keep: true })
       s.updated = this.now()
       this.touch()
       setTimeout(() => this.discover().catch(() => {}), 1500)

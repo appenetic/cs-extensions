@@ -40,8 +40,14 @@ läuft alles weiter wie ohne Plugin.
 Kosten: Jede Sitzung hat ihren Relay-Prozess, real etwa 21 MB (`footprint`).
 Die Bridge fragt `claude agents --json` alle 8 Sekunden ab, solange ein Auto
 verbunden ist, sonst jede Minute. Ein Aufruf dauert etwa 0,2 Sekunden.
-Sitzungen ohne Hooks (vor der Installation gestartet) verfolgt sie über die
-Änderungen an ihrem Transkript.
+Den Verlauf liest sie aus dem Transkript jeder Sitzung, sobald es sich ändert:
+bei jedem Hook und alle 8 Sekunden, solange ein Auto verbunden ist, sonst jede
+Minute. Daher kennt das Auto auch Claudes Worte
+zwischen den Werkzeugaufrufen, Sub-Agents mit ihrem Bericht, Hintergrund-Befehle,
+die enden, und wo der Verlauf zusammengefasst wurde. Was nur die Hooks oder das
+Auto sahen, steht daneben, bis das Transkript es auch hat; so geht ein Prompt
+sofort ins Auto. Sitzungen ohne Hooks (vor der Installation gestartet)
+verfolgt sie allein über ihr Transkript.
 
 ## Daten und Einstellungen
 

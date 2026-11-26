@@ -112,6 +112,15 @@ nächsten direkten Kontakt selbst.
 - **Verlauf:** Prompts, Claudes Antworten mit Tabellen und Listen, und
   Werkzeugaufrufe als kleine Blase mit Punkten. Text aus dem Auto ist als „Aus
   dem Auto“ markiert.
+  - Was Claude zwischen den Werkzeugaufrufen schreibt, steht klein als
+    Zwischenstand da; die letzte Antwort eines Durchgangs ist die große Blase.
+  - Sub-Agents sind Karten mit Typ, Aufgabe und Stand („läuft · 2 Min.“,
+    „fertig nach 3 Min.“). Ist einer fertig, zeigt die Karte den Anfang seines
+    Berichts, **Ergebnis lesen** den ganzen (bis 2000 Zeichen).
+  - Hintergrund-Befehle, die enden, und andere Meldungen von Claude Code sind
+    eine ruhige Zeile mit Zeichen: „Hintergrund-Befehl fertig · „…“ ·
+    Exit-Code 0“, rot bei einem Fehler. Wo Claude Code den Verlauf
+    zusammengefasst hat, steht „Verlauf zusammengefasst“.
   - Bilder, die du in einen Prompt eingefügt hast, stehen als Vorschau unter dem
     Text. Antippen zeigt sie in voller Breite. Der Mac lädt jedes erst, wenn du
     die Sitzung öffnest, und verkleinert es mit `sips` auf höchstens 1024 Pixel.

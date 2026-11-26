@@ -7,7 +7,7 @@ import http from 'node:http'
 import net from 'node:net'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { Bridge, allowedPeer, bridgeHosts, closingQuestion, imageCount, parseTranscript, shrinkImage, speakText, speakable, toolSummary, transcriptImages, userText, voiceFor } from '../bin/coilshift-bridge.mjs'
+import { Bridge, allowedPeer, bridgeHosts, closingQuestion, imageCount, noteEntry, parseTranscript, shrinkImage, speakText, speakable, taskNotifications, toolSummary, transcriptImages, userText, userTurn, voiceFor } from '../bin/coilshift-bridge.mjs'
 import { VERSION, ensureBridge, local, macLang, older, socketPath } from '../lib/common.mjs'
 
 function tmp() {
@@ -64,6 +64,135 @@ test('transcript backfill skips thinking, sidechains and system reminders', () =
   assert.equal(t.messages[2].count, 2, 'a run of tool calls is one entry')
   assert.equal(JSON.stringify(t).includes('secret'), false)
   assert.equal(JSON.stringify(t).includes('go test'), false, 'tool calls carry no details')
+})
+
+// A turn as Claude Code writes it: steps with tool calls, a sub-agent started
+// in the background, a background command, the agent's end as a notification,
+// a prompt from the car and a summary of the conversation.
+function richTranscript(file) {
+  const at = (s) => `2026-11-26T08:00:${String(s).padStart(2, '0')}Z`
+  const note = (fields) => '<task-notification>\n' + Object.entries(fields).map(([k, v]) => `<${k}>${v}</${k}>`).join('\n') + '\n</task-notification>'
+  const lines = [
+    { type: 'user', uuid: 'c0', isCompactSummary: true, isVisibleInTranscriptOnly: true, timestamp: at(0), message: { role: 'user', content: 'This session is being continued from a previous conversation …' } },
+    { type: 'user', uuid: 'u1', timestamp: at(1), message: { role: 'user', content: 'Sub-Agents zeigen' } },
+    { type: 'assistant', uuid: 'a1', timestamp: at(2), message: { role: 'assistant', content: [{ type: 'text', text: 'Ich prüfe die Formate.' }, { type: 'tool_use', id: 'toolu_b', name: 'Bash', input: { command: 'ls' } }] } },
+    { type: 'user', uuid: 'r1', timestamp: at(3), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_b', content: 'ok' }] } },
+    { type: 'assistant', uuid: 'a2', timestamp: at(4), message: { role: 'assistant', content: [{ type: 'text', text: 'Ich frage die Doku.' }, { type: 'tool_use', id: 'toolu_ag', name: 'Agent', input: { description: 'Hook-Felder prüfen', prompt: 'lange Anweisung', subagent_type: 'claude-code-guide', run_in_background: true } }] } },
+    { type: 'user', uuid: 'r2', timestamp: at(5), toolUseResult: { isAsync: true, status: 'async_launched' }, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_ag', content: [{ type: 'text', text: 'Async agent launched successfully.' }] }] } },
+    { type: 'assistant', uuid: 'a3', timestamp: at(6), message: { role: 'assistant', content: [{ type: 'text', text: 'Der Agent läuft, ich warte.' }] } },
+    { type: 'user', uuid: 'n1', timestamp: at(20), message: { role: 'user', content: note({ 'task-id': 'b1', 'tool-use-id': 'toolu_x', 'output-file': '/tmp/x', status: 'completed', summary: 'Background command "Wait for the feed" completed (exit code 0)' }) } },
+    { type: 'user', uuid: 'n2', timestamp: at(30), message: { role: 'user', content: note({ 'task-id': 'a9', 'tool-use-id': 'toolu_ag', status: 'completed', summary: 'Agent "Hook-Felder prüfen" finished', note: 'A task-notification fires …', result: 'Die Felder heißen agent_id und agent_type.', usage: '…' }) + '\n<system-reminder>intern</system-reminder>' } },
+    { type: 'assistant', uuid: 'a4', timestamp: at(31), message: { role: 'assistant', content: [{ type: 'text', text: 'Fertig: agent_id und agent_type.' }] } },
+    { type: 'user', uuid: 'n3', timestamp: at(40), message: { role: 'user', content: note({ status: 'failed', summary: 'Background command "Build" failed with exit code 2' }) } },
+    { type: 'user', uuid: 'u2', timestamp: at(50), message: { role: 'user', content: '[Aus dem Auto, per Sprache diktiert] Mach weiter' } },
+  ]
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+}
+
+test("the history shows Claude's steps, sub-agents, background work and summaries, never their XML", () => {
+  const dir = tmp()
+  const file = path.join(dir, 's.jsonl')
+  richTranscript(file)
+  const t = parseTranscript(file)
+  const shown = t.messages.map((m) => [m.role, m.text, m.step || false, m.kind || '', m.state || ''])
+  assert.deepEqual(shown, [
+    ['event', '', false, 'compact', ''],
+    ['user', 'Sub-Agents zeigen', false, '', ''],
+    ['assistant', 'Ich prüfe die Formate.', true, '', ''],
+    ['tool', '', false, '', ''],
+    ['assistant', 'Ich frage die Doku.', true, '', ''],
+    ['agent', 'Hook-Felder prüfen', false, '', 'done'],
+    ['assistant', 'Der Agent läuft, ich warte.', false, '', ''],
+    ['event', 'Wait for the feed', false, 'command', 'done'],
+    ['assistant', 'Fertig: agent_id und agent_type.', false, '', ''],
+    ['event', 'Build', false, 'command', 'failed'],
+    ['car', 'Mach weiter', false, '', ''],
+  ])
+  const agent = t.messages.find((m) => m.role === 'agent')
+  assert.equal(agent.agent, 'claude-code-guide')
+  assert.equal(agent.result, 'Die Felder heißen agent_id und agent_type.')
+  assert.equal(agent.ended - agent.at, 26000, 'from its start to its notification')
+  assert.deepEqual(t.messages.filter((m) => m.kind === 'command').map((m) => m.exit), [0, 2])
+  assert.equal(t.last, Date.parse('2026-11-26T08:00:50Z'))
+  const json = JSON.stringify(t)
+  for (const hidden of ['task-notification', 'lange Anweisung', 'intern', 'Aus dem Auto', 'This session is being continued']) assert.equal(json.includes(hidden), false, hidden)
+})
+
+test("a sub-agent's report back begins a turn: the answer before it stays an answer", () => {
+  const dir = tmp()
+  const file = path.join(dir, 's.jsonl')
+  const at = (s) => `2026-11-26T09:00:${String(s).padStart(2, '0')}Z`
+  const lines = [
+    { type: 'user', uuid: 'u1', timestamp: at(0), message: { role: 'user', content: 'Prüf das' } },
+    { type: 'assistant', uuid: 'a1', timestamp: at(1), message: { role: 'assistant', content: [{ type: 'text', text: 'Ich starte einen Agent.' }, { type: 'tool_use', id: 'toolu_a', name: 'Agent', input: { description: 'Prüfen', subagent_type: 'Explore' } }] } },
+    { type: 'user', uuid: 'r1', timestamp: at(2), toolUseResult: { isAsync: true, status: 'async_launched' }, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_a', content: 'Async agent launched successfully.' }] } },
+    { type: 'assistant', uuid: 'a2', timestamp: at(3), message: { role: 'assistant', content: [{ type: 'text', text: 'Ich warte auf den Agent.' }] } },
+    { type: 'user', uuid: 'n1', timestamp: at(20), message: { role: 'user', content: '<task-notification>\n<tool-use-id>toolu_a</tool-use-id>\n<status>completed</status>\n<summary>Agent "Prüfen" finished</summary>\n<result>Alles gut.</result>\n</task-notification>' } },
+    { type: 'assistant', uuid: 'a3', timestamp: at(21), message: { role: 'assistant', content: [{ type: 'text', text: 'Der Agent sagt: alles gut.' }] } },
+  ]
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  assert.deepEqual(parseTranscript(file).messages.map((m) => [m.role, m.text, m.step || false]), [
+    ['user', 'Prüf das', false],
+    ['assistant', 'Ich starte einen Agent.', true],
+    ['agent', 'Prüfen', false],
+    ['assistant', 'Ich warte auf den Agent.', false],
+    ['assistant', 'Der Agent sagt: alles gut.', false],
+  ])
+})
+
+test('notifications of background work become events or complete their agent', () => {
+  const n = taskNotifications('<task-notification>\n<tool-use-id>toolu_1</tool-use-id>\n<status>completed</status>\n<summary>Monitor event: "deploy"</summary>\n</task-notification>')
+  assert.deepEqual(noteEntry(n[0]), { event: { kind: 'notice', state: '', text: 'Monitor event: "deploy"' } })
+  assert.deepEqual(noteEntry({ toolUseId: 't', status: 'failed', summary: 'Agent "Review" failed: Agent terminated early due to an API error', result: '' }),
+    { agent: { tool: 't', name: 'Review', state: 'failed', result: 'Agent terminated early due to an API error' } })
+  assert.equal(noteEntry({ toolUseId: 't', status: 'completed', summary: 'Agent "Review" is waiting on its own background work', result: '' }).agent.state, 'running')
+  assert.deepEqual(noteEntry({ toolUseId: '', status: 'completed', summary: 'Background command "Build" completed (exit code 1)', result: '' }).event,
+    { kind: 'command', state: 'failed', text: 'Build', exit: 1 }, 'a non-zero exit is a failure')
+  assert.deepEqual(userTurn('[From the car] go on'), { role: 'car', text: 'go on' })
+  assert.deepEqual(userTurn('<task-notification><summary>Goal check-in: still running</summary></task-notification>').notes.map((x) => x.summary), ['Goal check-in: still running'])
+})
+
+test("a hooked session follows its transcript: every step, the car's prompt once, its answers kept", async () => {
+  const b = bridge()
+  const res = { on() {} }
+  const file = path.join(b.projectsDir, 'live.jsonl')
+  const hook = (event, extra = {}) => b.hook({ session_id: 'live', hook_event_name: event, cwd: '/p', transcript_path: file, ...extra }, res)
+  const write = (lines) => fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  const at = (s) => new Date(b.now() + s * 1000).toISOString()
+  const prompt = { type: 'user', uuid: 'u1', timestamp: at(0), message: { role: 'user', content: 'Baue es' } }
+  const step = { type: 'assistant', uuid: 'a1', timestamp: at(1), message: { role: 'assistant', content: [{ type: 'text', text: 'Ich baue jetzt.' }, { type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'make' } }] } }
+  // The prompt shows at once, before the transcript has it, and only once after.
+  await hook('UserPromptSubmit', { prompt: 'Baue es' })
+  assert.deepEqual(b.snapshot().sessions[0].messages.map((m) => [m.role, m.text]), [['user', 'Baue es']])
+  write([prompt, step])
+  await hook('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'make' } })
+  assert.deepEqual(b.snapshot().sessions[0].messages.map((m) => [m.role, m.text, m.step || false]),
+    [['user', 'Baue es', false], ['assistant', 'Ich baue jetzt.', true], ['tool', '', false]], 'the step before the tool call shows')
+  // A background command ends: its notification comes as a prompt and shows as an event.
+  const notification = '<task-notification>\n<status>completed</status>\n<summary>Background command "make" completed (exit code 0)</summary>\n</task-notification>'
+  await hook('UserPromptSubmit', { prompt: notification })
+  assert.equal(JSON.stringify(b.snapshot()).includes('task-notification'), false)
+  // The answer from Stop, already in the transcript, shows once.
+  const answer = { type: 'assistant', uuid: 'a2', timestamp: at(3), message: { role: 'assistant', content: [{ type: 'text', text: 'Gebaut.' }] } }
+  write([prompt, step, answer])
+  await hook('Stop', { last_assistant_message: 'Gebaut.' })
+  let messages = b.snapshot().sessions[0].messages
+  assert.deepEqual(messages.filter((m) => m.role === 'assistant').map((m) => [m.text, m.step || false]), [['Ich baue jetzt.', true], ['Gebaut.', false]])
+  // From the car: a prompt through the inbox and an answer to a permission.
+  const s = b.sessions.get('live')
+  b.addMessage(s, 'car', 'Teste auch')
+  b.addMessage(s, 'car', 'Freigegeben: Bash', { keep: true })
+  const inbox = 'Another Claude session sent a message:\n[Aus dem Auto] Teste auch'
+  await hook('UserPromptSubmit', { prompt: inbox })
+  assert.equal(JSON.stringify(b.snapshot()).includes('Another Claude'), false)
+  write([prompt, step, answer, { type: 'user', uuid: 'u2', isMeta: true, timestamp: at(9), message: { role: 'user', content: inbox } }])
+  b.sync(s)
+  messages = b.snapshot().sessions[0].messages
+  assert.deepEqual(messages.filter((m) => m.role === 'car').map((m) => m.text), ['Freigegeben: Bash', 'Teste auch'])
+  assert.equal(messages.find((m) => m.text === 'Teste auch').id, 'u2', "the transcript's copy of the car's prompt")
+  assert.equal(messages.filter((m) => m.role === 'car' && m.text === 'Teste auch').length, 1, "the car's prompt shows once")
+  assert.equal(messages.filter((m) => m.text === 'Freigegeben: Bash').length, 1, 'its answer stays')
+  assert.equal(messages.some((m) => 'keep' in m), false, 'the bridge keeps its marks to itself')
 })
 
 test('helpers', () => {
@@ -139,13 +268,15 @@ test('pasted images: counted on the message, found in the transcript, made small
   assert.equal((await transcriptImages(file, { id: 'm9', text: 'anders', at: Date.parse('2026-11-18T10:05:00Z') })).length, 0, 'but not further than a minute')
 
   const res = { on() {} }
-  // From the hooks: only the prompt, with a mark for each image.
+  // From the hooks: only the prompt, with a mark for each image; the
+  // transcript's entry with the same words takes its place.
   await b.hook({ session_id: 's1', hook_event_name: 'UserPromptSubmit', cwd: '/p', transcript_path: file, prompt: '[Image #2] [Image #3] zwei' }, res)
-  // Backfilled at the start: the transcript's entries with their ids.
+  // At the start: the transcript's entries with their ids.
   await b.hook({ session_id: 's2', hook_event_name: 'SessionStart', cwd: '/p', transcript_path: file }, res)
   const snap = b.snapshot()
-  const hooked = snap.sessions.find((s) => s.id === 's1').messages[0]
-  assert.equal(hooked.images, 2)
+  const hooked = snap.sessions.find((s) => s.id === 's1').messages.find((m) => m.text === '[Image #2] [Image #3] zwei')
+  assert.deepEqual([hooked.id, hooked.images], ['u3', 2])
+  assert.equal(snap.sessions.find((s) => s.id === 's1').messages.length, 2, 'the hooks\' copy is gone')
   assert.deepEqual(snap.sessions.find((s) => s.id === 's2').messages.map((m) => m.images), [1, 2])
   const device = b.redeem(b.newCode(), 'Tesla')
   const get = (q) => b.handle({ method: 'GET', url: new URL('https://bridge/v1/image?' + new URLSearchParams(q)), authorization: 'Bearer ' + device, body: {} })
@@ -418,6 +549,20 @@ test('a question that was rejected or turned into a clarification does not stay 
   await ask()
   await hook('UserPromptSubmit', { prompt: 'Darstellung kaputt' })
   assert.equal(pending(), undefined, 'a new prompt ends it')
+})
+
+test("a sub-agent's tool calls neither close an open question nor count as the session's", async () => {
+  const b = bridge()
+  const res = { on() {} }
+  const hook = (event, extra = {}) => b.hook({ session_id: 's1', hook_event_name: event, cwd: '/p', ...extra }, res)
+  await hook('UserPromptSubmit', { prompt: 'Frag mich' })
+  await hook('PreToolUse', { tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: 'Welche Farbe?', header: 'Farbe', options: [{ label: 'Rot' }] }] } })
+  await hook('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' }, agent_id: 'a1', agent_type: 'Explore' })
+  const s = b.snapshot().sessions[0]
+  assert.equal(s.pending && s.pending.kind, 'question', 'the question stays open')
+  assert.equal(s.messages.some((m) => m.role === 'tool'), false)
+  await hook('PostToolUse', { tool_name: 'AskUserQuestion' })
+  assert.equal(b.snapshot().sessions[0].pending, undefined, "the session's own next step settles it")
 })
 
 test('tool calls count into one entry per run, without names or arguments', async () => {

@@ -98,7 +98,7 @@
     },
     {
       "id": "com.appenetic.claude",
-      "version": "0.1.0-alpha.25",
+      "version": "0.1.0-alpha.26",
       "sdk": ">=1.0 <2",
       "title": "Claude Code (experimental)",
       "published_unix": 1794614400,
@@ -106,7 +106,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.claude",
-        "version": "0.1.0-alpha.25",
+        "version": "0.1.0-alpha.26",
         "sdk": ">=1.0 <2",
         "title": "Claude Code (experimental)",
         "summary": "Your Mac's Claude Code sessions on the MCU: list, history, questions as a card over the map, answers by touch, dictation or voice button. Pairing by code or QR code, also without Tailscale. In German or English, as your car is set.",
@@ -213,11 +213,11 @@
           ]
         }
       },
-      "manifest_sha256": "0dba1104682e934e2411f6e65198f5518216b8155b1e5f372b0a16782900fd80",
+      "manifest_sha256": "7c2d50110de54cb488bda5f4acce9158ea8536881d2c2815dca2b3a38ba2c4d6",
       "archive": {
-        "url": "pool/076bdff2c8ddfc68f97e9b1b01a0b8d7c71eb26c3fbb8ec936af6591e6f5bb0a",
-        "sha256": "076bdff2c8ddfc68f97e9b1b01a0b8d7c71eb26c3fbb8ec936af6591e6f5bb0a",
-        "bytes": 8632320
+        "url": "pool/f728bddcad853eeb64e2fc8c9cd969a5a7e6e32f1dfb86552daa62962f45d860",
+        "sha256": "f728bddcad853eeb64e2fc8c9cd969a5a7e6e32f1dfb86552daa62962f45d860",
+        "bytes": 8642560
       }
     },
     {

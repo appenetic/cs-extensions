@@ -84,6 +84,34 @@ h2 .pulse { width: 12px; height: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .typing.live i { animation: none; } }
 
+/* Claude's words on the way, small; background work that ended and summaries
+   as quiet lines with a sign; sub-agents as cards with their report. */
+:root { --soft: #242424; --ok: #34c759; --bad: #ff3a3a; }
+:root[data-theme="light"] { --soft: #e3e3e6; --ok: #1f8a3b; --bad: #d42a2a; }
+.messages svg { flex: none; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.message.step { max-width: 86%; padding: 8px 14px; background: var(--soft); border-color: transparent; font-size: 16px; line-height: 1.4; }
+.event { display: flex; align-items: center; gap: 12px; padding: 4px 2px; }
+.event .badge { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--fill); display: flex; align-items: center; justify-content: center; color: var(--text-2); }
+.event.done .badge { color: var(--ok); }
+.event.failed .badge { color: var(--bad); }
+.event .what, .agent .what { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.event .title { font-size: 16px; font-weight: 600; }
+.event .detail { font-size: 15px; color: var(--text-2); overflow-wrap: anywhere; }
+.message.agent { width: 86%; max-width: 86%; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.agent .head { display: flex; align-items: center; gap: 12px; }
+.agent .badge { flex: none; width: 36px; height: 36px; border-radius: 8px; background: var(--fill); display: flex; align-items: center; justify-content: center; }
+.agent .what { flex: 1 1 auto; gap: 2px; }
+.agent .kind { font-size: 13px; color: var(--text-2); }
+.agent .name { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.agent .state { flex: none; display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text-2); }
+.agent .state .pulse { margin: 0; }
+.agent .state.done svg { color: var(--ok); }
+.agent .state.failed svg { color: var(--bad); }
+.agent .result { margin: 0; font-size: 16px; line-height: 1.4; color: var(--text-2); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.agent .result.open { display: block; color: var(--text); }
+.agent .chip { align-self: flex-start; min-height: 48px; }
+
 .prompt { border-color: var(--orange); margin: 0; }
 .options { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
 .option { display: block; min-width: 140px; min-height: 56px; text-align: left; }

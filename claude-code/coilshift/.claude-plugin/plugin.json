@@ -1,7 +1,7 @@
 {
   "name": "coilshift",
   "displayName": "CoilShift for Tesla",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "Mirrors your Claude Code sessions into the Claude app of the CoilShift extension on the Tesla MCU. Questions and approvals show up in the car and can be answered by touch, dictation or the voice button. Pair with a code from the car or a QR code, also without Tailscale: when the car cannot reach the Mac directly, the connection goes end-to-end encrypted through an internet relay. In German or English.",
   "author": {
     "name": "Appenetic",

@@ -224,3 +224,51 @@ Wunsch des Nutzers: das Claude-Plugin zweisprachig, wie die Quiet-Ansicht.
   des Autos und des Macs. Am Auto offen: ob die drei neuen Beschriftungen der
   Karte erscheinen. Die geänderte Vorlage meldet der UI-Host wie bisher erst
   nach einem Neustart der Oberfläche an.
+
+## Zwischenstände, Sub-Agents und Hintergrund-Meldungen (alpha.26, Plugin 0.2.12)
+
+Wunsch des Nutzers (Bildschirmfoto aus dem Auto): Eine Hintergrund-Meldung
+stand als rohes `<task-notification>`-XML unter „Du“, Sub-Agents waren nur
+Punkte, und was Claude zwischen den Werkzeugaufrufen schreibt, fehlte ganz.
+Die Darstellung wurde vorher im Artboard „Claude Code im Auto“ abgenommen.
+- **Ursache:** Die Bridge nahm für Sitzungen mit Hooks nur den Prompt
+  (`UserPromptSubmit`), Punkte (`PostToolUse`) und die letzte Antwort (`Stop`).
+  Claude Code meldet Hintergrund-Arbeit als eigenen Turn mit
+  `<task-notification>` (Status, Zusammenfassung, bei Agents `<result>`), und
+  Sub-Agents starten in der aktuellen Version immer asynchron
+  (`toolUseResult.isAsync`, `async_launched`); ihr Ende kommt nur als solche
+  Meldung. Eine Zusammenfassung des Verlaufs ist ein User-Eintrag mit
+  `isCompactSummary`.
+- **Bridge:** Der Verlauf kommt jetzt aus dem Transkript, gelesen bei jedem
+  Hook und alle 8 Sekunden, wenn sich Größe oder Zeit der Datei ändern. Jeder
+  Text Claudes wird eine Nachricht; was noch Arbeit im selben Turn nach sich
+  hat, ist `step`. Ein `Agent`/`Task`-Aufruf wird ein Eintrag `agent` (Typ,
+  Aufgabe, `running`), die Meldung mit seiner `tool-use-id` macht ihn `done`,
+  `failed` oder `stopped` mit `ended` und dem Bericht. Andere Meldungen werden
+  `event` (`command` mit Exit-Code, `notice`), die Zusammenfassung `compact`.
+  Prompts aus dem Auto (mit „[Aus dem Auto]“) zeigt sie als Nachricht aus dem
+  Auto, ohne die Markierung. Über den Posteingang einer laufenden Sitzung
+  schreibt Claude Code sie als Meta-Eintrag mit „Another Claude session sent a
+  message:“ davor (13-mal so in den Transkripten dieses Macs); diese liest sie
+  mit, andere Meta-Einträge nicht. Die Rückmeldung eines Sub-Agents beginnt
+  einen neuen Turn, obwohl sie auf seiner Karte steht: Claudes Antwort davor
+  bleibt eine Antwort. Was nur Hooks oder Auto sahen, bleibt daneben,
+  bis das Transkript es enthält; Antworten des Autos auf Fragen und
+  Freigaben und Texte an eine Kopie im Hintergrund bleiben immer.
+- **Im Auto:** Der Dienst lässt `event` und `agent` mit bekannten Arten und
+  Ständen durch, Exit-Codes von −255 bis 255, Berichte bis 2000 Zeichen, ein
+  Ende nur nach dem Start. Die App zeigt Zwischenstände klein (der erste eines
+  Turns mit „Claude · vor …“, ohne Vorlesen), Meldungen als Zeile mit Haken,
+  Kreuz oder Zeichen, Sub-Agents als Karte; ein geöffneter Bericht bleibt bei
+  Updates offen.
+- **Werkzeugaufrufe eines Sub-Agents** tragen laut Hook-Doku `agent_id`. Sie
+  schließen keine offene Frage mehr (vorher hielt die Bridge sie für den
+  nächsten Schritt der Sitzung, was mit Agents im Hintergrund häufiger wird)
+  und zählen nicht in die Punkte der Sitzung.
+- **Geprüft:** Plugin-Tests mit einem Transkript aus allen Formen (Schritte,
+  Agent im Hintergrund samt Meldung, Befehl fertig und fehlgeschlagen,
+  Zusammenfassung, Prompt aus dem Auto) und einer Sitzung mit Hooks, deren
+  Transkript nachzieht; Go-Tests für die neuen Einträge; App-Test für
+  Reihenfolge, Texte, Vorlesen und den Bericht auf Tippen. Die Formate stammen
+  aus echten Transkripten dieses Macs (216 Meldungen, 9 fehlgeschlagen).
+  Am Auto offen: wie es im Auto aussieht.

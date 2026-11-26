@@ -374,6 +374,46 @@ test('tool calls show as small bubbles of dots that move only while Claude works
   assert.equal(typing(el(idle, 'messages')).getAttribute('class'), 'typing', 'still when Claude is done');
 });
 
+test("Claude's steps are small, background work is a quiet line, sub-agents are cards whose report opens on a tap", async () => {
+  const messages = [
+    { id: 'u1', role: 'user', text: 'Zeig die Sub-Agents', at: 1799999000000 },
+    { id: 'a1', role: 'assistant', text: 'Ich prüfe die **Formate**.', step: true, at: 1799999010000 },
+    { id: 't1', role: 'tool', text: '', count: 2, at: 1799999020000 },
+    { id: 'a2', role: 'assistant', text: 'Ich frage die Doku.', step: true, at: 1799999030000 },
+    { id: 'g2', role: 'agent', text: 'Schriften finden', agent: 'Explore', state: 'done', at: 1799999040000, ended: 1799999220000,
+      result: 'Die Schriften liegen in **/usr/share/fonts/blender**, gemeldet als `agent_id` und agent_type.\n\n- Blender-TSL\n- CT_speed' },
+    { id: 'g1', role: 'agent', text: 'Hook-Felder prüfen', agent: 'claude-code-guide', state: 'running', at: 1799999880000 },
+    { id: 'e1', role: 'event', kind: 'command', state: 'done', text: 'Wait for the feed', exit: 0, at: 1799999400000 },
+    { id: 'e2', role: 'event', kind: 'command', state: 'failed', text: 'Build', exit: 2, at: 1799999500000 },
+    { id: 'e3', role: 'event', kind: 'compact', state: '', text: '', at: 1799999600000 },
+    { id: 'a3', role: 'assistant', text: 'Fertig.', at: 1799999700000 },
+  ];
+  const session = { id: 's9', title: 'App', cwd: '/p', kind: 'interactive', status: 'working', updated: 1799999990000, delivery: 'inbox', messages };
+  const state = { view: view({ sessions: [session] }) };
+  const h = await setup({ fetchState: state, calls: [] });
+  const items = () => [...el(h, 'messages').children];
+  assert.deepEqual(items().map((li) => li.getAttribute('class')), ['message assistant', 'event compact', 'event failed', 'event done', 'message agent',
+    'message agent', 'message assistant step', 'message tool', 'message assistant step', 'message user']);
+  const text = items().map((li) => li.textContent);
+  assert.equal(text[1], 'Verlauf zusammengefasstÄltere Nachrichten stehen weiter im Terminal · vor 7 Min.');
+  assert.match(text[2], /^Hintergrund-Befehl fehlgeschlagen„Build“ · Exit-Code 2 · /);
+  assert.match(text[3], /^Hintergrund-Befehl fertig„Wait for the feed“ · Exit-Code 0 · /);
+  assert.match(text[4], /^Sub-Agent · claude-code-guideHook-Felder prüfenläuft · 2 Min\.$/);
+  assert.match(text[5], /^Sub-Agent · ExploreSchriften findenfertig nach 3 Min\.Die Schriften liegen in \/usr\/share\/fonts\/blender, gemeldet als agent_id und agent_type\. Blender-TSL CT_speedErgebnis lesen$/);
+  // The first step of the turn says who and when; the next one only what.
+  assert.match(text[8], /^Claude · vor 17 Min\.Ich prüfe die Formate\.$/);
+  assert.equal(text[6], 'Ich frage die Doku.');
+  assert.ok(items()[0].find((e) => e.className === 'chip speak'), 'the answer can be read aloud');
+  assert.ok(!items()[6].find((e) => e.className === 'chip speak'), 'a step is not read aloud');
+  // The report opens and stays open across an update.
+  items()[5].byText('Ergebnis lesen').click();
+  await h.settle(25);
+  assert.ok(items()[5].find((e) => e.className === 'result open'));
+  await poll(h);
+  assert.ok(items()[5].byText('Weniger'), 'still open after an update');
+  assert.doesNotMatch(el(h, 'messages').textContent, /task-notification|<summary>/);
+});
+
 test('a new background session starts in a known project', async () => {
   const calls = [];
   const state = { view: view(), answer: { ok: true, id: 'abcdef12' } };

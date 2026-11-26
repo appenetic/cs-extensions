@@ -533,6 +533,118 @@
     }
     return h('li', { class: 'message tool' }, dots);
   }
+  // ------------------------------------------------------------ history
+
+  // Claude's words on the way, background work that ended and sub-agents.
+  // Their signs are drawn: the car's font has no check mark.
+  var SIGNS = {
+    done: ['M5 12.5 10 17.5 19 7'],
+    failed: ['M7 7l10 10', 'M17 7 7 17'],
+    stopped: ['M7 12h10'],
+    notice: ['M12 7v6', 'M12 16.5v.5'],
+    compact: ['M4 7h16', 'M7 12h10', 'M10 17h4'],
+    agent: ['M6 8.5v7', 'M8.3 7.2 15.7 10.8']
+  };
+  function sign(name, size) {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', String(size || 18));
+    svg.setAttribute('height', String(size || 18));
+    svg.setAttribute('aria-hidden', 'true');
+    var paths = SIGNS[name] || [];
+    for (var i = 0; i < paths.length; i++) {
+      var path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', paths[i]);
+      svg.appendChild(path);
+    }
+    // A sub-agent: one branching off the main line.
+    var dots = name === 'agent' ? [[6, 6], [6, 18], [18, 12]] : [];
+    for (var j = 0; j < dots.length; j++) {
+      var dot = document.createElementNS(NS, 'circle');
+      dot.setAttribute('cx', String(dots[j][0]));
+      dot.setAttribute('cy', String(dots[j][1]));
+      dot.setAttribute('r', '2.5');
+      svg.appendChild(dot);
+    }
+    return svg;
+  }
+  function clock() {
+    return view && view.now ? view.now * 1000 : Date.now();
+  }
+  function lasted(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return t(s + ' Sek.', s + ' s');
+    var m = Math.round(s / 60);
+    if (m < 60) return t(m + ' Min.', m + ' min');
+    return t(Math.round(m / 60) + ' Std.', Math.round(m / 60) + ' h');
+  }
+  // plain is a report's beginning without its Markdown, for a few lines.
+  function plain(text) {
+    return trim(String(text || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`([^`]*)`/g, '$1')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/^\s{0,3}(#{1,6}|[-*+]|\d+\.)\s+/gm, '')
+      .replace(/(\*\*|\*)(\S[\s\S]*?)\1/g, '$2')
+      .replace(/\s+/g, ' '));
+  }
+  var COMMAND = { done: ['Hintergrund-Befehl fertig', 'Background command finished'], failed: ['Hintergrund-Befehl fehlgeschlagen', 'Background command failed'],
+    stopped: ['Hintergrund-Befehl abgebrochen', 'Background command stopped'] };
+  // An event: a quiet line with its sign, what ended and when.
+  function eventRow(m) {
+    var title;
+    var detail = [];
+    var mark = m.state === 'failed' ? 'failed' : m.state === 'stopped' ? 'stopped' : 'done';
+    if (m.kind === 'command') {
+      title = word(COMMAND, mark);
+      detail.push(t('„', '“') + m.text + t('“', '”'));
+      if (typeof m.exit === 'number') detail.push(t('Exit-Code ', 'exit code ') + m.exit);
+    } else if (m.kind === 'compact') {
+      mark = 'compact';
+      title = t('Verlauf zusammengefasst', 'History summarized');
+      detail.push(t('Ältere Nachrichten stehen weiter im Terminal', 'Older messages are still in the terminal'));
+    } else {
+      if (mark === 'done') mark = 'notice';
+      title = t('Meldung', 'Notice');
+      detail.push(m.text);
+    }
+    detail.push(ago(m.at));
+    return h('li', { class: 'event ' + mark },
+      h('span', { class: 'badge' }, sign(mark)),
+      h('span', { class: 'what' }, h('span', { class: 'title' }, title), h('span', { class: 'detail' }, detail.join(' · '))));
+  }
+  // A sub-agent: what it does and how it stands; its report opens on a tap.
+  // Which reports are open stays across updates.
+  var opened = {};
+  function agentCard(s, m) {
+    var state;
+    if (m.state === 'running') {
+      var dot = h('span', { class: 'pulse' });
+      dot.style.animationDelay = '-' + (Date.now() % 1600) + 'ms';
+      state = h('span', { class: 'state' }, dot, t('läuft · ', 'running · ') + lasted(clock() - m.at));
+    } else if (m.state === 'done') {
+      state = h('span', { class: 'state done' }, sign('done', 16), m.ended ? t('fertig nach ', 'done after ') + lasted(m.ended - m.at) : t('fertig', 'done'));
+    } else {
+      var stopped = m.state === 'stopped';
+      state = h('span', { class: 'state ' + (stopped ? 'stopped' : 'failed') }, sign(stopped ? 'stopped' : 'failed', 16), stopped ? t('abgebrochen', 'stopped') : t('fehlgeschlagen', 'failed'));
+    }
+    var card = h('li', { class: 'message agent' },
+      h('div', { class: 'head' },
+        h('span', { class: 'badge' }, sign('agent', 20)),
+        h('span', { class: 'what' }, h('span', { class: 'kind' }, t('Sub-Agent', 'Sub-agent') + (m.agent ? ' · ' + m.agent : '')), h('span', { class: 'name' }, m.text)),
+        state));
+    if (m.result) {
+      var key = s.id + ' ' + m.id;
+      var open = Boolean(opened[key]);
+      card.append(open ? h('div', { class: 'result open' }, markdown(m.result)) : h('p', { class: 'result' }, plain(m.result)));
+      card.append(button(open ? t('Weniger', 'Less') : t('Ergebnis lesen', 'Read result'), { type: 'button', class: 'chip' }, function () {
+        opened[key] = !open;
+        renderDetail(s);
+      }));
+    }
+    return card;
+  }
   function shortPath(path) {
     var parts = String(path || '').split('/');
     return parts.length > 3 ? '…/' + parts.slice(-2).join('/') : path;
@@ -800,6 +912,21 @@
         var count = m.count || 1;
         while (i + 1 < messages.length && messages[i + 1].role === 'tool') count += messages[++i].count || 1;
         rows.unshift(toolBubble(count, i === messages.length - 1 && s.status === 'working' && !s.pending));
+        continue;
+      }
+      if (m.role === 'event') {
+        rows.unshift(eventRow(m));
+        continue;
+      }
+      if (m.role === 'agent') {
+        rows.unshift(agentCard(s, m));
+        continue;
+      }
+      if (m.role === 'assistant' && m.step) {
+        // Claude's words on the way, small; the first of a turn says who and when.
+        var before = messages[i - 1];
+        var first = !before || (before.role !== 'assistant' && before.role !== 'tool' && before.role !== 'agent');
+        rows.unshift(h('li', { class: 'message assistant step' }, first ? h('span', { class: 'who' }, word(ROLE, 'assistant') + ' · ' + ago(m.at)) : '', markdown(m.text)));
         continue;
       }
       // The images stand below the text instead of their "[Image #n]".

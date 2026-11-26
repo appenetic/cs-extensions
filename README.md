@@ -23,7 +23,8 @@ dem Mac. Es ist öffentlich, auch für Kollegen:
 [Validierung](docs/claude-validation.md). Läuft seit alpha.8 am Auto
 (Model Y, Firmware 2026.32.7). Seit alpha.24 und Plugin 0.2.11 auf Deutsch
 oder Englisch: im Auto nach der Sprache des Autos, auf dem Mac nach der des
-Macs.
+Macs. Seit alpha.26 und Plugin 0.2.12 zeigt der Verlauf auch Claudes
+Zwischenstände, Sub-Agents mit ihrem Bericht und Hintergrund-Befehle.
 
 ## Welcome-Animation (neu, experimentell)
 
