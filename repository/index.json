@@ -415,7 +415,7 @@
     },
     {
       "id": "com.appenetic.quiet-view",
-      "version": "0.1.0-alpha.33",
+      "version": "0.1.0-alpha.34",
       "sdk": ">=1.0 <2",
       "title": "Quiet View (experimental)",
       "published_unix": 1794614400,
@@ -423,7 +423,7 @@
       "manifest": {
         "schema": 1,
         "id": "com.appenetic.quiet-view",
-        "version": "0.1.0-alpha.33",
+        "version": "0.1.0-alpha.34",
         "sdk": ">=1.0 <2",
         "title": "Quiet View (experimental)",
         "summary": "A calm full-screen app after FSD v15's Quiet Mode: the streets and buildings around you from OpenStreetMap, your street lit ahead in your ambient light color, with speedometer, Self-Driving profile, arrival time and turn hints. Swipe down to close. German or English.",
@@ -466,11 +466,11 @@
           ]
         }
       },
-      "manifest_sha256": "f225731cf05312a08a10db2b85bb4341bacd5b0b6e64d72aaaac21527b9f5397",
+      "manifest_sha256": "d0b0f17102c10fe5fd44dba78d0977ab0bb9e41d2f6520373569bd68783b82b9",
       "archive": {
-        "url": "pool/afa25dfe9af5c2951a34e57b43e0b98f4a1c0c63ead13064b5a9235dcf719708",
-        "sha256": "afa25dfe9af5c2951a34e57b43e0b98f4a1c0c63ead13064b5a9235dcf719708",
-        "bytes": 7946240
+        "url": "pool/cba3aac5609ef0eef9f308bc624b9d8c87bd66e782e385719adfa877585b4216",
+        "sha256": "cba3aac5609ef0eef9f308bc624b9d8c87bd66e782e385719adfa877585b4216",
+        "bytes": 7956480
       }
     },
     {

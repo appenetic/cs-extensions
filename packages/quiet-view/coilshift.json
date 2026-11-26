@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "com.appenetic.quiet-view",
-  "version": "0.1.0-alpha.33",
+  "version": "0.1.0-alpha.34",
   "sdk": ">=1.0 <2",
   "title": "Quiet View (experimental)",
   "summary": "A calm full-screen app after FSD v15's Quiet Mode: the streets and buildings around you from OpenStreetMap, your street lit ahead in your ambient light color, with speedometer, Self-Driving profile, arrival time and turn hints. Swipe down to close. German or English.",

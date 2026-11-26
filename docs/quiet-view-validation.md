@@ -749,6 +749,36 @@ selben Tag vom Nutzer selbst gesehen: Das Leuchten der Straße voraus blinkt.
   drei fehl (28 dunkle Bilder, 855 Bilder unter 390 m, 3 Größenänderungen nach
   dem Zeichnen).
 
+## FSD-Mahnung (alpha.34)
+
+Gewünscht von einem Tester auf Discord: Verlangt FSD Aufmerksamkeit, soll die
+App mahnen, statt sich einfach zu schließen. Der Nutzer hat entschieden: Sie
+schließt erst bei `WarningEscalatedChime`.
+
+- **Bis alpha.33** schloss die App schon bei `WarningVisual`, der stillen
+  ersten Stufe, bevor das Auto einen Ton gibt.
+- **Werte:** In `libVehicleIndicatorsInterface.so` im Auto stehen die Namen
+  von `AutopilotHandsOnState`: NotRequired, Detected, NotDetected,
+  WarningVisual, WarningChime, WarningChime2, WarningEscalatedChime,
+  WarningEscalatedChime2, StruckOut, Suspended, SNA. Im Stand las `lv`
+  „NotDetected“. Der Dienst versteht auch die Schreibweisen
+  `LC_HANDS_ON_REQD_…` und schließt auch beim Abbremsen.
+- **Design:** in der Demo (V33), mit den Stufen zum Durchspielen; vom Nutzer
+  für das Release freigegeben. Gerendert mit der echten Seite in allen Stufen,
+  auch mit der Schrift des Cybertrucks.
+- **Schnell:** Der Dienst liest den Wert über dieselbe D-Bus-Verbindung wie den
+  Lenkwinkel, fünfmal pro Sekunde. Antwortet QtCar darauf nicht, gelten wieder
+  Stream und Abfrage.
+- **Tests:** Go: Stufen und Schreibweisen; die App bleibt über die ersten drei
+  Stufen offen und schließt bei der Eskalation; der Wert vom Bus geht dem
+  späteren Stream vor und gibt ihn frei, wenn QtCar nicht mehr antwortet. Node:
+  Die echte Seite zeigt bei einer Mahnung Teslas Hinweis und das Blau und kehrt
+  danach zum Ambientelicht zurück; gegen alpha.33 schlägt der Test fehl.
+- **Offen im Auto:** welche Werte bei aktivem FSD wirklich kommen und in
+  welcher Folge; ob die Mahnung der Innenraumkamera („Blick auf Straße
+  halten“) über denselben Wert läuft (dafür gibt es eigene Werte wie
+  `GUI_driverAttentionMonitoringActive`).
+
 ## Am Auto offen
 
 1. Ob die App im Auto mit Cybertruck UI die Schrift des Cybertrucks zeigt
@@ -756,22 +786,24 @@ selben Tag vom Nutzer selbst gesehen: Das Leuchten der Straße voraus blinkt.
    Neustart der Oberfläche im Launcher steht.
 2. Wie die Straße voraus beim Fahren wirkt (alpha.31), auch an Kreuzungen
    und auf der Autobahn, und ob sie seit alpha.33 ohne Aussetzer leuchtet.
-3. Ob sich die Gebäude mit alpha.30 beim Fahren ruhig mitbewegen. Kurs und
+3. Ob die FSD-Mahnung (alpha.34) bei der stillen Stufe erscheint, mit jedem Ton
+   dringlicher wird und die App erst bei `WarningEscalatedChime` schließt.
+4. Ob sich die Gebäude mit alpha.30 beim Fahren ruhig mitbewegen. Kurs und
    Takt sind aus `turns.log` geklärt (alpha.30), dass sie ankommen mit
    alpha.17.
-4. Wie Schrift und Layout von alpha.18, die weiche Lichtbahn von alpha.19 und
+5. Wie Schrift und Layout von alpha.18, die weiche Lichtbahn von alpha.19 und
    die Stadt von alpha.20 auf dem Bildschirm im Auto wirken, auch in der
    Bildrate.
-5. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
+6. Ob sich das Fenster in D maximiert öffnet und ob es die linke Seite mit der
    Visualisierung und die untere Leiste überdeckt.
-6. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
+7. Wie die Animation auf der MCU läuft (Bildrate) und wie der Schein in anderen
    Farben aussieht, auch tagsüber.
-7. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
-8. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
+8. Ob `GUI_rgbMap` bei Audio-Sync und Rainbow mitläuft und wie schnell.
+9. Ob die Warnungen das Schließen auslösen. Ihre Werte stehen beim Auslösen im
    Paketlog.
-9. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
-   Auslöser stehen mit ihrem Wert im Paketlog.
-10. (Geklärt mit alpha.30: `VAPI_yawRate` ist rad/s, nach links positiv.)
+10. Welche Werte `VAPI_turnSignalActive` und die Warnstufen wirklich tragen. Die
+    Auslöser stehen mit ihrem Wert im Paketlog.
+11. (Geklärt mit alpha.30: `VAPI_yawRate` ist rad/s, nach links positiv.)
 11. Ob die Ankunft am echten Ziel erkannt wird, also wie nah die Navigation
     die Route beendet.
 12. Ob die Wache auch bei vielen Paketen auf einmal die neue Version startet:

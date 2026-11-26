@@ -8,6 +8,14 @@
 </head>
 <body>
 <canvas id="glow"></canvas>
+<div id="attention" class="attention" hidden>
+  <div id="attentionEdge" class="edge"></div>
+  <div class="plea">
+    <svg id="attentionWheel" class="wheel" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27"/><circle cx="32" cy="32" r="6"/><path d="M5 32 H26 M38 32 H59 M32 38 V59"/></svg>
+    <p class="title" data-t="attention">Bitte aufmerksam bleiben</p>
+    <p class="what" data-t="wheel">Lenkrad leicht drehen</p>
+  </div>
+</div>
 <div class="top">
   <div class="left">
     <div id="speed" class="speed" hidden><span id="speedValue" class="num"></span><span id="speedUnit" class="unit"></span></div>

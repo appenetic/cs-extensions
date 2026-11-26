@@ -137,12 +137,24 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
   `VAPI_displaySpeed`, die Zahl des Tachos, in seiner Einheit.
 - **Warnungen:** Beginnt bei offener App eine Warnung, schließt der Dienst sie
   über QtCars `dismissApp`. Das gilt für eine Übernahme-Aufforderung
-  (`GUI_centerDisplayTakeOverNow`), eine Hände-am-Lenkrad-Mahnung, die der
-  Bildschirm zeigt oder mit Ton meldet (`DAS_autopilotHandsOnState`), eine
-  Kollisionswarnung (`DAS_sideCollisionWarning`, `DAS_longCollisionWarning`)
-  und den Rückwärtsgang. Was ein Wert beim Öffnen schon zeigt, gilt als
-  Ausgangslage. So kann ein unerwarteter Normalwert die App nicht immer wieder
-  schließen. Jeder Auslöser steht mit seinem Wert im Paketlog.
+  (`GUI_centerDisplayTakeOverNow`), eine Kollisionswarnung
+  (`DAS_sideCollisionWarning`, `DAS_longCollisionWarning`), den Rückwärtsgang
+  und eine eskalierte Hände-am-Lenkrad-Mahnung (`DAS_autopilotHandsOnState`:
+  `WarningEscalatedChime`, das Abbremsen oder `StruckOut`). Was ein Wert beim
+  Öffnen schon zeigt, gilt als Ausgangslage. So kann ein unerwarteter
+  Normalwert die App nicht immer wieder schließen. Jeder Auslöser steht mit
+  seinem Wert im Paketlog.
+- **FSD-Mahnung:** Die ersten Stufen der Mahnung zeigt die App selbst, denn sie
+  verdeckt Teslas eigenen Hinweis: `WarningVisual` (still, nur auf dem
+  Bildschirm), dann `WarningChime` und `WarningChime2` (mit Ton). Das Licht wird
+  blau und pulsiert, die Ränder leuchten, und wo sonst die Ankunft steht,
+  steht Teslas Hinweis „Bitte aufmerksam bleiben · Lenkrad leicht drehen“
+  (englisch „Please stay attentive · Apply slight turning force to steering
+  wheel“). Mit jedem Ton pulsiert es schneller und tiefer (alle 1,3 s, 0,85 s,
+  0,55 s), und die Stadt tritt dahinter zurück; Tacho und Abbiegehinweis
+  bleiben. Den Wert liest der Dienst fünfmal pro Sekunde direkt von QtCar,
+  nicht über den Stream des Daemons, der etwa 1,7 s später käme. Endet die
+  Mahnung, kehrt das Bild in 0,8 s zum Ambientelicht zurück.
 
 ## Grenzen
 

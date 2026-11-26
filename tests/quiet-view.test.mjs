@@ -24,6 +24,7 @@ function gl(frame) {
     getUniformLocation: (p, name) => ({ p, name }),
     useProgram: (p) => { used = p; },
     uniform1f: (at, v) => { if (at) at.p.uniforms[at.name] = v; },
+    uniform3f: (at, r, g, b) => { if (at && at.name === 'uColor') frame.color = [r, g, b]; },
     createBuffer: () => ({ id: ++id }),
     getExtension: (name) => (name === 'OES_standard_derivatives' ? {} : null),
     getParameter: () => '',
@@ -68,7 +69,7 @@ function street(seam) {
   return rows;
 }
 
-async function drive({ rows, kmh, seconds, pickEvery, fps = 60 }) {
+async function drive({ rows, kmh, seconds, pickEvery, fps = 60, nagAt = () => '' }) {
   let now = 0;
   const later = [];
   const frame = { lit: 0, sized: 0 };
@@ -80,7 +81,7 @@ async function drive({ rows, kmh, seconds, pickEvery, fps = 60 }) {
   const view = () => ({
     lang: 'de', color: '#8a3cff', level: 60, kmh, speed: String(kmh), unit: 'km/h', steer: 0, fsd: 'Standard',
     options: { eta: true, speed: true, turns: true, pulses: true, bright: 'auto', buildings: true, view: 'street' },
-    pose: fix, bv,
+    pose: fix, bv, nag: nagAt(now),
   });
   const answer = (body) => ({ ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(body)) });
   const page = {
@@ -140,7 +141,8 @@ async function drive({ rows, kmh, seconds, pickEvery, fps = 60 }) {
     const fn = draw;
     draw = null;
     if (fn) fn(now);
-    frames.push({ t: now, y, lit: frame.lit, late: frame.late, sized: frame.sized });
+    frames.push({ t: now, y, lit: frame.lit, late: frame.late, sized: frame.sized, color: frame.color,
+      reminds: !page.document.getElementById('attention').hidden });
   }
   // From 4 s on: the picture has woken and the light reaches its full length.
   return frames.filter((f) => f.t >= 4000);
@@ -167,4 +169,18 @@ test('the canvas changes its resolution only before a frame draws on it', async 
   assert.ok(frames[frames.length - 1].sized > frames[0].sized, 'the resolution changed during the drive');
   const late = frames.filter((f) => f.late);
   assert.equal(late.length, 0, `sized after drawing in ${late.length} frames, the first at ${late[0] && Math.round(late[0].t)} ms`);
+});
+
+test('a reminder from FSD turns the light blue under its words until it ends', async () => {
+  // From 6 s to 10 s the car reminds the driver at its first chime. The
+  // ambient light is violet: more red than green, the reminder's blue the
+  // other way round.
+  const frames = await drive({ rows: street(null), kmh: 100, seconds: 18, pickEvery: 1e9,
+    nagAt: (t) => (t >= 6000 && t < 10000 ? 'chime' : '') });
+  const during = frames.filter((f) => f.t >= 7000 && f.t < 10000);
+  const before = frames.filter((f) => f.t < 6000);
+  const after = frames.filter((f) => f.t >= 16000);
+  assert.ok(before.every((f) => !f.reminds && f.color[0] > f.color[1]), 'nothing before the reminder');
+  assert.ok(during.every((f) => f.reminds && f.color[1] > f.color[0]), 'its words and its blue while it reminds');
+  assert.ok(after.every((f) => !f.reminds && f.color[0] > f.color[1]), 'the ambient light again once it ends');
 });

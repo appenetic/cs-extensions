@@ -11,8 +11,11 @@
 // what to show and how high the eye looks over the street. WebGL draws the
 // picture in true perspective, with a filmic roll-off and a little grain so
 // the dark gradients do not band; on a slow GPU it draws fewer pixels, and
-// without WebGL a plainer canvas picture stands in. The service streams what
-// the car shows (events), and answers /state while the stream is down.
+// without WebGL a plainer canvas picture stands in. When FSD reminds the
+// driver to take the wheel, the light turns blue and pulses, the faster the
+// more urgent, under Tesla's words, until the reminder escalates and the
+// service closes the app. The service streams what the car shows (events),
+// and answers /state while the stream is down.
 (() => {
   'use strict';
 
@@ -47,6 +50,19 @@
   // How much of Mad Max's chevrons shows, and how far they have run.
   let mad = 0;
   let rush = 0;
+  // FSD's hands-on reminder, by the stage the service names: the page reminds
+  // the driver too, the more urgently with each chime (the escalated chime
+  // closes the app, so Tesla's own warning shows). A stage's pulse: its period
+  // in seconds, the picture's brightness in the middle of it and how far it
+  // swings, and how strongly the edges glow.
+  const NAGS = new Map([['visual', { period: 1.3, base: 1, depth: 0.55, edge: 0.55 }],
+    ['chime', { period: 0.85, base: 0.8, depth: 0.8, edge: 0.8 }], ['chime2', { period: 0.55, base: 0.62, depth: 1, edge: 1 }]]);
+  const NAG_RGB = [62, 120, 255];
+  // How much of the reminder shows, its stage's look as it moves over to a new
+  // one, and where its pulse stands (0 to 1, brightest at 0.5).
+  let nagMix = 0;
+  const nagLook = { ...NAGS.get('visual') };
+  let nagPhase = 0.5;
   let state = null;
   let lastState = 0;
   let lastFrame = 0;
@@ -859,7 +875,19 @@ void main() {
     } else if (light) {
       rgb = light;
     }
-    if (rgb.map(Math.round).join() !== painted) paintStyles(rgb);
+    // FSD's reminder comes in within a quarter second and goes in 0.8 s, its
+    // pulse starting bright. A new stage's look moves over in 0.3 s, and the
+    // pulse keeps its phase when a chime makes it faster.
+    const nag = state && NAGS.get(state.nag);
+    if (nag && nagMix < 0.01) nagPhase = 0.5;
+    nagMix += ((nag ? 1 : 0) - nagMix) * Math.min(1, dt / (nag ? 0.25 : 0.8));
+    if (nag) for (const k of ['period', 'base', 'depth', 'edge']) nagLook[k] += (nag[k] - nagLook[k]) * Math.min(1, dt / 0.3);
+    nagPhase = (nagPhase + dt / nagLook.period) % 1;
+    const beat = 0.5 - 0.5 * Math.cos(2 * Math.PI * nagPhase);
+    const nagGlow = 1 + nagMix * (nagLook.base - 1 + nagLook.depth * (beat - 0.5));
+    showNag(beat);
+    const shown = nagMix > 0.001 ? blend(rgb, NAG_RGB, smooth(0, 1, nagMix)) : rgb;
+    if (shown.map(Math.round).join() !== painted) paintStyles(shown);
     glow = Math.abs(glowGoal - glow) < 0.004 ? glowGoal : glow + (glowGoal - glow) * Math.min(1, dt / 0.8);
     let left = 0;
     let right = 0;
@@ -887,12 +915,12 @@ void main() {
     }
     const reach = 400 * smooth(0.35, 2.2, awake) * (1 - arrive);
     // In Mad Max the chevrons come in over a second and glide ahead of the
-    // car at 3 m/s.
-    mad += ((state && state.fsd === 'Mad Max' && !state.arrived ? 1 : 0) - mad) * Math.min(1, dt / 1.0);
+    // car at 3 m/s; while FSD reminds the driver, they rest.
+    mad += ((state && state.fsd === 'Mad Max' && !state.arrived && !nag ? 1 : 0) - mad) * Math.min(1, dt / 1.0);
     rush += dt * 3 * (mad > 0.001 ? 1 : 0);
     const way = view && onStreet && reach > 1 ? wayAhead(view, state && state.turn, reach) : null;
     layout();
-    picture.draw({ rgb, shown: rgb, glow: glow * wake * dim, travel, streaks: options.pulses, left, right, arrive,
+    picture.draw({ rgb: shown, shown, glow: glow * wake * dim * nagGlow, travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, eye,
       cam: buildingsFade > 0.01 || roadsFade > 0.01 ? view : null, buildings: buildingsFade, rise: smooth(0, 1, buildingsRise),
       roads: roadsFade, reach, mad, rush, path: way, pathEdge: onStreet ? onStreet.edge : 0 });
@@ -929,6 +957,18 @@ void main() {
     s.setProperty('--light-rgb', c.join(' '));
     const luminance = c.reduce((sum, v, i) => sum + [0.2126, 0.7152, 0.0722][i] * (v / 255) ** 2.2, 0);
     s.setProperty('--knob', luminance > 0.5 ? '#161616' : '#fff');
+  }
+
+  // FSD's reminder on the screen: its words fade with it, the edges and the
+  // wheel pulse with the light.
+  function showNag(beat) {
+    const el = $('attention');
+    const on = nagMix > 0.002;
+    if (el.hidden === on) el.hidden = !on;
+    if (!on) return;
+    el.style.opacity = nagMix.toFixed(3);
+    $('attentionEdge').style.opacity = (nagLook.edge * (0.25 + 0.75 * beat)).toFixed(3);
+    $('attentionWheel').style.opacity = (0.55 + 0.45 * beat).toFixed(3);
   }
 
   // Shows or hides an element with a fade; once faded out it gives up its room.
@@ -1042,6 +1082,7 @@ void main() {
     shows: 'What the view shows', eta: 'Arrival time and progress', turns: 'Turn hints', speed: 'Speedometer',
     pulses: 'Light streaks', buildings: 'Streets and buildings', view: 'View height', street: 'Street', raised: 'Raised',
     above: 'High', bright: 'Brightness', high: 'Bright', low: 'Dimmed', done: 'Done',
+    attention: 'Please stay attentive', wheel: 'Apply slight turning force to steering wheel',
   };
   const GERMAN = {};
   for (const el of document.querySelectorAll('[data-t]')) GERMAN[el.dataset.t] = el.textContent;
@@ -1089,7 +1130,8 @@ void main() {
       reveal($('progress'), progress);
       if (progress) $('progressFill').style.width = `${Math.round(Math.min(1, v.progress) * 1000) / 10}%`;
     }
-    reveal($('center'), done || arrival);
+    // While FSD reminds the driver, its words stand where the arrival is.
+    reveal($('center'), (done || arrival) && !NAGS.has(v.nag));
     showTurn(!done && options.turns ? v.turn : null);
     // The Self-Driving profile, as the car names it. A new one fades over: the
     // old name fades out, the new one in. A view that comes while it does so

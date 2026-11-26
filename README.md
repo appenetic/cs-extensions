@@ -46,7 +46,9 @@ um das Auto aus OpenStreetMap aus der Höhe eines Fahrers. Die eigene Straße
 leuchtet in der Farbe des Ambientelichts voraus, an der nächsten Abbiegung in
 deren Richtung; im Profil Mad Max gleiten weiche Pfeile darauf. Darüber ruhig
 Tacho, Self-Driving-Profil, Ankunft, nächste Abbiegung und Fortschritt, am Ziel
-ein eigener Ankunftsbildschirm; bei Warnungen schließt sie sich selbst. Fest
+ein eigener Ankunftsbildschirm. Verlangt FSD Aufmerksamkeit, mahnt sie selbst
+mit, blau pulsierend und mit jedem Ton dringlicher, und schließt sich erst,
+wenn die Mahnung eskaliert; bei anderen Warnungen schließt sie sich sofort. Fest
 nach unten wischen schließt sie, lange drücken öffnet die Optionen. Sie spricht
 Deutsch oder Englisch, je nach Sprache des Autos, und nimmt wie das Auto die
 Schrift des Cybertrucks, wenn in CoilShift „Cybertruck UI“ an ist; im Feed
