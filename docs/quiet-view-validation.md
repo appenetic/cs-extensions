@@ -701,13 +701,61 @@ zeigen, sonst Teslas eigene.
   Horizont, und für Claude der Funke von Claude Code auf Terrakotta. Ein Test
   prüft bei beiden Paketen 180 × 180 px und den transparenten Rand.
 
+## Licht ohne Aussetzer (alpha.33)
+
+Gemeldet von einem Tester auf Discord mit einem Video von der Autobahn, und am
+selben Tag vom Nutzer selbst gesehen: Das Leuchten der Straße voraus blinkt.
+
+- **Ursache 1, neue Auswahl:** Der Dienst schickt alle 60 m eine neue Auswahl
+  an Straßen. Die Seite baute ihren Index neu und vergaß dabei die Straße des
+  Autos, und gesucht wird sie nur zehnmal pro Sekunde. Bis zur nächsten Suche
+  fehlte das Leuchten für bis zu 100 ms, bei 100 km/h etwa alle 2 s.
+- **Ursache 2, Kachelgrenzen:** Jede Kachel schneidet eine Straße an ihrem
+  Rand aus ihrer eigenen, gerundeten Geometrie. In den neun Berliner Kacheln
+  treffen 268 Enden an inneren Kachelrändern ein Ende der Nachbarkachel genau,
+  81 verfehlen es (Median 0,10 m, p90 0,30 m). Dort endete der Weg voraus: Das
+  Licht wurde zur Grenze hin kürzer und ging beim Überfahren bis zu einer
+  halben Sekunde aus.
+- **Ursache 3, Auflösung:** Änderte die Seite ihre Auflösung, setzte sie die
+  neue Größe der Zeichenfläche erst, nachdem das Bild gezeichnet war. Eine
+  Zeichenfläche mit neuer Größe ist bis zum nächsten Bild schwarz, also blitzte
+  jede Stufe der Auflösung einmal schwarz. Ebenso jedes Bild, solange sich das
+  Fenster in der Größe ändert. In der Demo (bis V32) fiel das auf: Beim
+  Verkleinern des Fensters über 1,5 s war die Zeichenfläche in Chrome zu 98 %
+  schwarz. Mit V33 und alpha.33 nimmt sie eine neue Größe nur noch direkt vor
+  dem Zeichnen an.
+- **Fix in der Seite:** Mit einer neuen Auswahl findet die Seite den
+  Abschnitt, auf dem das Auto fährt, an seinen beiden Enden im neuen Index
+  wieder und sucht sofort neu, noch vor dem nächsten Bild. Ein loses
+  Linienende, das keine andere Linie teilt, geht in das nächste lose Ende bis
+  1 m daneben über. Der Dienst bleibt unverändert.
+- **Gemessen:** Die echte Seite fährt in Node Bild für Bild die Demo-Strecke
+  (Karl-Marx-Allee bis Alexanderplatz, 3,2 km), mit den Auswahlen, die der
+  Dienst aus den Berliner Kacheln macht. Bei 50 km/h und 60 Bildern pro
+  Sekunde hatte alpha.32 nach 38 von 45 Auswahlen eine Lücke (bis 100 ms), an
+  einer Kachelgrenze eine von 483 ms und 247 Bilder mit weniger als 60 m
+  Licht. alpha.33 hat keines davon, auch bei 100 km/h und bei 30 Bildern pro
+  Sekunde mit 3 m GPS-Rauschen.
+- **Bleibt:** In einer Kehre von 126° auf der Strecke geht das Licht bei 15
+  bis 50 km/h für 0,35 bis 1 s aus, solange der Kurs zu keiner der beiden
+  Straßen passt. Das bleibt bewusst so: Weitere Winkel würden an Kreuzungen
+  die falsche Straße beleuchten.
+- **Tests:** Node (`tests/quiet-view.test.mjs`): Die Seite fährt mit 100 km/h
+  eine gerade Straße. Mit einer neuen Auswahl alle 60 m bleibt jedes Bild
+  beleuchtet, und über eine Kachelgrenze mit 0,2 m Versatz reicht das Licht
+  immer mindestens 390 m weit. Ein dritter Test fährt mit 33 Bildern pro
+  Sekunde, bis die Seite die Auflösung senkt, und prüft, dass sich die
+  Zeichenfläche dabei nie nach dem Zeichnen ändert. Gegen alpha.32 schlagen alle
+  drei fehl (28 dunkle Bilder, 855 Bilder unter 390 m, 3 Größenänderungen nach
+  dem Zeichnen).
+
 ## Am Auto offen
 
 1. Ob die App im Auto mit Cybertruck UI die Schrift des Cybertrucks zeigt
    und ohne sie Teslas eigene (alpha.32), und ob das neue Symbol nach dem
    Neustart der Oberfläche im Launcher steht.
 2. Wie die Straße voraus beim Fahren wirkt (alpha.31), auch an Kreuzungen
-   und auf der Autobahn.
+   und auf der Autobahn, und ob sie seit alpha.33 ohne Aussetzer leuchtet.
 3. Ob sich die Gebäude mit alpha.30 beim Fahren ruhig mitbewegen. Kurs und
    Takt sind aus `turns.log` geklärt (alpha.30), dass sie ankommen mit
    alpha.17.

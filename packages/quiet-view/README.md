@@ -113,6 +113,13 @@ des Autos. Die letzten zwölf hebt er komprimiert in `CSDK_STATE/tiles` auf.
   Navigation am nächsten liegt (bis 30 m daneben), biegt es in die Straße, die
   höchstens 45° vom Winkel der Abbiegung abweicht. Tesla gibt die Route selbst
   nicht heraus; weiter als bis zur nächsten Abbiegung kennt die App sie nicht.
+  Kommt alle 60 m eine neue Auswahl an Straßen, findet die Seite die Straße des
+  Autos darin noch vor dem nächsten Bild wieder. Wo eine Straße von einer
+  Kachel in die nächste läuft, schneidet jede Kachel sie für sich, und die
+  Enden liegen oft ein paar Zentimeter auseinander; ein loses Ende geht in das
+  nächste lose Ende bis 1 m daneben über. Bis alpha.32 ging das Leuchten
+  deshalb mit jeder neuen Auswahl bis zu 100 ms aus, und an etwa jeder vierten
+  Kachelgrenze endete es dort.
 - **Bewegung:** Zwischen zwei Positionen fährt die Seite mit dem Tempo weiter
   und dreht so schnell, wie der Lenkwinkel es sagt: wie Radstand 2,89 m und
   Übersetzung 10:1, mal 0,65 (auf einer Fahrt in Berlin gegen den Kurs
@@ -225,7 +232,9 @@ weniger Pixel; die ersten 90 Bilder nach dem Start oder einer Pause zählen
 dabei nicht, ebenso wenig 90 Bilder, in die eine neue Auswahl von Gebäuden und
 Straßen fiel. Läuft sie danach etwa 15 s im Takt des Bildschirms, geht sie eine
 Stufe zurück nach oben; muss sie eine solche Stufe wieder abgeben, bleibt sie
-für die Sitzung dort. Ohne WebGL steht ein schlichteres Canvas-Bild da, nur der
+für die Sitzung dort. Die neue Größe nimmt das Bild erst direkt vor dem
+nächsten Zeichnen an, denn eine Zeichenfläche, die danach ihre Größe ändert,
+bleibt bis zum nächsten Bild schwarz. Ohne WebGL steht ein schlichteres Canvas-Bild da, nur der
 Schein über dem Boden. Eine neue Farbe blendet über OKLab, damit die Farben
 dazwischen klar bleiben statt schmutzig zu werden, und das Bild dämpft sich
 dabei kurz etwas, je mehr, je weiter die Farben auseinanderliegen.

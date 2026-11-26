@@ -816,11 +816,17 @@ void main() {
   let stayLow = false;
   let rebuilt = false;
 
+  // The canvas takes a new size only right before a frame draws on it: sized
+  // at any other moment it shows black until the next frame, at each step of
+  // the resolution and, while the window is resized, in every frame.
   function layout() {
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    canvas.width = Math.max(1, Math.round(innerWidth * dpr * quality));
-    canvas.height = Math.max(1, Math.round(innerHeight * dpr * quality));
-    picture.resize(canvas.width, canvas.height);
+    const width = Math.max(1, Math.round(innerWidth * dpr * quality));
+    const height = Math.max(1, Math.round(innerHeight * dpr * quality));
+    if (canvas.width === width && canvas.height === height) return;
+    canvas.width = width;
+    canvas.height = height;
+    picture.resize(width, height);
   }
 
   function frame(now) {
@@ -885,6 +891,7 @@ void main() {
     mad += ((state && state.fsd === 'Mad Max' && !state.arrived ? 1 : 0) - mad) * Math.min(1, dt / 1.0);
     rush += dt * 3 * (mad > 0.001 ? 1 : 0);
     const way = view && onStreet && reach > 1 ? wayAhead(view, state && state.turn, reach) : null;
+    layout();
     picture.draw({ rgb, shown: rgb, glow: glow * wake * dim, travel, streaks: options.pulses, left, right, arrive,
       breath: 0.5 + 0.5 * Math.sin((s * Math.PI * 2) / 5), time: s, eye,
       cam: buildingsFade > 0.01 || roadsFade > 0.01 ? view : null, buildings: buildingsFade, rise: smooth(0, 1, buildingsRise),
@@ -896,13 +903,11 @@ void main() {
         raised = false;
         paced = 0;
         quality = Math.max(0.35, quality * 0.75);
-        layout();
       } else if (ms && ms < 18.5) {
         if (++paced >= 10 && quality < 1 && !stayLow && !picture.soft) {
           raised = true;
           paced = 0;
           quality = Math.min(1, quality / 0.75);
-          layout();
         }
       } else if (ms) {
         paced = 0;
@@ -1229,7 +1234,10 @@ void main() {
   // per line its points, whether it is one-way and how far its edges lie from
   // its middle; its stretches in cells of 50 m; and the lines meeting at each
   // point, by its decimetres, as the service rounds them, so lines that share
-  // a point on the map share it here exactly.
+  // a point on the map share it here exactly. Where a street runs on from one
+  // tile into the next, each tile cuts it on its own and the two ends may lie
+  // a few centimetres apart: an end no other line shares meets the nearest
+  // such end within a metre.
   let streets = null;
   let hasRoads = false;
   let roadsFade = 0;
@@ -1265,7 +1273,44 @@ void main() {
         }
       });
     }
+    const loose = [];
+    const looseIn = new Map();
+    lines.forEach((line, li) => {
+      for (const i of [0, line.pts.length - 1]) {
+        const p = line.pts[i];
+        if (nodes.get(pointKey(p)).length > 1) continue;
+        const c = `${Math.floor(p[0])},${Math.floor(p[1])}`;
+        if (!looseIn.has(c)) looseIn.set(c, []);
+        looseIn.get(c).push([li, i]);
+        loose.push([li, i]);
+      }
+    });
+    for (const [li, i] of loose) {
+      const p = lines[li].pts[i];
+      let best = null;
+      for (let cx = Math.floor(p[0]) - 1; cx <= Math.floor(p[0]) + 1; cx++) {
+        for (let cy = Math.floor(p[1]) - 1; cy <= Math.floor(p[1]) + 1; cy++) {
+          for (const [lj, j] of looseIn.get(`${cx},${cy}`) || []) {
+            const q = lines[lj].pts[j];
+            const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+            if (lj !== li && d <= 1 && (!best || d < best.d)) best = { d, lj, j };
+          }
+        }
+      }
+      if (best) nodes.get(pointKey(p)).push([best.lj, best.j]);
+    }
     return lines.length ? { lines, cells, nodes } : null;
+  }
+
+  // The match of the car's street in a new pick's lines: the line that has
+  // its stretch's two ends next to each other.
+  function carriedOver(m) {
+    if (!m || !streets) return null;
+    for (const [li, si] of streets.nodes.get(pointKey(m.a)) || []) {
+      const b = streets.lines[li].pts[si + 1];
+      if (b && pointKey(b) === pointKey(m.b)) return { ...m, li, si };
+    }
+    return null;
   }
 
   // The car's street: of the stretches within 15 m whose direction lies within
@@ -1441,9 +1486,17 @@ void main() {
         hasBuildings = picture.setBuildings(doc.b);
         const rows = Array.isArray(doc.r) ? doc.r : [];
         hasRoads = picture.setRoads(rows);
+        // The car's street is found again among the new lines before the
+        // next frame, from the match so far, so the light ahead does not go
+        // out with each pick.
+        const was = onStreet;
         streets = indexStreets(rows);
-        onStreet = null;
         buildingsOrigin = doc.o;
+        onStreet = carriedOver(was);
+        if (cam && cam.o === buildingsOrigin && streets) {
+          matchedAt = performance.now();
+          onStreet = findStreet(cam.x, cam.y, cam.h);
+        }
         rebuilt = true;
       }
     } catch {
@@ -1588,7 +1641,6 @@ void main() {
     press = null;
   });
 
-  addEventListener('resize', layout);
   layout();
   requestAnimationFrame(frame);
   askWindow('max');
