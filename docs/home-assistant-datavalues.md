@@ -21,6 +21,29 @@ Tür deshalb sekündlich gelesen. `NAV_vehicleSpeedMph` lieferte während der Fa
 durchgehend 0 (122 Meldungen in D). alpha.15 leitet die Geschwindigkeit dann aus
 der Standortabfrage ab. `VAPI_vehicleSpeed` ist weiterhin ungeprüft.
 
+**Live-Ergänzung vom 2026-11-27 (Laden, ab alpha.18):** Über die Werteliste der
+CoilShift-App und über `/v1/dv` mit dem Token des Pakets wurden am Zielauto
+(Firmware 2026.32.7) gelesen, während es nach einer AC-Ladung mit vollem Akku an
+der Wallbox hing:
+
+| DataValue | Wert | Bedeutung |
+| --- | --- | --- |
+| `VAPI_acChargerKwhTotal` | `4664.920` → `4664.927` | Lebenszähler AC-Ladeenergie in kWh, wächst laufend (0,003 kWh in 270 s, etwa 40 W) |
+| `VAPI_kWhChargeCounter` | gleicher Zuwachs | Ladezähler des Akkus |
+| `VAPI_dcChargerKwhTotal` | `2154.022` | Lebenszähler DC-Laden |
+| `VAPI_chargerPower` | `1.700`, `1.600` | gemeldete Ladeleistung in kW; floss nicht (der Zähler wuchs um etwa 40 W) |
+| `VAPI_isCharging` / `GTW_chargeState` | `false` / `Complete` | |
+| `VAPI_chargerVoltage` / `VAPI_chargerCurrent` | `228.987` / `3.000` | |
+| `VAPI_chargerPhases` | `2` | Code: die letzte 11-kW-Ladung mit 16 A war dreiphasig |
+| `VAPI_chargingID` | gleich zwischen den Lesungen | Kennung der Ladesitzung |
+| `GUI_acEnergyAdded` | `20.876` | AC-Energie der letzten Sitzung in kWh |
+| `GUI_chargeSessionIdealEnergyAdded` | `19.580` | Energie dieser Sitzung im Akku |
+| `GUI_chargeSessionChargerType` | `AC` | |
+| `GUI_fastChargePower` | `0.000` | Gleichstrom-Ladeleistung in kW |
+
+Ungültige Werte heißen über die CoilShift-App `@invalid`, über die Debug-Schnittstelle
+`<invalid>`; die Bridge behandelt beides als fehlend.
+
 ## Vorgeschlagene Konfiguration
 
 | Plugin-Einstellung | Wert | Evidenz und Grenze |

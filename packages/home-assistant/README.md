@@ -48,11 +48,16 @@ Mit dem Standardpräfix `coilshift_car` werden über die Home-Assistant-States-A
 | `sensor.coilshift_car_gear` | Fahrstufe `P`, `R`, `N` oder `D`; automatisch über den SDK-Fahrzeugendpunkt |
 | `sensor.coilshift_car_soc` | Akkuladestand in %, Geräteklasse `battery`; Standardquelle `VAPI_batteryLevel` |
 | `binary_sensor.coilshift_car_driver_door` | `on` = offen, `off` = geschlossen, Geräteklasse `door` |
+| `sensor.coilshift_car_charging_power` | Ladeleistung in kW (ab alpha.18), `0`, wenn das Auto nicht lädt |
+| `sensor.coilshift_car_home_charging_energy` | zu Hause geladene Energie in kWh fürs Energie-Dashboard (ab alpha.18) |
+| `sensor.coilshift_car_charging_state` | Ladestatus des Autos, roh, z. B. `Complete` (ab alpha.18) |
+| `binary_sensor.coilshift_car_charging` | `on`, solange das Auto lädt, Geräteklasse `battery_charging` (ab alpha.18) |
 
 Jede Entität besitzt das Attribut `updated_at` (UTC). Ungültige/fehlende Werte
 werden als `unavailable` gesendet; für ungültige Positionen entfallen die Koordinaten.
-Der Tracker-Zustand lautet bei gültigem GPS `not_home`; eine Home-Zonenberechnung
-ist hier nicht implementiert. Die Koordinaten können auf einer Karte dargestellt werden.
+Der Tracker-Zustand lautet bei gültigem GPS `home`, wenn das Auto in der Heimzone
+`zone.home` steht, sonst `not_home` (ab alpha.18, siehe „Laden und
+Energie-Dashboard“). Die Koordinaten können auf einer Karte dargestellt werden.
 
 Die States-API erzeugt Zustände, keine registrierte HA-Integration bzw. keinen
 Geräteregister-Eintrag mit `unique_id`. Nach einem Home-Assistant-Neustart legt der
@@ -365,3 +370,49 @@ Im QR-Code steht eine Tailscale-Adresse jetzt an erster Stelle; die übrigen
 Adressen bleiben über die Adress-Schaltflächen erreichbar. Tailscale wird am
 Interface-Namen `tailscale*` erkannt, weil auch Mobilfunknetze `100.64.0.0/10`
 für Carrier-Grade-NAT verwenden.
+
+## Laden und Energie-Dashboard (alpha.18)
+
+Vier neue Entitäten zeigen das Laden. **`sensor.coilshift_car_home_charging_energy`**
+zählt die Energie, die das Auto zu Hause aus dem Netz nimmt. Der Sensor erfüllt,
+was das Energie-Dashboard verlangt: kWh, `device_class: energy`,
+`state_class: total_increasing`. Er gehört dort unter **Einzelne Geräte**. Als
+Leistung (optional) passt `sensor.coilshift_car_charging_power`; der zeigt aber
+auch unterwegs die Ladeleistung.
+
+- **Quelle:** der Lebenszähler des Autos für AC-Ladeenergie,
+  `VAPI_acChargerKwhTotal`. Gezählt wird, wie weit er wächst, in 0,001-kWh-Schritten.
+  Er läuft laufend mit, also auch dann, wenn das Auto mit vollem Akku an der
+  Wallbox hängt und Strom für 12 V oder die Klimatisierung nimmt (am Auto
+  gemessen: etwa 40 W). Auch das kommt aus deinem Netz und wird gezählt.
+  Nach der letzten Ladung des Autos (20,876 kWh AC, 19,58 kWh im Akku) misst der
+  Zähler auf der Netzseite. Bestätigen lässt sich das mit einem Zähler an der
+  Wallbox.
+- **Nur zu Hause:** Die Bridge holt sich die Heimzone `zone.home` aus Home
+  Assistant (Mittelpunkt und Radius, mindestens 100 m, dazu 50 m
+  GPS-Toleranz) und vergleicht sie mit der Position des Autos. Unterwegs
+  geladene Energie zählt nicht. Fehlt die Heimzone oder die Position, zählt
+  nichts; was in dieser Zeit hereinkommt, wird verbucht, sobald der Ort wieder
+  bekannt ist. Ohne lesbare `zone.home` meldet der Dienst „degraded“.
+- **Neustarts und Updates:** Der Zählerstand liegt in `$CSDK_STATE/energy.json`.
+  Startet der Dienst mitten in einer Ladung zu Hause neu (gleiche Ladesitzung
+  `VAPI_chargingID`), wird die Lücke nachgezählt; bei einer anderen Sitzung
+  nicht, sie könnte woanders gewesen sein. Geht der Stand verloren, etwa durch
+  Deinstallieren, beginnt der Sensor bei 0. Home Assistant wertet das bei
+  `total_increasing` als Zählerwechsel; es geht nichts verloren und nichts wird
+  doppelt gezählt.
+- **Ladeleistung:** `VAPI_chargerPower` in kW, nur während das Auto lädt
+  (`VAPI_isCharging`), bei Gleichstrom `GUI_fastChargePower`. Steht das Auto
+  voll an der Wallbox, meldet es eine Ladeleistung um 1,7 kW, die nicht fließt;
+  deshalb steht der Sensor dann auf 0, der gemeldete Wert ist als Attribut
+  `reported_power_kw` zu sehen. Weitere Attribute: `at_home`, `charge_state`,
+  `charger_type`, `voltage_v`, `current_a`, `phases_raw` (ein Code des Autos,
+  keine Anzahl: `2` war eine dreiphasige 11-kW-Ladung) und `session_energy_kwh`.
+- Die Ladewerte gehen bei jeder Änderung an Home Assistant, sonst einmal pro
+  Minute.
+- **Tracker:** `device_tracker.coilshift_car` steht in der Heimzone auf `home`,
+  sonst auf `not_home`. Die Position bleibt wie bisher als Attribut.
+
+Steht im Energie-Dashboard schon ein Zähler für die Wallbox, würde ein
+zusätzliches Gerät mit diesem Sensor dieselbe Energie doppelt zählen. Dann
+entweder den alten Zähler ersetzen oder diesen Sensor nur zur Kontrolle nutzen.
