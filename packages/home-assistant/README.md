@@ -371,7 +371,7 @@ Adressen bleiben über die Adress-Schaltflächen erreichbar. Tailscale wird am
 Interface-Namen `tailscale*` erkannt, weil auch Mobilfunknetze `100.64.0.0/10`
 für Carrier-Grade-NAT verwenden.
 
-## Laden und Energie-Dashboard (alpha.18)
+## Laden und Energie-Dashboard (ab alpha.18)
 
 Vier neue Entitäten zeigen das Laden. **`sensor.coilshift_car_home_charging_energy`**
 zählt die Energie, die das Auto zu Hause aus dem Netz nimmt. Der Sensor erfüllt,
@@ -380,14 +380,13 @@ was das Energie-Dashboard verlangt: kWh, `device_class: energy`,
 Leistung (optional) passt `sensor.coilshift_car_charging_power`; der zeigt aber
 auch unterwegs die Ladeleistung.
 
-- **Quelle:** der Lebenszähler des Autos für AC-Ladeenergie,
-  `VAPI_acChargerKwhTotal`. Gezählt wird, wie weit er wächst, in 0,001-kWh-Schritten.
-  Er läuft laufend mit, also auch dann, wenn das Auto mit vollem Akku an der
-  Wallbox hängt und Strom für 12 V oder die Klimatisierung nimmt (am Auto
-  gemessen: etwa 40 W). Auch das kommt aus deinem Netz und wird gezählt.
-  Nach der letzten Ladung des Autos (20,876 kWh AC, 19,58 kWh im Akku) misst der
-  Zähler auf der Netzseite. Bestätigen lässt sich das mit einem Zähler an der
-  Wallbox.
+- **Quelle (ab alpha.19):** die Leistung, die das Auto aus der Wallbox zieht
+  (`VAPI_chargerPower`), über die Zeit aufsummiert. Damit zählt auch, was das
+  Auto an der Wallbox fürs Heizen oder Kühlen nimmt, etwa im Camp-Modus. Am
+  Auto gemessen: 1,6 kW bei vollem Akku, davon die Wärmepumpe 750 W, Akkustrom 0.
+  Der Lebenszähler `VAPI_acChargerKwhTotal` zählt nur, was in den Akku geht,
+  damals etwa 50 W. Er dient als Untergrenze: Zwischen zwei Lesungen zählt das
+  Größere von beidem, über eine Lücke von mehr als 10 Minuten nur der Zähler.
 - **Nur zu Hause:** Die Bridge holt sich die Heimzone `zone.home` aus Home
   Assistant (Mittelpunkt und Radius, mindestens 100 m, dazu 50 m
   GPS-Toleranz) und vergleicht sie mit der Position des Autos. Unterwegs
@@ -401,11 +400,10 @@ auch unterwegs die Ladeleistung.
   Deinstallieren, beginnt der Sensor bei 0. Home Assistant wertet das bei
   `total_increasing` als Zählerwechsel; es geht nichts verloren und nichts wird
   doppelt gezählt.
-- **Ladeleistung:** `VAPI_chargerPower` in kW, nur während das Auto lädt
-  (`VAPI_isCharging`), bei Gleichstrom `GUI_fastChargePower`. Steht das Auto
-  voll an der Wallbox, meldet es eine Ladeleistung um 1,7 kW, die nicht fließt;
-  deshalb steht der Sensor dann auf 0, der gemeldete Wert ist als Attribut
-  `reported_power_kw` zu sehen. Weitere Attribute: `at_home`, `charge_state`,
+- **Ladeleistung:** `VAPI_chargerPower` in kW, solange das Auto eingesteckt ist
+  (`VAPI_evseChargeType` endet auf `Present`), auch wenn es nur heizt; bei
+  Gleichstrom `GUI_fastChargePower`. Ausgesteckt steht der Sensor auf 0.
+  Attribute: `at_home`, `plugged_in`, `charging`, `charge_state`,
   `charger_type`, `voltage_v`, `current_a`, `phases_raw` (ein Code des Autos,
   keine Anzahl: `2` war eine dreiphasige 11-kW-Ladung) und `session_energy_kwh`.
 - Die Ladewerte gehen bei jeder Änderung an Home Assistant, sonst einmal pro

@@ -28,10 +28,10 @@ der Wallbox hing:
 
 | DataValue | Wert | Bedeutung |
 | --- | --- | --- |
-| `VAPI_acChargerKwhTotal` | `4664.920` → `4664.927` | Lebenszähler AC-Ladeenergie in kWh, wächst laufend (0,003 kWh in 270 s, etwa 40 W) |
+| `VAPI_acChargerKwhTotal` | `4664.920` → `4664.927` | Lebenszähler der AC-Energie in den Akku, kWh; wuchs nur um 40–57 W, während das Auto 1,6 kW aus der Wallbox zog |
 | `VAPI_kWhChargeCounter` | gleicher Zuwachs | Ladezähler des Akkus |
 | `VAPI_dcChargerKwhTotal` | `2154.022` | Lebenszähler DC-Laden |
-| `VAPI_chargerPower` | `1.700`, `1.600` | gemeldete Ladeleistung in kW; floss nicht (der Zähler wuchs um etwa 40 W) |
+| `VAPI_chargerPower` | `1.700`, `1.600` | Leistung aus der Wallbox in kW; floss tatsächlich: Camp-Modus, Wärmepumpe `VAPI_cmpdInputHVPower` 750 W, `VAPI_batteryCurrent` 0 |
 | `VAPI_isCharging` / `GTW_chargeState` | `false` / `Complete` | |
 | `VAPI_chargerVoltage` / `VAPI_chargerCurrent` | `228.987` / `3.000` | |
 | `VAPI_chargerPhases` | `2` | Code: die letzte 11-kW-Ladung mit 16 A war dreiphasig |

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "com.appenetic.home-assistant",
-  "version": "0.1.0-alpha.18",
+  "version": "0.1.0-alpha.19",
   "sdk": ">=1.0 <2",
   "title": "Home Assistant Bridge (experimental)",
   "summary": "Überträgt GPS, Geschwindigkeit, Fahrstufe, Akkuladestand, Fahrertür und Ladeleistung über HTTPS an Home Assistant, dazu die zu Hause geladene Energie fürs Energie-Dashboard. Mit eigener Einstellungsseite.",
@@ -152,7 +152,7 @@
     ]
   },
   "panel": {
-    "entry": "panel/settings-0.1.0-alpha.18.html",
+    "entry": "panel/settings-0.1.0-alpha.19.html",
     "title": "Home Assistant · Einstellungen",
     "permissions": [
       "settings.read",
