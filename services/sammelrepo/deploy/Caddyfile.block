@@ -19,7 +19,7 @@ cs.appenetic.de {
 	# Nur Seiten und Index komprimieren, die Archive gehen Byte für Byte raus.
 	@text path / /index.json /admin /admin/* /static/*
 	encode @text zstd gzip
-	# X-Echte-IP setzt nur Caddy, damit zählt die Statistik die Herkunft; eine mitgeschickte Kopfzeile wird überschrieben.
+	# X-Echte-IP setzt nur Caddy, für die Anmeldesperre und die Besucherzählung; eine mitgeschickte Kopfzeile wird überschrieben.
 	reverse_proxy 127.0.0.1:7356 {
 		header_up X-Echte-IP {remote_host}
 	}

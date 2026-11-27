@@ -9,39 +9,37 @@
 <main class="wrap">
 {{with .Stats}}
 <section class="kpis" aria-label="Kennzahlen">
-<div class="kpi"><span class="kpi-label">Absender heute</span><span class="kpi-value">{{.Today.Senders}}</span><span class="kpi-sub">{{.Today.Fetches}} Abrufe</span></div>
-<div class="kpi"><span class="kpi-label">Absender gestern</span><span class="kpi-value">{{.Yesterday.Senders}}</span><span class="kpi-sub">{{.Yesterday.Fetches}} Abrufe</span></div>
-<div class="kpi"><span class="kpi-label">Ø Absender pro Tag</span><span class="kpi-value">{{.Avg7}}</span><span class="kpi-sub">letzte 7 Tage</span></div>
-<div class="kpi"><span class="kpi-label">Downloads</span><span class="kpi-value">{{.Downloads30}}</span><span class="kpi-sub">letzte 30 Tage</span></div>
+<div class="kpi"><span class="kpi-label">Abrufe heute</span><span class="kpi-value">{{.Today.Fetches}}</span><span class="kpi-sub">des Index durch CoilShift</span></div>
+<div class="kpi"><span class="kpi-label">Abrufe gestern</span><span class="kpi-value">{{.Yesterday.Fetches}}</span><span class="kpi-sub">des Index</span></div>
+<div class="kpi"><span class="kpi-label">Ø Abrufe pro Tag</span><span class="kpi-value">{{.Avg7}}</span><span class="kpi-sub">letzte 7 Tage</span></div>
+<div class="kpi"><span class="kpi-label">Archiv-Downloads</span><span class="kpi-value">{{.Downloads30}}</span><span class="kpi-sub">letzte 30 Tage</span></div>
 </section>
 
 <section class="card">
-<div class="card-head"><h2>Absender pro Tag</h2><span class="sub">letzte 30 Tage, ein Absender ≈ ein Auto</span></div>
+<div class="card-head"><h2>Abrufe pro Tag</h2><span class="sub">letzte 30 Tage, Index-Abrufe</span></div>
 <figure class="chart">
-<div class="chart-plot" role="img" aria-label="Säulendiagramm der Absender pro Tag in den letzten 30 Tagen; die Werte stehen in der Tabelle darunter.">
+<div class="chart-plot" role="img" aria-label="Säulendiagramm der Index-Abrufe pro Tag in den letzten 30 Tagen; die Werte stehen in der Tabelle darunter.">
 <div class="ticks" aria-hidden="true">{{range .Ticks}}<span>{{.}}</span>{{end}}</div>
 <div class="cols">{{range .Columns}}<div class="col{{if .Today}} today{{end}}" tabindex="0" data-tip="{{.Tip}}"><span class="col-bar {{.Height}}"></span></div>{{end}}</div>
 </div>
 <div class="xlabels" aria-hidden="true">{{range .Columns}}<span>{{.Label}}</span>{{end}}</div>
 </figure>
 <details class="table-view"><summary>Als Tabelle</summary>
-<div class="table-wrap"><table class="mini"><thead><tr><th scope="col">Tag</th><th scope="col" class="num">Absender</th><th scope="col" class="num">Abrufe</th><th scope="col" class="num">Seitenaufrufe</th></tr></thead>
-<tbody>{{range .Days}}<tr><td>{{.Date.Format "02.01.2006"}}</td><td class="num">{{.Senders}}</td><td class="num">{{.Fetches}}</td><td class="num">{{.Views}}</td></tr>{{end}}</tbody></table></div>
+<div class="table-wrap"><table class="mini"><thead><tr><th scope="col">Tag</th><th scope="col" class="num">Abrufe</th><th scope="col" class="num">Archiv-Downloads</th><th scope="col" class="num">Seitenaufrufe</th></tr></thead>
+<tbody>{{range .Days}}<tr><td>{{.Date.Format "02.01.2006"}}</td><td class="num">{{.Fetches}}</td><td class="num">{{.DownloadCount}}</td><td class="num">{{.Views}}</td></tr>{{end}}</tbody></table></div>
 </details>
 </section>
 
 <div class="grid2">
-<section class="card"><div class="card-head"><h2>Länder</h2><span class="sub">Absender, 30 Tage</span></div>{{template "ranks" .Countries}}</section>
-<section class="card"><div class="card-head"><h2>Orte</h2><span class="sub">Absender, 30 Tage</span></div>{{template "ranks" .Places}}</section>
-<section class="card"><div class="card-head"><h2>Downloads je Paket</h2><span class="sub">30 Tage</span></div>{{template "ranks" .Packages}}</section>
-<section class="card"><div class="card-head"><h2>Software der Absender</h2><span class="sub">30 Tage</span></div>{{template "ranks" .Clients}}
+<section class="card"><div class="card-head"><h2>Archiv-Downloads je Paket</h2><span class="sub">30 Tage</span></div>{{template "ranks" .Packages}}</section>
+<section class="card"><div class="card-head"><h2>Wer abruft</h2><span class="sub">Index-Abrufe nach Software, 30 Tage</span></div>{{template "ranks" .Clients}}
 <p class="hint">Öffentliche Seite: {{.Views30}} Aufrufe von {{.Visitors30}} Besuchern in 30 Tagen.</p></section>
 </div>
 
 <section class="card method">
 <h2>So wird gezählt</h2>
-<p>Ein Absender ist eine Adresse (bei IPv6 ein /64-Netz) mit derselben Software an einem Tag. Wechselt ein Auto im Mobilfunk die Adresse, zählt es an dem Tag mehrfach; Autos hinter einer gemeinsamen Adresse zählen einmal. Ein Abruf ist jedes Laden des Index, ein Download jedes Laden eines Paketarchivs.</p>
-<p>Gespeichert werden nur Tageszähler. Adressen werden beim ersten Abruf des Tages im Speicher einem Ort zugeordnet und mit einem Schlüssel gehasht, der um Mitternacht verfällt; die Adresse selbst bleibt nirgends liegen. Standorte: <a href="https://db-ip.com" rel="noopener">IP Geolocation by DB-IP</a> (CC BY 4.0){{with .GeoStand}}, Stand {{.}}{{end}}. Im Mobilfunk zeigt der Ort oft nur den Netzknoten des Anbieters.</p>
+<p>Die Autos rufen den Feed nicht selbst ab. Ein Server von CoilShift holt den Index (Kennung <code>coilshift-repository-fetcher</code>) und die Archive und verteilt sie an die Autos. Wie viele Autos das Sammel-Repo nutzen und wo sie sind, lässt sich deshalb nicht messen.</p>
+<p>Ein Abruf ist jedes Laden des Index, ein Archiv-Download jedes Laden eines Paketarchivs. CoilShift lädt jedes Archiv in der Regel nur einmal und verteilt es dann selbst; ein Download heißt also nicht, dass ein Auto das Paket installiert hat. Gespeichert werden nur Tageszähler. Besucher der öffentlichen Seite werden mit einem Tagesschlüssel gezählt, der um Mitternacht verfällt; keine Adresse wird gespeichert.</p>
 </section>
 {{end}}
 </main>

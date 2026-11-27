@@ -34,14 +34,13 @@ type web struct {
 	h      *hub
 	a      *auth
 	stats  *stats
-	geo    *geo
 	tmpl   *template.Template
 	static map[string][]byte
 	assets map[string]string // file → versioned URL
 }
 
-func newWeb(h *hub, a *auth, st *stats, g *geo) (*web, error) {
-	w := &web{h: h, a: a, stats: st, geo: g, static: map[string][]byte{}, assets: map[string]string{}}
+func newWeb(h *hub, a *auth, st *stats) (*web, error) {
+	w := &web{h: h, a: a, stats: st, static: map[string][]byte{}, assets: map[string]string{}}
 	for _, name := range []string{"app.css", "app.js", "icon.svg"} {
 		b, err := webFiles.ReadFile("web/" + name)
 		if err != nil {
@@ -601,16 +600,13 @@ type statsView struct {
 	Ticks               []int
 	Columns             []column
 	Days                []dayView
-	Countries, Places   []labelled
 	Clients, Packages   []labelled
-	GeoStand            string
 	HasData             bool
 }
 
 type labelled struct {
 	count
-	Label, Flag string
-	Width       string
+	Width string
 }
 
 // niceTop rounds up to a top with four clean steps (1, 2, 5 × 10ⁿ each).
@@ -624,37 +620,28 @@ func niceTop(v int) int {
 	}
 }
 
-func flagOf(cc string) string {
-	if len(cc) != 2 || cc[0] < 'A' || cc[0] > 'Z' || cc[1] < 'A' || cc[1] > 'Z' {
-		return ""
-	}
-	return string([]rune{0x1F1E6 + rune(cc[0]-'A'), 0x1F1E6 + rune(cc[1]-'A')})
-}
-
-func labels(cs []count, label func(string) (string, string)) []labelled {
+func labels(cs []count) []labelled {
 	out := make([]labelled, len(cs))
 	for i, c := range cs {
-		l, f := label(c.Key)
-		out[i] = labelled{count: c, Label: l, Flag: f, Width: "w" + strconv.Itoa(max(1, int(c.Share*100+0.5)))}
+		out[i] = labelled{count: c, Width: "w" + strconv.Itoa(max(1, int(c.Share*100+0.5)))}
 	}
 	return out
 }
 
+// statistics shows what can be measured: CoilShift's servers fetch the index
+// and the archives for the cars, so there is no count of cars.
 func (w *web) statistics(rw http.ResponseWriter, r *http.Request, s session) {
 	v := w.adminView(s, "statistik")
 	days := w.stats.days(30)
-	names := w.stats.countryNames()
 	sv := &statsView{Today: days[len(days)-1], Yesterday: days[len(days)-2], Days: slices.Clone(days)}
 	slices.Reverse(sv.Days)
-	sum7, maxSenders := 0, 0
+	sum7, most := 0, 0
 	for i, d := range days {
 		if i >= len(days)-7 {
-			sum7 += d.Senders
+			sum7 += d.Fetches
 		}
-		maxSenders = max(maxSenders, d.Senders)
-		for _, n := range d.Downloads {
-			sv.Downloads30 += n
-		}
+		most = max(most, d.Fetches)
+		sv.Downloads30 += d.DownloadCount()
 		sv.Views30 += d.Views
 		sv.Visitors30 += d.Visitors
 		if d.Fetches > 0 || d.Views > 0 || len(d.Downloads) > 0 {
@@ -662,53 +649,22 @@ func (w *web) statistics(rw http.ResponseWriter, r *http.Request, s session) {
 		}
 	}
 	sv.Avg7 = strings.Replace(strconv.FormatFloat(float64(sum7)/7, 'f', 1, 64), ".", ",", 1)
-	sv.Top = niceTop(maxSenders)
+	sv.Top = niceTop(most)
 	for i := 4; i >= 0; i-- {
 		sv.Ticks = append(sv.Ticks, sv.Top*i/4)
 	}
 	for i, d := range days {
-		c := column{Value: d.Senders, Today: i == len(days)-1,
-			Height: "h" + strconv.Itoa(d.Senders*100/sv.Top),
-			Tip: fmt.Sprintf("%s %s: %d Absender, %d Abrufe", weekday(d.Date), d.Date.Format("02.01."),
-				d.Senders, d.Fetches)}
+		c := column{Value: d.Fetches, Today: i == len(days)-1,
+			Height: "h" + strconv.Itoa(d.Fetches*100/sv.Top),
+			Tip: fmt.Sprintf("%s %s: %d Abrufe, %d Archiv-Downloads", weekday(d.Date), d.Date.Format("02.01."),
+				d.Fetches, d.DownloadCount())}
 		if (len(days)-1-i)%7 == 0 {
 			c.Label = d.Date.Format("02.01.")
 		}
 		sv.Columns = append(sv.Columns, c)
 	}
-	sv.Countries = labels(ranked(days, func(d *dayStats) map[string]int { return d.Countries }, 12),
-		func(k string) (string, string) {
-			if k == "" {
-				return "unbekannt", ""
-			}
-			if n := names[k]; n != "" {
-				return n, flagOf(k)
-			}
-			return k, flagOf(k)
-		})
-	sv.Places = labels(ranked(days, func(d *dayStats) map[string]int { return d.Places }, 12),
-		func(k string) (string, string) {
-			parts := strings.SplitN(k, "|", 3)
-			for len(parts) < 3 {
-				parts = append(parts, "")
-			}
-			city, region, cc := parts[0], parts[1], parts[2]
-			switch {
-			case city == "" && region == "":
-				return "unbekannt", flagOf(cc)
-			case city == "":
-				return region, flagOf(cc)
-			case region == "" || region == city:
-				return city, flagOf(cc)
-			}
-			return city + ", " + region, flagOf(cc)
-		})
-	plain := func(k string) (string, string) { return k, "" }
-	sv.Clients = labels(ranked(days, func(d *dayStats) map[string]int { return d.Clients }, 8), plain)
-	sv.Packages = labels(ranked(days, func(d *dayStats) map[string]int { return d.Downloads }, 20), plain)
-	if b := w.geo.built(); !b.IsZero() {
-		sv.GeoStand = b.In(berlin).Format("01/2006")
-	}
+	sv.Clients = labels(ranked(days, func(d *dayStats) map[string]int { return d.Clients }, 8))
+	sv.Packages = labels(ranked(days, func(d *dayStats) map[string]int { return d.Downloads }, 20))
 	v.Stats = sv
 	w.render(rw, http.StatusOK, "statistik.html", v)
 }

@@ -16,4 +16,4 @@
 <form class="who" method="post" action="/admin/abmelden"><input type="hidden" name="csrf" value="{{.CSRF}}"><span>{{.User}}</span><button class="link" type="submit">Abmelden</button></form>
 </div></header>{{end}}
 
-{{define "ranks"}}{{if .}}<ol class="ranks">{{range .}}<li><span class="rank-label">{{with .Flag}}<span class="flag" aria-hidden="true">{{.}}</span>{{end}}<span class="rank-name">{{.Label}}</span></span><span class="rank-track" aria-hidden="true"><span class="rank-bar {{.Width}}"></span></span><span class="rank-value">{{.N}}<span class="pct">{{.Pct}} %</span></span></li>{{end}}</ol>{{else}}<p class="empty">Noch keine Daten.</p>{{end}}{{end}}
+{{define "ranks"}}{{if .}}<ol class="ranks">{{range .}}<li><span class="rank-label"><span class="rank-name">{{.Key}}</span></span><span class="rank-track" aria-hidden="true"><span class="rank-bar {{.Width}}"></span></span><span class="rank-value">{{.N}}<span class="pct">{{.Pct}} %</span></span></li>{{end}}</ol>{{else}}<p class="empty">Noch keine Daten.</p>{{end}}{{end}}

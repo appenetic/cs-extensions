@@ -11,7 +11,7 @@ RestartSec=2
 DynamicUser=yes
 # Benutzer mit Passwort-Hash. Ändern: /srv/sammelrepo/cs-sammelrepo passwort NAME, dann systemctl restart cs-sammelrepo
 LoadCredential=benutzer:/srv/sammelrepo/benutzer
-# Zustand, gespiegelte Archive, Statistik und Geo-Datenbank liegen in /var/lib/cs-sammelrepo
+# Zustand, gespiegelte Archive und Statistik liegen in /var/lib/cs-sammelrepo
 StateDirectory=cs-sammelrepo
 StateDirectoryMode=0700
 UMask=0077

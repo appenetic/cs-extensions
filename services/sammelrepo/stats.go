@@ -18,20 +18,17 @@ import (
 	"time"
 )
 
-// Counting without keeping addresses: a sender is the address (IPv6 per
-// /64) plus the user agent, hashed with a salt that lives for one day. The
-// place is looked up when a sender first shows up on a day; the address
-// itself is never stored. A car whose cellular address changes counts more
-// than once a day, cars behind one address count once.
+// Cars never fetch the feed themselves: a CoilShift server fetches the index
+// and the archives and hands them on. So the counters say how often CoilShift
+// fetches and downloads, not how many cars there are. Visitors of the public
+// page count once a day by their address and user agent, hashed with a salt
+// that lives for one day; no address is stored.
 
 const keepDays = 400
 
 type dayStats struct {
 	Fetches   int            `json:"fetches"`   // index requests
-	Senders   int            `json:"senders"`   // distinct senders of index requests
-	Countries map[string]int `json:"countries"` // ISO code → senders
-	Places    map[string]int `json:"places"`    // "city|region|country" → senders
-	Clients   map[string]int `json:"clients"`   // client name → senders
+	Clients   map[string]int `json:"clients"`   // client name → index requests
 	Downloads map[string]int `json:"downloads"` // "id version" → archive downloads
 	Views     int            `json:"views"`     // views of the public page
 	Visitors  int            `json:"visitors"`  // distinct visitors of it
@@ -41,13 +38,11 @@ type statsData struct {
 	Days  map[string]*dayStats `json:"days"`
 	Today string               `json:"today"`
 	Salt  []byte               `json:"salt"`
-	Seen  map[string]bool      `json:"seen"`  // today's hashed senders and visitors
-	Names map[string]string    `json:"names"` // ISO code → country name, for the page
+	Seen  map[string]bool      `json:"seen"` // today's hashed visitors
 }
 
 type stats struct {
 	path string
-	geo  *geo
 	now  func() time.Time
 	logf func(string, ...any)
 
@@ -61,8 +56,8 @@ var (
 	botPattern    = regexp.MustCompile(`(?i)bot|crawl|spider|scan|headless|preview|monitor`)
 )
 
-func newStats(dir string, g *geo, logf func(string, ...any)) *stats {
-	s := &stats{path: filepath.Join(dir, "statistik.json"), geo: g, now: time.Now, logf: logf}
+func newStats(dir string, logf func(string, ...any)) *stats {
+	s := &stats{path: filepath.Join(dir, "statistik.json"), now: time.Now, logf: logf}
 	switch b, err := os.ReadFile(s.path); {
 	case err == nil:
 		_ = json.Unmarshal(b, &s.data)
@@ -71,9 +66,6 @@ func newStats(dir string, g *geo, logf func(string, ...any)) *stats {
 	}
 	if s.data.Days == nil {
 		s.data.Days = map[string]*dayStats{}
-	}
-	if s.data.Names == nil {
-		s.data.Names = map[string]string{}
 	}
 	return s
 }
@@ -101,7 +93,7 @@ func (s *stats) dayLocked() *dayStats {
 		d = &dayStats{}
 		s.data.Days[today] = d
 	}
-	for _, m := range []*map[string]int{&d.Countries, &d.Places, &d.Clients, &d.Downloads} {
+	for _, m := range []*map[string]int{&d.Clients, &d.Downloads} {
 		if *m == nil {
 			*m = map[string]int{}
 		}
@@ -109,7 +101,7 @@ func (s *stats) dayLocked() *dayStats {
 	return d
 }
 
-// firstLocked tells whether this sender is new today.
+// firstLocked tells whether this visitor is new today.
 func (s *stats) firstLocked(kind string, r *http.Request) bool {
 	m := hmac.New(sha256.New, s.data.Salt)
 	m.Write([]byte(kind + "|" + rateKey(clientIP(r)) + "|" + r.UserAgent()))
@@ -142,16 +134,7 @@ func (s *stats) fetch(r *http.Request) {
 	defer s.mu.Unlock()
 	d := s.dayLocked()
 	d.Fetches++
-	if s.firstLocked("feed", r) {
-		p := s.geo.lookup(clientIP(r))
-		d.Senders++
-		if p.Country != "" && p.CountryName != "" {
-			s.data.Names[p.Country] = p.CountryName
-		}
-		d.Countries[p.Country]++
-		d.Places[p.City+"|"+p.Region+"|"+p.Country]++
-		d.Clients[client(r.UserAgent())]++
-	}
+	d.Clients[client(r.UserAgent())]++
 	s.dirty = true
 }
 
@@ -208,7 +191,7 @@ func (s *stats) days(n int) []dayView {
 		out[i].Date = t.In(berlin)
 		if d := s.data.Days[dayOf(t)]; d != nil {
 			c := *d
-			for _, m := range []*map[string]int{&c.Countries, &c.Places, &c.Clients, &c.Downloads} {
+			for _, m := range []*map[string]int{&c.Clients, &c.Downloads} {
 				*m = maps.Clone(*m)
 			}
 			out[i].dayStats = c
@@ -217,15 +200,18 @@ func (s *stats) days(n int) []dayView {
 	return out
 }
 
-func (s *stats) countryNames() map[string]string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return maps.Clone(s.data.Names)
-}
-
 type dayView struct {
 	Date time.Time
 	dayStats
+}
+
+// DownloadCount sums the day's archive downloads.
+func (d dayView) DownloadCount() int {
+	n := 0
+	for _, v := range d.Downloads {
+		n += v
+	}
+	return n
 }
 
 type count struct {

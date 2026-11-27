@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -30,9 +29,8 @@ func newTestSite(t *testing.T) *testSite {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := &geo{dir: filepath.Join(h.dir, "geo"), logf: t.Logf, now: time.Now}
-	st := newStats(h.dir, g, t.Logf)
-	w, err := newWeb(h, a, st, g)
+	st := newStats(h.dir, t.Logf)
+	w, err := newWeb(h, a, st)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +112,7 @@ func TestFeedAndPublicPage(t *testing.T) {
 		t.Fatal("pool serves more than archives")
 	}
 	day := s.w.stats.days(1)[0]
-	if day.Fetches != 4 || day.Senders != 1 || day.Downloads["dev.test.pkg 1.0.0"] != 1 || day.Views != 1 {
+	if day.Fetches != 4 || day.Clients["Go-http-client/2.0"] != 4 || day.Downloads["dev.test.pkg 1.0.0"] != 1 || day.Views != 1 {
 		t.Fatalf("counts: %+v", day.dayStats)
 	}
 	if b, _ := json.Marshal(s.w.stats.data); strings.Contains(string(b), "203.0.113") {

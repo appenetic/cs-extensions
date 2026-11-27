@@ -268,9 +268,8 @@ body.center { min-height: 100vh; min-height: 100dvh; display: flex; align-items:
 
 .ranks { list-style: none; margin: 0; padding: 0; }
 .ranks li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 6px 0; font-size: .92rem; }
-.rank-label { display: flex; gap: 6px; min-width: 0; }
+.rank-label { min-width: 0; }
 .rank-name { overflow-wrap: anywhere; }
-.flag { flex: none; }
 .rank-track { display: block; height: 10px; grid-column: 1 / -1; grid-row: 2; }
 .rank-bar { display: block; height: 10px; background: var(--viz-1); border-radius: 0 4px 4px 0; }
 .rank-value { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }

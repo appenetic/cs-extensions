@@ -34,25 +34,27 @@ steht nur noch eine Adresse, neue Quellen kommen über die Admin-Seite dazu.
 
 ## Statistik
 
-Unter Admin → Statistik:
-- wie viele Absender den Index pro Tag abrufen (ein Absender ist ungefähr ein Auto)
-- woher sie kommen (Land, Ort)
-- mit welcher Software sie abrufen
-- wie oft jedes Paket heruntergeladen wird
-- wie oft die öffentliche Seite aufgerufen wird
+Die Autos rufen den Feed nicht selbst ab. Index und Archive holt ein Server
+von CoilShift (Kennung `coilshift-repository-fetcher`) und verteilt sie an die
+Autos. Er schickt keine Kennung des Autos mit. Wie viele Autos das Sammel-Repo
+nutzen und wo sie sind, lässt sich also nicht messen.
 
-Gespeichert werden nur Tageszähler. Die IP-Adresse wird beim ersten Abruf des
-Tages im Speicher einem Ort zugeordnet und mit einem Tagesschlüssel gehasht,
-der um Mitternacht verfällt. Die Orte kommen aus „IP to City Lite“ von DB-IP
-(CC BY 4.0). Der Dienst lädt die Datenbank jeden Monat neu.
+Admin → Statistik zeigt deshalb nur, was sich messen lässt:
+- die Index-Abrufe pro Tag, aufgeteilt nach Software
+- die Archiv-Downloads je Paket (CoilShift lädt jedes Archiv meist nur einmal)
+- die Aufrufe der öffentlichen Seite
+
+Gespeichert werden nur Tageszähler. Besucher der öffentlichen Seite werden mit
+einem Tagesschlüssel gezählt, der um Mitternacht verfällt. Eine Adresse wird
+nie gespeichert.
 
 ## Betrieb
 
 - Server `root@159.69.252.1`, Dienst `cs-sammelrepo.service` (systemd,
   `DynamicUser`, lauscht nur auf `127.0.0.1:7356`).
   Protokoll: `journalctl -u cs-sammelrepo`.
-- Binary und Benutzerdatei liegen in `/srv/sammelrepo/`, Zustand, Pool,
-  Statistik und Geo-Datenbank in `/var/lib/cs-sammelrepo/`.
+- Binary und Benutzerdatei liegen in `/srv/sammelrepo/`, Zustand, Pool und
+  Statistik in `/var/lib/cs-sammelrepo/`.
   `indexe/` hält die letzten 30 veröffentlichten Indexe. Meldet das Auto
   `bad_index`, zeigt ein Diff gegen den letzten angenommenen Index, was sich
   geändert hat.
@@ -91,7 +93,6 @@ Nach einer Passwortänderung gelten alte Anmeldungen nicht mehr.
 
 ```
 go test ./...
-SAMMELREPO_GEO_DB=/pfad/dbip-city-lite.mmdb go test -run Geo -v ./...
 ```
 
 Nur Standardbibliothek, Go 1.25 oder neuer. Die Tests spielen Quellen mit

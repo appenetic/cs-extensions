@@ -63,7 +63,6 @@ func serve(args []string) {
 	users := fl.String("users", credential("benutzer", "/srv/sammelrepo/benutzer"), "Benutzerdatei")
 	public := fl.String("public", "", "öffentliche Adresse, z. B. https://cs.example.org")
 	interval := fl.Duration("interval", 5*time.Minute, "Abstand zwischen zwei Abrufen der Quellen")
-	geoOn := fl.Bool("geo", true, "Herkunft der Abrufe mit der DB-IP-Datenbank bestimmen")
 	_ = fl.Parse(args)
 
 	host, _, err := net.SplitHostPort(*listen)
@@ -93,9 +92,8 @@ func serve(args []string) {
 	if err := h.load(); err != nil {
 		log.Fatal(err)
 	}
-	g := &geo{dir: filepath.Join(*dir, "geo"), client: h.client, logf: log.Printf, now: time.Now}
-	st := newStats(*dir, g, log.Printf)
-	w, err := newWeb(h, a, st, g)
+	st := newStats(*dir, log.Printf)
+	w, err := newWeb(h, a, st)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,9 +101,6 @@ func serve(args []string) {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	go h.loop(ctx)
-	if *geoOn {
-		go g.keepFresh(ctx)
-	}
 	go func() {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()
