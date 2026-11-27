@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+<head>
+{{template "head"}}
+<title>{{.Name}}</title>
+<meta name="description" content="Ein CoilShift-Repository, das die Pakete mehrerer Repositories bündelt.">
+</head>
+<body class="public">
+<header class="topbar"><div class="wrap topbar-in">
+<a class="brand" href="/">{{icon}}<span>{{.Name}}</span></a>
+<nav class="tabs" aria-label="Bereiche"><a href="/admin">Admin</a></nav>
+</div></header>
+<main class="wrap">
+<section class="hero">
+<h1>{{.Name}}</h1>
+<p class="lede">Ein CoilShift-Repository, das die Pakete von {{len .Sources}} Repositories bündelt. Einmal im Auto eintragen, und die Updates aller Quellen kommen von hier.</p>
+<div class="feed-url"><code id="feed-url">{{.FeedURL}}</code><button type="button" class="btn" data-copy="feed-url">Kopieren</button></div>
+<p class="meta">In CoilShift unter Repositories hinzufügen · {{.Active}} Pakete · zuletzt geändert {{.Generated}}</p>
+</section>
+
+<section class="card">
+<div class="card-head"><h2>Zuletzt geändert</h2></div>
+<ol class="timeline">{{range .Events}}
+<li class="ev {{.Kind}}"><span class="ev-dot" aria-hidden="true"></span><time datetime="{{.ISO}}">{{.When}}</time><span class="ev-text"><strong>{{.Title}}</strong> {{.What}}{{with .Source}}<span class="src">{{.}}</span>{{end}}</span></li>{{else}}
+<li class="empty">Noch keine Änderungen.</li>{{end}}
+</ol>
+</section>
+
+<section class="card">
+<div class="card-head"><h2>Pakete</h2><span class="count">{{.Active}}</span></div>
+<div class="table-wrap"><table class="pkgs">
+<thead><tr><th scope="col">Paket</th><th scope="col">Version</th><th scope="col">Quelle</th><th scope="col">Geändert</th></tr></thead>
+<tbody>{{range .Packages}}<tr><td><strong>{{.Title}}</strong><code>{{.ID}}</code></td><td class="num" data-label="Version">{{.Version}}</td><td data-label="Quelle">{{.Source}}</td><td data-label="Geändert">{{.Changed}}</td></tr>
+{{else}}<tr><td colspan="4" class="empty">Noch keine Pakete.</td></tr>{{end}}</tbody>
+</table></div>
+{{if .Withdrawn}}<details class="withdrawn"><summary>Zurückgezogen ({{len .Withdrawn}})</summary>
+<ul class="plain">{{range .Withdrawn}}<li><strong>{{.Title}}</strong> {{.Version}} <span class="sub">{{.Status}}</span></li>{{end}}</ul>
+</details>{{end}}
+</section>
+
+<section class="card">
+<div class="card-head"><h2>Quellen</h2><span class="count">{{len .Sources}}</span></div>
+<ul class="plain sources-public">{{range .Sources}}<li><strong>{{.Name}}</strong><code class="url">{{.URL}}</code><span class="sub">{{.Count}} Pakete</span></li>{{else}}<li class="empty">Noch keine Quellen.</li>{{end}}</ul>
+</section>
+</main>
+<footer class="wrap foot">Die Pakete stammen unverändert aus ihren Quellen; das Sammel-Repo prüft Prüfsummen und hält jede Version vor, die im Feed steht.</footer>
+</body>
+</html>

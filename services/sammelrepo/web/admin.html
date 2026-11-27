@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+{{template "head"}}
+<title>Übersicht · Sammel-Repo</title>
+</head>
+<body{{if .Busy}} data-busy="1"{{end}}>
+{{template "adminbar" .}}
+<main class="wrap">
+{{with .Flash}}<p class="msg{{if $.FlashErr}} err{{end}}" role="{{if $.FlashErr}}alert{{else}}status{{end}}">{{.}}</p>{{end}}
+
+<section class="card">
+<div class="card-head"><h2>Adresse fürs Auto</h2></div>
+<div class="feed-url"><code id="feed-url">{{.FeedURL}}</code><button type="button" class="btn" data-copy="feed-url">Kopieren</button></div>
+<div class="row-between">
+<p class="meta">{{.Active}} Pakete im Feed{{if .Withdrawn}}, {{.Withdrawn}} zurückgezogen{{end}} · {{len .Sources}} Quellen · zuletzt geändert {{.Generated}}{{with .Next}} · nächster Abruf {{.}}{{end}}</p>
+<form method="post" action="/admin/aktualisieren"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn" type="submit">Jetzt abrufen</button></form>
+</div>
+</section>
+
+<section class="card" id="quellen">
+<div class="card-head"><h2>Quellen</h2><span class="count">{{len .Sources}}</span></div>
+<p class="hint">Steht ein Paket in mehreren Quellen, gilt die weiter oben. Eine entfernte Quelle lässt ihre Pakete als zurückgezogen im Feed: CoilShift lehnt einen Feed ab, aus dem ein Paket einfach verschwindet.</p>
+<ul class="sources">{{range .Sources}}
+<li class="source">
+<div class="source-main">
+<div class="source-title"><span class="state {{.State}}" aria-hidden="true"></span><strong>{{.Name}}</strong><span class="pill">{{.Count}} Pakete</span></div>
+<code class="url">{{.URL}}</code>
+<p class="meta" data-progress="{{.ID}}">{{.StateText}}</p>
+{{range .Notes}}<p class="note">{{.}}</p>{{end}}
+</div>
+<div class="source-actions">
+<form method="post" action="/admin/quellen/{{.ID}}/hoch"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="icon-btn" type="submit" aria-label="{{.Name}} nach oben"{{if .First}} disabled{{end}}>↑</button></form>
+<form method="post" action="/admin/quellen/{{.ID}}/runter"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="icon-btn" type="submit" aria-label="{{.Name}} nach unten"{{if .Last}} disabled{{end}}>↓</button></form>
+<form method="post" action="/admin/quellen/{{.ID}}/entfernen" data-confirm="{{.Name}} entfernen? Ihre Pakete bleiben als zurückgezogen im Feed."><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn quiet" type="submit">Entfernen</button></form>
+</div>
+</li>{{else}}
+<li class="empty">Noch keine Quelle eingetragen.</li>{{end}}
+</ul>
+<form class="add" method="post" action="/admin/quellen">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<label for="url">Repository hinzufügen</label>
+<div class="row"><input id="url" name="url" type="text" inputmode="url" placeholder="https://beispiel.github.io/feed" value="{{.AddValue}}" required autocomplete="off" autocapitalize="none" spellcheck="false"><button class="btn primary" type="submit">Hinzufügen</button></div>
+<p class="hint">Dieselbe Adresse, die du sonst im Auto eintragen würdest.</p>
+</form>
+</section>
+
+<section class="card">
+<div class="card-head"><h2>Pakete</h2><span class="count">{{.Active}}</span></div>
+<div class="table-wrap"><table class="pkgs">
+<thead><tr><th scope="col">Paket</th><th scope="col">Version</th><th scope="col">Quelle</th><th scope="col">Stand</th></tr></thead>
+<tbody>{{range .Packages}}<tr class="{{.Class}}"><td><strong>{{.Title}}</strong><code>{{.ID}}</code></td><td class="num" data-label="Version">{{.Version}}</td><td data-label="Quelle">{{.Source}}</td><td data-label="Stand"><span class="pill {{.Class}}">{{.Status}}</span><span class="sub">{{.Changed}}</span></td></tr>
+{{else}}<tr><td colspan="4" class="empty">Noch keine Pakete.</td></tr>{{end}}</tbody>
+</table></div>
+</section>
+
+<section class="card">
+<div class="card-head"><h2>Verlauf</h2></div>
+<ol class="log">{{range .Events}}<li class="ev {{.Kind}}"><time datetime="{{.ISO}}">{{.When}}</time><span>{{.Text}}</span></li>{{else}}<li class="empty">Noch nichts passiert.</li>{{end}}</ol>
+</section>
+
+<section class="card" id="name">
+<div class="card-head"><h2>Name im Auto</h2></div>
+<form class="add" method="post" action="/admin/name">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<label for="repo-name">So heißt das Repository in CoilShift</label>
+<div class="row"><input id="repo-name" name="name" type="text" value="{{.Name}}" maxlength="60" required><button class="btn" type="submit">Speichern</button></div>
+</form>
+</section>
+</main>
+<footer class="wrap foot">cs-sammelrepo {{.Version}}</footer>
+</body>
+</html>

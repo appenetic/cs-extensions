@@ -1,0 +1,38 @@
+
+# Sammel-Repo für CoilShift (cs.appenetic.de), eingerichtet am 27.11.2026: ein Paketfeed aus mehreren Repositories.
+# Dienst cs-sammelrepo auf 127.0.0.1:7356, Quelle: services/sammelrepo im Repo appenetic/cs-extensions.
+# Feed, Archive und Startseite sind öffentlich (CoilShift holt sie ohne Anmeldung), /admin meldet der Dienst selbst an.
+# A und AAAA für cs.appenetic.de liegen bei INWX.
+cs.appenetic.de {
+	tls {
+		issuer acme {
+			disable_http_challenge
+		}
+	}
+	header {
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	# Nur Seiten und Index komprimieren, die Archive gehen Byte für Byte raus.
+	@text path / /index.json /admin /admin/* /static/*
+	encode @text zstd gzip
+	# X-Echte-IP setzt nur Caddy, damit zählt die Statistik die Herkunft; eine mitgeschickte Kopfzeile wird überschrieben.
+	reverse_proxy 127.0.0.1:7356 {
+		header_up X-Echte-IP {remote_host}
+	}
+	# Zugriffsprotokoll wie bei den anderen Seiten, IP-Adressen gekürzt (IPv4 /24, IPv6 /48).
+	log {
+		output file /data/logs/sammelrepo.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+		format filter {
+			wrap json
+			request>remote_ip ip_mask 24 48
+			request>client_ip ip_mask 24 48
+		}
+	}
+}

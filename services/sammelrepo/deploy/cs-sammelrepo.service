@@ -1,0 +1,44 @@
+[Unit]
+Description=Sammel-Repo für CoilShift (cs.appenetic.de): ein Paketfeed aus mehreren Repositories
+Documentation=https://github.com/appenetic/cs-extensions/tree/main/services/sammelrepo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/srv/sammelrepo/cs-sammelrepo serve --public https://cs.appenetic.de
+Restart=always
+RestartSec=2
+DynamicUser=yes
+# Benutzer mit Passwort-Hash. Ändern: /srv/sammelrepo/cs-sammelrepo passwort NAME, dann systemctl restart cs-sammelrepo
+LoadCredential=benutzer:/srv/sammelrepo/benutzer
+# Zustand, gespiegelte Archive, Statistik und Geo-Datenbank liegen in /var/lib/cs-sammelrepo
+StateDirectory=cs-sammelrepo
+StateDirectoryMode=0700
+UMask=0077
+# Holt die Quellen aus dem Internet, lauscht selbst aber nur auf 127.0.0.1:7356 (davor Caddy)
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+MemoryMax=768M
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de">
+<head>
+{{template "head"}}
+<title>Anmelden · Sammel-Repo</title>
+</head>
+<body class="center">
+<main class="login">
+<form class="card" method="post" action="/admin/anmelden">
+<p class="brand">{{icon}}<span>Sammel-Repo</span></p>
+<h1>Anmelden</h1>
+{{with .Msg}}<p class="msg{{if $.Err}} err{{end}}" role="{{if $.Err}}alert{{else}}status{{end}}">{{.}}</p>{{end}}
+<label for="benutzer">Benutzername</label>
+<input type="text" id="benutzer" name="benutzer" value="{{.User}}" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="64" required{{if not .User}} autofocus{{end}}>
+<label for="passwort">Passwort</label>
+<input type="password" id="passwort" name="passwort" autocomplete="current-password" maxlength="256" required{{if .User}} autofocus{{end}}>
+<label class="check"><input type="checkbox" name="bleiben" value="1"{{if .Keep}} checked{{end}}> Angemeldet bleiben (30 Tage)</label>
+<button class="btn primary wide" type="submit">Anmelden</button>
+</form>
+<p class="foot"><a href="/">Zur öffentlichen Seite</a></p>
+</main>
+</body>
+</html>
